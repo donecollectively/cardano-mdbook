@@ -68,16 +68,9 @@ enum Datum {
                 };
 
                 goodTypes = Map[String]Bool{
-                    "person":true, 
-                    "skill": true, 
-                    "experience": true, 
-                    "training cert": true, 
-                    "aptitude": true,
-                     "other": true
-                };
-                goodPlatforms = Map[String]Bool{
-                    "ATALA Prism":true, 
-                     "other": true
+                    "pg":true, //page
+                    "spg": true,  // suggested page
+                    "chg": true,  // suggested change
                 };
                 assert(goodTypes.get_safe(cred.credType).switch{
                     None => error("invalid credType"),

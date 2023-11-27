@@ -82,7 +82,7 @@ enum MintDelegateActivity {
                 //! 1. allows minting BookPage records (bkpg- uut + optional suggAuthz uut [required when the record is a suggestion] )
                 //! 1a. creating a (non-suggestion, type=pg) BookPage requires charter authority
                 //! 1b. creating a Suggested Page (type=spg) requires a collaborator token
-                //! 1c. creating a Suggested Change (type=ssg) requires a collaborator token
+                //! 1c. creating a Suggested Change (type=chg) requires a collaborator token
                 //! 2. Allows minting collaborator tokens, by authority of the charter token
                 //! 2a. collaborator token is sent to a provided address
                 //! 3a. createdAt has to match "now"
@@ -123,6 +123,7 @@ enum MintDelegateActivity {
                         purposes : []String = []String::from_data(fields.get(2));
 
                         // 1. ✅ a BookPage & its authority delegate can be minted
+                        // !!! more options to honor suggested-page and suggested-change scenarios
                             purposes.length == 2 &&
                             purposes.get(0) == regCredPurpose &&
                             purposes.get(1) == credAuthzPurpose;
