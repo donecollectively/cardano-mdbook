@@ -393,115 +393,105 @@ export class CCRegistry extends DefaultCapo {
 
     requirements() {
         return hasReqts({
-            "people can post credentials to be listed in the creds Registry": {
-                purpose:
-                    "testnet: create a project-based learning zone for credentials and a useful creds registry",
+            "the book's operator can create pages in the book": {
+                purpose: "clear authority for now, extensibility for later",
                 details: [
-                    "People can post credentials into the registry ",
-                    "  ... to share information about the credentials they have ",
-                    "  ... or that they would like to offer.",
-                    "Provides directory of verifiable credentials and their issuers ",
-                    "  ... for use by Web 3 communities in Cardano and beyond.",
-                    "People can use the directory to understand what credentials mean",
-                    "  ... and how to acquire and verify them",
-                    "The registry is operated by people who can exercise oversight authority over the registry",
+                    "The book's authority token is issued to a wallet for now,",
+                    "  ... and later, can be decentralized further",
                 ],
-                mech: ["per nested requirements"],
+                mech: [
+                    "The holder of the book authority token can directly create book pages",
+                ],
                 requires: [
-                    "allows anyone to post information about a credential, for listing in the registry",
-                    "creates validated credential listings",
-                    "enforces an automatic expiration for every listing",
-                    "issues a linked authority token for the creator's wallet",
-                    "a listing can be freshened by the holder of the linked authority token",
+                    "page expiration"
+                ],
+            },
+
+            "collaborators can suggest pages to be added in the book": {
+                purpose: "testnet: enable collaboration for invitees",
+                details: [
+                    "People can post page suggestions into the book once they have a collaborator token",
+                    "Each book is operated by people who can exercise oversight authority over their books",
+                ],
+                mech: [
+                    "creates page records with type='spg' for suggested",
+                    "the suggestor's collaborator token is referenced in the suggestedBy field",
+                    "the suggestor can make changes to the page before it is accepted",
+                ],
+                requires: [
+                    "contributor tokens can be minted by the book's operator",
+                    "page expiration",
                     "the registry's trustee group can govern listed credentials",
                 ],
             },
-            "allows anyone to post information about a credential, for listing in the registry":
-                {
-                    purpose: "Enables openness",
-                    details: [
-                        "People are expected to use a web UI for filling out details.",
-                        "The UI code should mkTxnCreatingRegisteredCredential() with the details.",
-                        "The Create transaction makes an identifiable UTxO in the contract for the listing, ",
-                        "  ... and sends an NFT-like token to the user's wallet for positive linkage with the listing.",
-                    ],
-                    mech: [
-                        "The person who posts the credential is the default trustee for that credential's policy-delegate",
-                        "Creates a RegisteredCredential datum in the contract, with a rcred-xxxxx UUT",
-                    ],
-                    requires: [
-                        "creates validated credential listings",
-                        "issues a linked authority token for the creator's wallet",
-                    ],
-                },
-
-            "creates validated credential listings": {
+            "contributor tokens can be minted by the book's operator": {
                 purpose:
-                    "Provides baseline assurance of having key details for a listing",
+                    "creates positive control for who can be a contributor",
                 details: [
-                    "Required fields must be filled, for a listing to be valid",
-                    "Other validations may also be enforced",
-                    "Validation problems in mkTxnCreatingRegistryEntry() should be made visible to the UI layer",
-                    "It should be possible for people to experiment with credential listings even if they do not yet have an issuing service or dID",
+                    "The book's operations staff can approve the minting of collaborator tokens.",
+                    "These tokens give the holder permission to suggest new pages or changes to existing pages",
                 ],
                 mech: [
-                    "type, name, issuer name, and description are required as essential information about the credential",
-                    "at least one Expectation for the subject of a credential must be specified",
-                    "other fields are optional, to support experimentation",
+                    "the charter-authority token is required for minting collaborator tokens",
+                    "the collaborator token can be sent directly to the collaborator",
                 ],
-                requires: [],
             },
-
-            "issues a linked authority token for the creator's wallet": {
-                purpose:
-                    "to enable a person to easily connect in the future with their listings",
+            "the book's operator can adopt proposed changes to the book": {
+                purpose: "",
                 details: [
-                    "Each created listing also issues an NFT-like token, sent to the creator's wallet",
-                    "The minted metadata can contain or reference HTML/Javascript to show in-wallet details",
-                    "That token can be re-minted later, to update its metadata as needed",
-                    "Additional mints of the same token can be issued to other trustees on that listing,",
-                    "  ... or for interested people to use like a bookmark for that listing",
+                    "When suggestions have been made, the book's operator retains authority for adopting the suggestions.",
                 ],
                 mech: [
-                    "uses a token name 'link:regCred-xyz' linked to each regCred-xyz record",
-                    "requires the linked authority token for updating a regCred entry",
-                ],
-                requires: [],
-            },
-
-            "enforces an automatic expiration for every listing": {
-                purpose:
-                    "provides a dead-man-switch convention to ensure freshness of displayed listings",
-                details: [
-                    "Issuing parties must freshen their credential listings periodically",
-                    "  ... to guard against obsolete registry listings.",
-                    "At that time, they may choose to freshen certain details of their listings also.",
-                ],
-                mech: [
-                    "TEMP: expiration is 1 year",
-                    "TODO: initial expiration is 90 days, and may not be modified by the creator",
-                    "TODO: after 2/3 of the validity period, the validity can be extended by 1.6x, max 1y",
-                    "queries for active listings SHOULD filter out past-expiry records",
+                    "When a suggestion is accepted, its uut is burned, with its minUtxo sent to its originator",
                 ],
                 requires: [
-                    "a listing can be freshened by the holder of the linked authority token",
+                    "The workflow guards against change conflict"
+                ]
+            },            
+
+            "page expiration": {
+                purpose: "for proactive freshness even in the face of immutable content",
+                details: [
+                    "Book pages expire by default, and can be freshened as long as they remain relevant.",
+                    "This way, obsolete content is naturally hidden, ",
+                    "  ... while remaining available for review/update/freshening"
+                ],
+                mech: [
+                    "expired pages are hidden by default",
+                    "expired pages can be freshened by the book's operator, with or without content changes",
+                    "FUT: expired pages can be freshened implicitly by a collaborator suggesting a fresh change that resolves any obsolescense",
                 ],
             },
 
-            "a listing can be revoked": {
-                purpose:
-                    "for proactive assurance of freshness and quality of the listing and the registry overall",
+            "The workflow guards against change conflict": {
+                purpose: "So that people can easily avoid merging suggestions that have become obsolete",
                 details: [
-                    "The registry's operator(s) and a listing's owner can revoke a listing.",
-                    "A revoked listing MUST NOT be considered an active item in the registry.",
+                    "On-chain logic can't be expected to validate diffs.  ",
+                    "However, the application layer can validate that diffs can be applied cleanly.",
+                    "And, it can require the person who merges a conflicting change to review the results."
                 ],
                 mech: [
-                    "A revocation is allowed by authority of the regCred's linked authority token",
-                    "A revocation is allowed by authority of the registry's operators",
+                    "A diff that conflicts can't be merged until it is updated to apply cleanly",
+                    "A diff that applies cleanly can be merged with no extra confirmation",
+                    "Two diffs, applied in a different areas of a page, can both be merged without extra confirmation"
                 ],
                 requires: [
-                    "the registry's trustee group can govern listed credentials",
-                    "issues a linked authority token for the creator's wallet",
+
+                ],
+            },
+
+            "page deletion": {
+                purpose:
+                    "for proactive assurance of freshness and quality of each page and the book overall",
+                details: [
+                    "The book's operator can revoke a listing.",
+                    "A revoked listing MUST NOT be considered an active page in the book.",
+                ],
+                mech: [
+                    "A deletion is allowed for the holder of govAuthority token",
+                ],
+                requires: [
+                    // "FUT: A virtual deletion can be developed by momentum of collaborators"
                 ],
             },
 
