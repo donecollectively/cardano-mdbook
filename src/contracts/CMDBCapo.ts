@@ -31,12 +31,12 @@ import specializedCapo from "./specializedCMDBCapo.hl"; // assert { type: 'text'
 
 import { CMDBMintDelegate } from "./CMDBMintDelegate.js";
 
-export type RegisteredCredentialOnchain = {
+export type BookEntryOnchain = {
     credAuthority: RelativeDelegateLink<AuthorityPolicy>;
-    cred: RegisteredCredential;
+    cred: BookEntry;
 };
 
-export type RegisteredCredential = {
+export type BookEntry = {
     credType: string;
     credName: string;
     credDesc: string;
@@ -51,19 +51,19 @@ export type RegisteredCredential = {
     issuanceUrl: string;
 };
 
-type credId = RegisteredCredentialOnchain["credAuthority"]["uutName"];
-export type RegisteredCredentialCreate = RegisteredCredentialOnchain & {
+type credId = BookEntryOnchain["credAuthority"]["uutName"];
+export type BookEntryCreate = BookEntryOnchain & {
     id: credId;
 };
 
-export type RegisteredCredentialForUpdate = RegisteredCredentialOnchain & {
+export type BookEntryForUpdate = BookEntryOnchain & {
     id: credId;
     utxo: TxInput;
-    updated?: RegisteredCredential;
+    updated?: BookEntry;
 };
 export type RegisteredCredentialUpdated = {
-    updated: RegisteredCredential;
-} & RegisteredCredentialForUpdate;
+    updated: BookEntry;
+} & BookEntryForUpdate;
 
 export class CMDBCapo extends DefaultCapo {
     get specializedCapo() {
@@ -87,7 +87,7 @@ export class CMDBCapo extends DefaultCapo {
 
     @datum
     mkDatumRegisteredCredential<
-        T extends RegisteredCredentialCreate | RegisteredCredentialUpdated
+        T extends BookEntryCreate | RegisteredCredentialUpdated
     >(d: T): InlineDatum {
         //!!! todo: make it possible to type these datum helpers more strongly
         //  ... at the interface to Helios
@@ -98,7 +98,7 @@ export class CMDBCapo extends DefaultCapo {
 
         //@ts-expect-error can't seem to tell the the Updated alternative actually does have this attribut,
         //    ... just because the Create alternative does not...
-        const rec = d.updated || (d.cred as RegisteredCredential);
+        const rec = d.updated || (d.cred as BookEntry);
 
         //@ts-expect-error
         if (d.updated) {
@@ -182,7 +182,7 @@ export class CMDBCapo extends DefaultCapo {
      **/
     @txn
     async mkTxnCreatingRegistryEntry<TCX extends StellarTxnContext<any>>(
-        cred: RegisteredCredential,
+        cred: BookEntry,
         iTcx?: TCX
     ): Promise<TCX> {
         // to make a new cred entry, we must:
@@ -246,7 +246,7 @@ export class CMDBCapo extends DefaultCapo {
     @partialTxn
     txnReceiveRegistryEntry<TCX extends StellarTxnContext<any>>(
         tcx: TCX,
-        cred: RegisteredCredentialForUpdate | RegisteredCredentialCreate
+        cred: BookEntryForUpdate | BookEntryCreate
     ): TCX {
         debugger;
         const credMinValue = this.mkMinTv(this.mph, cred.id);
@@ -307,13 +307,13 @@ export class CMDBCapo extends DefaultCapo {
      **/
     async readRegistryEntry(
         utxo: TxInput
-    ): Promise<RegisteredCredentialForUpdate | undefined> {
+    ): Promise<BookEntryForUpdate | undefined> {
         const a = utxo.value.assets.getTokenNames(this.mph);
         const credId = a
             .map((x) => helios.bytesToText(x.bytes))
             .find((x) => x.startsWith("regCred"));
 
-        const result = await this.readDatum<RegisteredCredentialOnchain>(
+        const result = await this.readDatum<BookEntryOnchain>(
             "RegisteredCredential",
             utxo.origOutput.datum as InlineDatum
         );
@@ -337,13 +337,13 @@ export class CMDBCapo extends DefaultCapo {
      * @public
      **/
     async getCredEntryDelegate(
-        cred: RegisteredCredentialOnchain
+        cred: BookEntryOnchain
     ): Promise<AuthorityPolicy>;
     async getCredEntryDelegate(credId: string): Promise<AuthorityPolicy>;
     async getCredEntryDelegate(
-        credOrId: string | RegisteredCredentialOnchain
+        credOrId: string | BookEntryOnchain
     ): Promise<AuthorityPolicy> {
-        const cred: RegisteredCredentialOnchain =
+        const cred: BookEntryOnchain =
             "string" == typeof credOrId
                 ? await this.findRegistryEntry(credOrId)
                 : credOrId;

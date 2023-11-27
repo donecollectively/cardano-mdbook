@@ -37,12 +37,12 @@ import {
 } from "@donecollectively/stellar-contracts";
 import {
     CMDBCapo,
-    RegisteredCredentialForUpdate,
-    RegisteredCredentialOnchain,
+    BookEntryForUpdate as BookEntryForUpdate,
+    BookEntryOnchain,
 } from "../../contracts/CMDBCapo.js";
-import { CredForm } from "../../local-comps/book/PageEditor.jsx";
+import { PageEditor } from "../../local-comps/book/PageEditor.jsx";
 import { CredsList } from "../../local-comps/book/BookPages.jsx";
-import { CredView } from "../../local-comps/book/PageView.js";
+import { PageView } from "../../local-comps/book/PageView.js";
 import { Button } from "../../components/Button.js";
 import { ClientSideOnly } from "../../components/ClientSideOnly.js";
 import { inPortal } from "../../inPortal.js";
@@ -66,7 +66,7 @@ export type PageStatus = {
 };
 
 type stateType = PageStatus & {
-    credsRegistry?: CMDBCapo;
+    bookContract?: CMDBCapo;
     networkParams?: NetParams;
     progResult?: string;
     selectedWallet?: string;
@@ -78,8 +78,8 @@ type stateType = PageStatus & {
     showDetail?: string;
     tcx?: StellarTxnContext<any>;
 
-    allCreds?: RegisteredCredentialForUpdate[];
-    credsIndex?: { [k: string]: RegisteredCredentialForUpdate };
+    bookDetails?: BookEntryForUpdate[];
+    bookRecordIndex?: { [k: string]: BookEntryForUpdate };
 
     nextAction?: keyof typeof actionLabels;
     moreInstructions?: string;
@@ -197,8 +197,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     render() {
         let {
             tcx,
-            credsRegistry,
-            allCreds,
+            bookContract,
+            bookDetails,
             wallet,
             progressBar,
             walletUtxos,
@@ -293,14 +293,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 )) ||
             "";
 
-        if (!allCreds) {
+        if (!bookDetails) {
             results = inPortal("topCenter", loading);
         } else if ("create" == route) {
             if (wallet) {
                 results = (
-                    <CredForm
+                    <PageEditor
                         {...{
-                            credsRegistry,
+                            bookContract,
                             wallet,
                             walletHelper,
                             walletUtxos,
@@ -319,17 +319,17 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         } else if ("edit" == route) {
             if (wallet) {
                 const { updateState } = this;
-                const editing = this.state.credsIndex[id];
+                const editing = this.state.bookRecordIndex[id];
                 results = (
-                    <CredForm
+                    <PageEditor
                         {...{
-                            credsRegistry,
+                            bookContract,
                             wallet,
                             updateState,
                             refresh: this.fetchRegistryEntries,
                             router,
                         }}
-                        cred={editing}
+                        entry={editing}
                         onSave={this.saved}
                         onClose={this.closeForm}
                     />
@@ -340,17 +340,17 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             }
         } else if ("view" == route) {
             // status = "";
-            const cred = this.state.credsIndex[id];
+            const cred = this.state.bookRecordIndex[id];
             results = (
-                <CredView {...{ cred, wallet, walletUtxos, credsRegistry }} />
+                <PageView {...{ cred, wallet, walletUtxos, bookContract }} />
             );
         } else {
             results = (
                 <CredsList
                     {...{
-                        allCreds,
-                        createCredential: this.createCredential,
-                        credsRegistry,
+                        bookDetails: bookDetails,
+                        createBookEntry: this.createCredential,
+                        bookContract,
                         credsStatus: status,
                         editCredId: this.editCredential,
                         // refreshCreds
@@ -388,7 +388,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     doAction(action) {
         const actions = {
             initializeRegistry: this.bootstrapRegistry,
-            retryRegistry: this.connectCredsRegistry,
+            retryRegistry: this.connectBookContract,
         };
         const thisAction = actions[action];
         thisAction.call(this);
@@ -464,7 +464,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             },
             "//component did mount"
         );
-        this.connectCredsRegistry();
+        this.connectBookContract();
     }
 
     _unmounted?: true;
@@ -538,11 +538,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         walletHelper.getUtxos().then((walletUtxos) => {
             this.updateState(undefined, { walletUtxos });
         });
-        return this.connectCredsRegistry(autoNext);
+        return this.connectBookContract(autoNext);
     }
 
     // -- step 3 - check if the creds registry is ready for use
-    async connectCredsRegistry(autoNext = true) {
+    async connectBookContract(autoNext = true) {
         const [route] = this.currentRoute;
         if ("create" == route || "edit" == route) {
             await this.connectWallet();
@@ -565,13 +565,13 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             ...config,
         };
         try {
-            const credsRegistry = new CMDBCapo(cfg);
-            const isConfigured = await credsRegistry.isConfigured;
+            const bookContract = new CMDBCapo(cfg);
+            const isConfigured = await bookContract.isConfigured;
             if (!isConfigured) {
                 // alert("not configured");
                 await this.updateState(
                     `Creds Registry contract isn't yet created or configured.  Add a configuration if you have it, or create the registry now.`,
-                    { credsRegistry, nextAction: "initializeRegistry" }
+                    { bookContract, nextAction: "initializeRegistry" }
                 );
                 return;
                 // return this.stellarSetup();
@@ -579,14 +579,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             if (!autoNext)
                 return this.updateState(
                     "",
-                    { credsRegistry },
+                    { bookContract: bookContract },
                     "//creds registry connected to wallet, ready to do an on-chain activity"
                 );
 
             await this.updateState(
                 "... searching ...",
                 {
-                    credsRegistry,
+                    bookContract,
                 },
                 "//searching (or freshening search after wallet connection)"
             );
@@ -609,14 +609,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             { progressBar: true }
         );
 
-        const { credsRegistry, wallet } = this.state;
+        const { bookContract, wallet } = this.state;
         let tcx: Awaited<
-            ReturnType<stateType["credsRegistry"]["mkTxnMintCharterToken"]>
+            ReturnType<stateType["bookContract"]["mkTxnMintCharterToken"]>
         >;
         try {
             const addresses = await wallet.usedAddresses;
 
-            tcx = await credsRegistry.mkTxnMintCharterToken({
+            tcx = await bookContract.mkTxnMintCharterToken({
                 govAuthorityLink: {
                     strategyName: "address",
                     config: {
@@ -645,7 +645,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             }
         );
         try {
-            await credsRegistry.submit(tcx);
+            await bookContract.submit(tcx);
             await this.updateState(
                 `Registry creation submitted.  Deploy the following details...`,
                 {
@@ -666,7 +666,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         } catch (e) {
             console.error(e);
             this.updateState(`wallet reported "${e.message}"`, {
-                credsRegistry: undefined,
+                bookContract: undefined,
                 error: true,
                 nextAction: "retryRegistry",
             });
@@ -683,17 +683,17 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
     //  -- step 4: Read registry entries from chain
     async fetchRegistryEntries() {
-        const { credsRegistry } = this.state;
+        const { bookContract } = this.state;
 
-        const found = await this.bf.getUtxos(credsRegistry.address);
-        const { mph } = credsRegistry;
+        const found = await this.bf.getUtxos(bookContract.address);
+        const { mph } = bookContract;
 
-        const allCreds: RegisteredCredentialForUpdate[] = [];
+        const allCreds: BookEntryForUpdate[] = [];
         const credsIndex = {};
         const waiting: Promise<any>[] = [];
         for (const utxo of found) {
             waiting.push(
-                credsRegistry.readRegistryEntry(utxo).then((cred) => {
+                bookContract.readRegistryEntry(utxo).then((cred) => {
                     if (!cred) return;
                     allCreds.push(cred);
                     credsIndex[cred.id] = cred;
@@ -701,7 +701,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             );
         }
         await Promise.all(waiting);
-        this.updateState("", { allCreds, credsIndex });
+        this.updateState("", { bookDetails: allCreds, bookRecordIndex: credsIndex });
     }
 
     /**

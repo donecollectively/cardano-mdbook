@@ -8,10 +8,10 @@ import React, { useState } from "react";
 // import { createPortal } from "react-dom";
 // import { Prose } from "@/components/Prose.jsx";
 // import { useLiveQuery } from "dexie-react-hooks";
-import { RegisteredCredentialOnchain, RegisteredCredentialForUpdate } from "../../contracts/CMDBCapo.js";
+import { BookEntryOnchain, BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
 import { helios } from "@donecollectively/stellar-contracts";
 import { Markdoc } from "../../components/Markdoc.jsx";
-import { credRegistryProps } from "./sharedPropTypes.js";
+import { BookManagementProps } from "./sharedPropTypes.js";
 import { Button } from "../../components/Button.jsx";
 
 import link from "next/link.js";
@@ -21,16 +21,16 @@ const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hWallet = typeof Cip30Wallet.prototype;
 
 type propsType = {
-    cred: RegisteredCredentialForUpdate;
+    cred: BookEntryForUpdate;
     wallet?: hWallet;
     preview? : true
-} & credRegistryProps
+} & BookManagementProps
 
 type stateType = {
     rendered: boolean
 }
 
-export class CredView extends React.Component<propsType, stateType> {
+export class PageView extends React.Component<propsType, stateType> {
     render() {
         const {rendered} = this.state || {}
         if (!rendered) setTimeout(() => this.setState({rendered:true}), 10);
@@ -39,7 +39,6 @@ export class CredView extends React.Component<propsType, stateType> {
             cred: { cred: page },
             wallet,
             preview,
-            credsRegistry,
         } = this.props;
 
         // const tt =  new Address("addr1qx6p9k4rq077r7q4jdkv7xfz639tts6jzxsr3fatqxdp2y9w9cdd2uueqwnv0cw9gne02c0mzrvfsrk884lry7kpka8shpy5qw")
@@ -68,10 +67,10 @@ export class CredView extends React.Component<propsType, stateType> {
     }
 
     possibleEditButton() {
-        const {walletUtxos, credsRegistry, cred} = this.props;
+        const {walletUtxos, bookContract, cred} = this.props;
         if (!walletUtxos) return "...loading wallet utxos..."; // undefined
-        // const delegateToken = credsRegistry.tvForDelegate(cred.credAuthority)
-        const tokenPredicate = credsRegistry.mkDelegatePredicate(cred.credAuthority)
+
+        const tokenPredicate = bookContract.mkDelegatePredicate(cred.credAuthority)
         const foundToken = walletUtxos.find(tokenPredicate)
         if (!foundToken) return "no tokens" //undefined
 

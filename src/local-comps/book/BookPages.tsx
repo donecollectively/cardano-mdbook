@@ -1,20 +1,20 @@
 import React from "react";
 import {
     CMDBCapo,
-    RegisteredCredentialForUpdate,
-    RegisteredCredentialOnchain,
+    BookEntryForUpdate,
+    BookEntryOnchain,
 } from "../../contracts/CMDBCapo.js";
 import { Prose } from "../../components/Prose.jsx";
 import link from "next/link.js";
 const Link = link.default;
 
 type paramsType = {
-    credsRegistry: CMDBCapo;
-    allCreds: RegisteredCredentialForUpdate[];
+    bookContract: CMDBCapo;
+    bookDetails: BookEntryForUpdate[];
     // refreshCreds: Function;
     credsStatus: string;
     editCredId: Function;
-    createCredential: Function;
+    createBookEntry: Function;
 };
 type stateType = {};
 
@@ -24,14 +24,12 @@ export class CredsList extends React.Component<paramsType, stateType> {
         super(props);
     }
     render() {
-        const {allCreds} = this.props
-        return this.renderResultsTable(allCreds);
+        const { bookDetails: bookDetails } = this.props;
+        return this.renderResultsTable(bookDetails);
     }
 
-    renderResultsTable(filteredCreds: RegisteredCredentialForUpdate[]) {
-        const {
-            createCredential
-        } = this.props
+    renderResultsTable(filteredBookDetails: BookEntryForUpdate[]) {
+        const { createBookEntry: createCredential } = this.props;
         return (
             <Prose className="">
                 <table>
@@ -43,7 +41,6 @@ export class CredsList extends React.Component<paramsType, stateType> {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredCreds.map(
                             ({
                                 id, cred
                             }) => (
@@ -58,7 +55,8 @@ export class CredsList extends React.Component<paramsType, stateType> {
                                 </tr>
                             )
                         )}
-                        {!filteredCreds.length && (
+                        {filteredBookDetails.map(({ id, cred }) => (
+                        {!filteredBookDetails.length && (
                             <tr>
                                 <td colSpan={4} style={{ textAlign: "center" }}>
                                     No credentials are registered yet
@@ -85,8 +83,8 @@ export class CredsList extends React.Component<paramsType, stateType> {
                                 </button>
                             </td>
                             <td colSpan={2} style={{ textAlign: "right" }}>
-                                {(filteredCreds.length || "") && (
-                                    <>{filteredCreds.length} credentials</>
+                                {(filteredBookDetails.length || "") && (
+                                    <>{filteredBookDetails.length} topics  !!! todo: filter for top-level topics / topic-count</>
                                 )}
                             </td>
                         </tr>
@@ -97,8 +95,6 @@ export class CredsList extends React.Component<paramsType, stateType> {
     }
 
     create = () => {
-        debugger
-        this.props.createCredential()
-    }
-
+        this.props.createBookEntry();
+    };
 }

@@ -7,30 +7,30 @@ import React, {
 import { createPortal } from "react-dom";
 import {
     CMDBCapo,
-    RegisteredCredential,
-    RegisteredCredentialOnchain,
-    RegisteredCredentialForUpdate,
+    BookEntry,
+    BookEntryOnchain,
+    BookEntryForUpdate,
 } from "../../contracts/CMDBCapo.js";
 import { Prose } from "../../components/Prose.jsx";
 import head from "next/head.js";
 const Head = head.default;
 
 import { TxOutput, Wallet, dumpAny } from "@donecollectively/stellar-contracts";
-import { credRegistryProps } from "./sharedPropTypes.js";
+import { BookManagementProps } from "./sharedPropTypes.js";
 import { BookHomePage } from "../../pages/book/[...args].jsx";
 import { NextRouter } from "next/router.js";
 import { PageView } from "./PageView.jsx";
 
 type stateUpdaterFunc = BookHomePage["updateState"];
 type propsType = {
-    cred?: RegisteredCredentialForUpdate;
+    entry?: BookEntryForUpdate;
     create?: boolean;
     updateState: stateUpdaterFunc;
     refresh: Function;
     router: NextRouter;
     onSave: Function;
     onClose: Function;
-} & credRegistryProps;
+} & BookManagementProps;
 
 type stateType = {
     modified: boolean;
@@ -38,11 +38,11 @@ type stateType = {
     error?: string;
     submitting?: boolean;
     problems: Record<string, string>;
-    current: RegisteredCredential;
+    current: BookEntry;
 };
 
 type FieldProps = {
-    rec: RegisteredCredential;
+    rec: BookEntry;
     fn: string;
     as?: React.ElementType;
     rows?: number;
@@ -107,7 +107,7 @@ type fieldOptions =
 
 let mountCount = 0;
 
-export class CredForm extends React.Component<propsType, stateType> {
+export class PageEditor extends React.Component<propsType, stateType> {
     form = createRef<HTMLFormElement>();
     i: number;
     constructor(props) {
@@ -118,14 +118,14 @@ export class CredForm extends React.Component<propsType, stateType> {
     }
 
     async componentDidMount() {
-        const { cred, credsRegistry } = this.props;
+        const { entry: cred, bookContract: bookContract } = this.props;
         // console.error(`MOUNTED CredForm ${this.i}`)
         const current =
             cred?.cred ||
             ({
                 ...testCredInfo,
                 // expectations: ["", ""],
-            } as RegisteredCredential);
+            } as BookEntry);
         await new Promise((res) => {
             this.setState(
                 {
@@ -140,11 +140,7 @@ export class CredForm extends React.Component<propsType, stateType> {
         let tcx: any;
         try {
             const env = process.env.NODE_ENV;
-            const minter = await credsRegistry.getMintDelegate();
-            // tcx = await credsRegistry.mkTxnCreatingRegistryEntry(testCredInfo);
-            // console.warn(dumpAny(tcx));
-
-            // await credsRegistry.submit(tcx);
+            const minter = await bookContract.getMintDelegate();
         } catch (error) {
             console.error(error.stack);
             debugger;
@@ -165,7 +161,7 @@ export class CredForm extends React.Component<propsType, stateType> {
             submitting,
             problems,
         } = this.state || {};
-        const { cred, create, onClose, onSave, credsRegistry } = this.props;
+        const { entry: cred, create, onClose, onSave, bookContract } = this.props;
         if (!rec) return ""; //wait for didMount
         const showTitle = <>{create && "Creating"} Credential Listing</>;
         let sidebarContent;
@@ -348,10 +344,10 @@ export class CredForm extends React.Component<propsType, stateType> {
                                 Preview
                             </h3>
                             <hr className="not-prose mb-2" />
-                            <CredView
+                            <PageView
                                 {...{
                                     cred: { ...cred, cred: rec },
-                                    credsRegistry,
+                                    bookContract,
                                 }}
                                 preview
                             />
@@ -468,7 +464,7 @@ export class CredForm extends React.Component<propsType, stateType> {
     }
 
     validators: Record<string, ChangeHandler> = {};
-    mkChangeValidator(fieldId: string, validate: Function, rec : RegisteredCredential, index? : number): ChangeHandler {
+    mkChangeValidator(fieldId: string, validate: Function, rec : BookEntry, index? : number): ChangeHandler {
         const v = this.validators[fieldId];
         if (v) return v;
         const changedWithValidation: ChangeHandler = (e) => {
@@ -515,9 +511,9 @@ export class CredForm extends React.Component<propsType, stateType> {
     };
     capture(form) {
         const formData = new FormData(form);
-        const updatedCred: RegisteredCredential = Object.fromEntries(
+        const updatedCred: BookEntry = Object.fromEntries(
             formData.entries()
-        ) as unknown as RegisteredCredential;
+        ) as unknown as BookEntry;
         const exp = formData.getAll("expectations") as string[];
 
         updatedCred.expectations = exp;
@@ -527,10 +523,10 @@ export class CredForm extends React.Component<propsType, stateType> {
     async save(e: React.SyntheticEvent) {
         const { current: rec } = this.state;
         const {
-            cred: credForUpdate,
+            entry: credForUpdate,
             refresh,
             updateState,
-            credsRegistry,
+            bookContract,
             router,
             create,
             wallet,
@@ -554,8 +550,8 @@ export class CredForm extends React.Component<propsType, stateType> {
             const txnDescription = `${create ? "creation" : "update"} txn`;
             updateState(`preparing ${txnDescription}`, { progressBar: true });
             const tcx = create
-                ? await credsRegistry.mkTxnCreatingRegistryEntry(updatedCred)
-                : await credsRegistry.mkTxnUpdatingRegistryEntry({
+                ? await bookContract.mkTxnCreatingRegistryEntry(updatedCred)
+                : await bookContract.mkTxnUpdatingRegistryEntry({
                       ...credForUpdate,
                       updated: updatedCred,
                   });
@@ -568,7 +564,7 @@ export class CredForm extends React.Component<propsType, stateType> {
             );
             const minDelay = new Promise((res) => setTimeout(res, 2000));
 
-            await credsRegistry.submit(tcx);
+            await bookContract.submit(tcx);
             await minDelay;
             updateState(`submitting the ${txnDescription} to the network`);
             refresh().then(async () => {
