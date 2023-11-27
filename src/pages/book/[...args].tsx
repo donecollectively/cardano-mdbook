@@ -36,13 +36,13 @@ import {
     helios,
 } from "@donecollectively/stellar-contracts";
 import {
-    CCRegistry,
+    CMDBCapo,
     RegisteredCredentialForUpdate,
     RegisteredCredentialOnchain,
-} from "../../contracts/CCRegistry.js";
-import { CredForm } from "../../components/book/CredForm.jsx";
-import { CredsList } from "../../components/book/CredsList.jsx";
-import { CredView } from "../../components/book/CredView.js";
+} from "../../contracts/CMDBCapo.js";
+import { CredForm } from "../../local-comps/book/PageEditor.jsx";
+import { CredsList } from "../../local-comps/book/BookPages.jsx";
+import { CredView } from "../../local-comps/book/PageView.js";
 import { Button } from "../../components/Button.js";
 import { ClientSideOnly } from "../../components/ClientSideOnly.js";
 import { inPortal } from "../../inPortal.js";
@@ -66,7 +66,7 @@ export type PageStatus = {
 };
 
 type stateType = PageStatus & {
-    credsRegistry?: CCRegistry;
+    credsRegistry?: CMDBCapo;
     networkParams?: NetParams;
     progResult?: string;
     selectedWallet?: string;
@@ -549,11 +549,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         }
         const { networkParams, wallet } = this.state;
         let config = ccrConfig
-            ? { config: CCRegistry.parseConfig(ccrConfig) }
+            ? { config: CMDBCapo.parseConfig(ccrConfig) }
             : { partialConfig: {} };
 
         if (!wallet) console.warn("connecting to registry with no wallet");
-        let cfg: StellarConstructorArgs<ConfigFor<CCRegistry>> = {
+        let cfg: StellarConstructorArgs<ConfigFor<CMDBCapo>> = {
             setup: {
                 network: this.bfFast,
                 networkParams,
@@ -565,7 +565,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             ...config,
         };
         try {
-            const credsRegistry = new CCRegistry(cfg);
+            const credsRegistry = new CMDBCapo(cfg);
             const isConfigured = await credsRegistry.isConfigured;
             if (!isConfigured) {
                 // alert("not configured");

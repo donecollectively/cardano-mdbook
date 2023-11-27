@@ -27,9 +27,9 @@ import type {
 } from "@donecollectively/stellar-contracts";
 
 //@ts-expect-error importing a file typescript isn't expected to understand
-import specializedCapo from "./specializedCCRegistry.hl"; // assert { type: 'text' };
+import specializedCapo from "./specializedCMDBCapo.hl"; // assert { type: 'text' };
 
-import { CCRMintDelegate } from "./CCRMintDelegate.js";
+import { CMDBMintDelegate } from "./CMDBMintDelegate.js";
 
 export type RegisteredCredentialOnchain = {
     credAuthority: RelativeDelegateLink<AuthorityPolicy>;
@@ -65,11 +65,11 @@ export type RegisteredCredentialUpdated = {
     updated: RegisteredCredential;
 } & RegisteredCredentialForUpdate;
 
-export class CCRegistry extends DefaultCapo {
+export class CMDBCapo extends DefaultCapo {
     get specializedCapo() {
         return mkHeliosModule(
             specializedCapo,
-            "src/contracts/specializedCCRegistry.hl"
+            "src/contracts/specializedCMDBCapo.hl"
         );
     }
 
@@ -159,7 +159,7 @@ export class CCRegistry extends DefaultCapo {
             ),
             mintDelegate: defineRole(uutPurpose, baseClass, {
                 default: {
-                    delegateClass: CCRMintDelegate,
+                    delegateClass: CMDBMintDelegate,
                     // partialConfig: {},
                     // validateConfig(args): strategyValidation {
                     //     return undefined

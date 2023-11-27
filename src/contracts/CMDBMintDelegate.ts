@@ -6,7 +6,7 @@ import CcrSpecialMintDelegate from "./specializedMintDelegate.hl";
 //@ts-expect-error because TS doesn't understand helios
 import CcrSpecialCapo from "./specializedCCRegistry.hl";
 
-export class CCRMintDelegate extends BasicMintDelegate {
+export class CMDBMintDelegate extends BasicMintDelegate {
 
     _m : HeliosModuleSrc 
     get specializedMintDelegate(): HeliosModuleSrc {

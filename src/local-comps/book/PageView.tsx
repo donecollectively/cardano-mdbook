@@ -5,17 +5,17 @@ import head from "next/head.js";
 const Head = head.default;
 import { useRouter } from "next/router.js";
 import React, { useState } from "react";
-import { createPortal } from "react-dom";
-import { Prose } from "@/components/Prose.jsx";
-import { useLiveQuery } from "dexie-react-hooks";
-import { RegisteredCredentialOnchain, RegisteredCredentialForUpdate } from "../../contracts/CCRegistry.js";
-import { Markdoc } from "../Markdoc.js";
+// import { createPortal } from "react-dom";
+// import { Prose } from "@/components/Prose.jsx";
+// import { useLiveQuery } from "dexie-react-hooks";
+import { RegisteredCredentialOnchain, RegisteredCredentialForUpdate } from "../../contracts/CMDBCapo.js";
 import { helios } from "@donecollectively/stellar-contracts";
-import { ClientSideOnly } from "../ClientSideOnly.js";
-import { inPortal } from "../../inPortal.js";
+import { Markdoc } from "../../components/Markdoc.jsx";
 import { credRegistryProps } from "./sharedPropTypes.js";
-import { Button } from "../Button.js";
-import link from "next/link.js"; const Link = link.default
+import { Button } from "../../components/Button.jsx";
+
+import link from "next/link.js";
+const Link = link.default
 
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hWallet = typeof Cip30Wallet.prototype;

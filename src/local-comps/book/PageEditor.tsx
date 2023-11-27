@@ -6,12 +6,12 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import {
-    CCRegistry,
+    CMDBCapo,
     RegisteredCredential,
     RegisteredCredentialOnchain,
     RegisteredCredentialForUpdate,
-} from "../../contracts/CCRegistry.js";
-import { Prose } from "../Prose.jsx";
+} from "../../contracts/CMDBCapo.js";
+import { Prose } from "../../components/Prose.jsx";
 import head from "next/head.js";
 const Head = head.default;
 

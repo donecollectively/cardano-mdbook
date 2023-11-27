@@ -1,18 +1,22 @@
 import React from "react";
-import { CCRegistry, RegisteredCredentialForUpdate, RegisteredCredentialOnchain } from "../../contracts/CCRegistry.js";
-import { Prose } from "../Prose.jsx";
-import link from "next/link.js"; const Link = link.default;
+import {
+    CMDBCapo,
+    RegisteredCredentialForUpdate,
+    RegisteredCredentialOnchain,
+} from "../../contracts/CMDBCapo.js";
+import { Prose } from "../../components/Prose.jsx";
+import link from "next/link.js";
+const Link = link.default;
 
 type paramsType = {
-    credsRegistry: CCRegistry;    
+    credsRegistry: CMDBCapo;
     allCreds: RegisteredCredentialForUpdate[];
     // refreshCreds: Function;
     credsStatus: string;
     editCredId: Function;
-    createCredential: Function
-}
-type stateType = {
-}
+    createCredential: Function;
+};
+type stateType = {};
 
 export class CredsList extends React.Component<paramsType, stateType> {
     static notProse = true;
