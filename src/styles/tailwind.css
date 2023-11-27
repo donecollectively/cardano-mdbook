@@ -1,0 +1,91 @@
+@import "tailwindcss/base";
+@import "./fonts.css";
+@import "./docsearch.css";
+@import "./prism.css";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+.dark .callout strong {
+    --tw-prose-bold: #00afe6;
+}
+
+.error {
+    background-color: #300;
+    padding: 0.75em;
+    border-radius: 0.33em;
+    border-color: #f99;
+    color: #f66;
+}
+
+.status {
+    background-color: #003;
+    padding: 0.75em;
+    border-radius: 0.33em;
+    border-color: #99f;
+    color: #99f;
+}
+.progress {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    height: 1em;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25),
+        0 1px rgba(255, 255, 255, 0.08);
+}
+.progress-bar {
+    height: 0.25em;
+    background-color: #ee303c;
+    border-radius: 4px;
+    appearance: none;
+    transition: 0.4s linear;
+    transition-property: width, background-color;
+}
+.progress-striped .progress-bar {
+    background-color: #fcbc51;
+    width: 100%;
+    background-image: linear-gradient(
+        45deg,
+        rgb(252, 163, 17) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgb(252, 163, 17) 50%,
+        rgb(252, 163, 17) 75%,
+        transparent 75%,
+        transparent
+    );
+    animation: progressAnimationStrike 6s;
+}
+
+::-moz-progress-bar,  ::-webkit-progress-value {
+    background-color: blue
+}
+
+@keyframes progressAnimationStrike {
+    from {
+        width: 0;
+    }
+    to {
+        width: 100%;
+    }
+}
+
+input::placeholder,
+textarea::placeholder {
+    font-weight: bold;
+    font-style: italic;
+    opacity: 0.4;
+}
+
+ul.checklist {
+    list-style-position: outside;
+    /* padding-left: 1.2em; */
+}
+ul.checklist li {
+    /* margin-top: -0.5em;
+        margin-bottom: 0.5em; */
+    padding-left: 0.75em;
+    margin-left: 2em;
+}
+ul.checklist li::marker {
+    content: "☐";
+    font-size: 125%;
+}

@@ -1,0 +1,67 @@
+{
+    "name": "cardano-md-book",
+    "version": "0.1.0",
+    "homepage": "https://donecollectively.github.io/cMDbook",
+    "description": "Markdown-based content management on Cardano",
+    "license": "SEE LICENSE IN LICENSE.TXT",
+    "main": "./dist/cardano-md-book.mjs",
+    "types": "./dist/cardano-md-book.d.ts",
+    "scripts": {
+        "dev": "next dev -p 3360",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "test": "vitest",
+        "test:debug": "vitest --inspect --threads false",
+        "testing": "vitest --inspect --threads false",
+        "test:ui": "vitest --ui",
+        "test:run": "vitest run"
+    },
+    "type": "module",
+    "postcss": {
+        "plugins": {
+            "postcss-import": {},
+            "tailwindcss": {},
+            "postcss-focus-visible": {
+                "replaceWith": "[data-focus-visible-added]"
+            },
+            "autoprefixer": {}
+        }
+    },
+    "overrides": {},
+    "browserslist": "defaults, not ie <= 11",
+    "dependencies": {
+        "@docsearch/react": "^3.2.1",
+        "@donecollectively/CaaSC": "../CaaSC",
+        "@donecollectively/stellar-contracts": "../stellar-contracts",
+        "@headlessui/react": "^1.7.2",
+        "@markdoc/markdoc": "0.1.7",
+        "@markdoc/next.js": "0.1.6",
+        "@sindresorhus/slugify": "^2.1.0",
+        "@tailwindcss/typography": "^0.5.10",
+        "autoprefixer": "^10.4.12",
+        "clsx": "^1.2.1",
+        "cross-fetch": "^4.0.0",
+        "dexie": "^3.2.4",
+        "dexie-react-hooks": "^1.1.6",
+        "focus-visible": "^5.2.0",
+        "next": "^13.5.6",
+        "postcss-focus-visible": "^6.0.4",
+        "postcss-import": "^14.1.0",
+        "prism-react-renderer": "^1.3.5",
+        "react": "18.2.0",
+        "react-dom": "18.2.0",
+        "tailwindcss": "^3.3.5"
+    },
+    "devDependencies": {
+        "@types/react": "18.2.22",
+        "eslint": "8.26.0",
+        "eslint-config-next": "13.0.2",
+        "prettier": "^2.7.1",
+        "prettier-plugin-tailwindcss": "^0.1.13",
+        "rollup-plugin-string": "^3.0.0",
+        "typescript": "5.2.2",
+        "vite": "^4.5.0",
+        "vitest": "^0.34.5"
+    }
+}
