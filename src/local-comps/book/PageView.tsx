@@ -17,16 +17,6 @@ import { credRegistryProps } from "./sharedPropTypes.js";
 import { Button } from "../Button.js";
 import link from "next/link.js"; const Link = link.default
 
-// ViewCert.getInitialPXXrops = async (ctx) => {
-//     const { id } = ctx.query
-//     if ("undefined" == typeof window) return {}
-
-//     await new Promise((r) => setTimeout(r, 400))
-//     return { sidebar: [<div>hi sidebar {id}</div>] }
-//     const res = await fetch("https://api.github.com/repos/vercel/next.js")
-//     const json = await res.json()
-//     return { stars: json.stargazers_count }
-// }
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hWallet = typeof Cip30Wallet.prototype;
 
@@ -44,70 +34,13 @@ export class CredView extends React.Component<propsType, stateType> {
     render() {
         const {rendered} = this.state || {}
         if (!rendered) setTimeout(() => this.setState({rendered:true}), 10);
-        // const [posts, setPosts] = useState(null);
-        // useEffect(() => {    fetchPosts().then(p => setPosts(p));  }, []);
-        console.log(
-            "--------------------------------------------------------------------------------- cert view render"
-        );
+
         const {
-            cred: { cred },
+            cred: { cred: page },
             wallet,
             preview,
             credsRegistry,
         } = this.props;
-        const metaTable = (
-            <Prose className="">
-                <table className="mt-16 table-auto text-gray-400">
-                    <tbody>
-                        <tr>
-                            <th>
-                                <strong>Issued by</strong>
-                            </th>
-                            <td>
-                                {cred.issuerName}
-                            </td>
-                        </tr>
-                        {/* <tr>
-                            <th>Registration space</th>
-                            <td>
-                                <strong>???? Cardano on-chain</strong>
-                            </td>
-                        </tr> */}
-                        <tr>
-                            <th><strong>Issuance platform</strong></th>
-                            <td>
-                                {cred.issuancePlatform || "‹unspecified›"}
-                                {/* <strong>??? AtalaPRISM via LearnerShape</strong> */}
-                            </td>
-                        </tr>
-                        <tr>
-                            <th><strong>Issuance URL</strong></th>
-                            <td>
-                                {cred.issuanceUrl ? 
-                                    <Link href={cred.issuanceUrl}>click here</Link>
-                                    : <>‹none›</>
-                                }
-                            </td>
-                        </tr>
-                        {/* <tr>
-                            <th>Verification Service</th>
-                            <td>
-                                <strong>???</strong>
-                            </td>
-                        </tr> */}
-                    </tbody>
-                </table>
-            </Prose>
-        );
-
-        let sidebarMetaTable = preview ? metaTable : (
-            <ClientSideOnly>
-                {inPortal(
-                    "sidebar",
-                    <div className="hidden lg:block">{metaTable}</div>
-                )}
-            </ClientSideOnly>
-        );
 
         // const tt =  new Address("addr1qx6p9k4rq077r7q4jdkv7xfz639tts6jzxsr3fatqxdp2y9w9cdd2uueqwnv0cw9gne02c0mzrvfsrk884lry7kpka8shpy5qw")
         // const ttt = Address.fromHash(tt.pubKeyHash, false)
@@ -117,8 +50,7 @@ export class CredView extends React.Component<propsType, stateType> {
             <>
                 <Head>
                     <title>
-                        Certificate:
-                        {cred.credName} by {cred.issuerName}
+                        {page.pageTitle}
                     </title>
                 </Head>
 
@@ -127,36 +59,10 @@ export class CredView extends React.Component<propsType, stateType> {
                         {this.possibleEditButton()}
                     </div>
                 )}
-                <h2>{cred.credName}</h2>
+                <h2>{page.pageTitle}</h2>
                 <div>
-                    <h4>
-                        Certificate Description{" "}
-                        {/* <span className="text-slate-700">
-                            {cred.credSummary}
-                        </span> */}
-                    </h4>
-                    <Markdoc content={cred.credDesc} />
-                    <h4>Expectations of a Credential Holder</h4>
-                    <div className="hidden">
-                        Skills, Capabilities / Experience
-                    </div>
-                    <ul className={`not-prose checklist`}>
-                        {cred.expectations
-                            .filter((x) => !!x)
-                            .map((expectation, i) => (
-                                <li key={`exp-${i}`}>{expectation}</li>
-                            ))}
-                    </ul>
+                    <Markdoc content={page.pageContent} />
                 </div>
-                <h4>Issuance requirements / Governance Process</h4>
-
-                <Markdoc content={cred.issuingGovInfo} />
-
-                <div className="block lg:hidden">
-                    <hr />
-                    {metaTable}
-                </div>
-                {sidebarMetaTable}
             </>
         );
     }

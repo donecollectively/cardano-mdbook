@@ -64,23 +64,7 @@ type ChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
 
 const testCredInfo = {
     expectations: [""],
-    // first - DEMU
-    // credDesc:
-    //     "Certifies a person's knowledge and ability to operate DEMU's Munode and administer the delegations and other music-related activities",
-    // credName: "DEMU Certified Node Operator",
-    // // credSummary: "Certifies administrative and technical understanding of operating Munode",
-    // credType: "skill",
-    // expectations: [
-    //     "has a practical understanding of general unix system administration",
-    //     "can operate a nodejs-based service, including handling of version upgrades",
-    //     "has learned about delegation and music-inventory mechanics of DEMU's content network",
-    //     "owns a $DEMU.munodeOperator token",
-    // ],
-    // issuerName: "DEMU",
-    // issuingGovInfo:
-    //     "Candidates will attend a node-operator training program and get their Munode running on testnet.\n\nAfter they demonstrate music-inventory delegation activities, DEMU staff will issue the certificate.",
-    // issuancePlatform: "ATALA Prism",
-
+//!!! todo
     // credName: `Sample ${new Date().toUTCString()}`,
     // credDesc: "test description",
     // credSummary: "tester",
@@ -281,92 +265,21 @@ export class CredForm extends React.Component<propsType, stateType> {
                     >
                         <table>
                             <tbody>
-                                {this.field("Credential Type", "credType", {
-                                    type: "select",
-                                    options: [
-                                        "person",
-                                        "skill",
-                                        "experience",
-                                        "training cert",
-                                        "aptitude",
-                                        "other",
-                                    ],
-                                    tableCellStyle: {
-                                        padding: "0.25em",
-                                        // backgroundColor: "#142281e7"
-                                    },
-                                    style: {
-                                        backgroundColor: "#142281e7",
-                                    },
-                                })}
-                                {this.field("Credential Name", "credName", {
-                                    placeholder: "Short onscreen label",
+                                {this.field("Page Title", "title", {
+                                    placeholder: "Book Index title",
                                     validator(v) {
-                                        if (v.length < 10)
-                                            return "must be at least 10 characters";
+                                        if (v.length < 8)
+                                            return "must be at least 8 characters";
                                     },
                                 })}
-                                {this.field("Description", "credDesc", {
-                                    type: "textarea",
-                                    rows: 3,
+                                {this.field("Content", "pageContent", {
+                                    type: "markdown",
+                                    rows: 50,
                                     validator(v) {
                                         if (v.length < 40)
                                             return "must be at least 40 characters";
                                     },
                                 })}
-                                {this.field("Issuer Name", "issuerName", {
-                                    validator(v) {
-                                        if (v.length < 4) return "too short";
-                                    },
-                                })}
-                                {this.field("Issuing Entity DID", "credDID", {
-                                    placeholder: "e.g. did:prism: ...",
-                                })}
-                                {this.field(
-                                    "Issuance Platform",
-                                    "issuancePlatform",
-                                    {
-                                        type: "select",
-                                        options: ["ATALA Prism", "other"],
-                                        tableCellStyle: {
-                                            padding: "0.25em",
-                                            // backgroundColor: "#142281e7"
-                                        },
-                                        style: {
-                                            backgroundColor: "#142281e7",
-                                        },
-                                    }
-                                )}
-                                {this.field(
-                                    "Issuance URL (optional)",
-                                    "issuanceUrl",
-                                    {}
-                                )}
-
-                                {this.field("Expectations", "expectations", {
-                                    helpText:
-                                        "credential holders will have demonstrated these skills, capabilities, or evidence",
-                                    array: true,
-                                    validator(v, rec, arrayIndex) {
-                                        if (arrayIndex && !v.length) return; //non-first item can be empty
-                                        if (v.length < 10) return "too short";
-                                    },
-                                    length: rec.expectations?.length,
-                                })}
-                                {this.field(
-                                    "Governance Details",
-                                    "issuingGovInfo",
-                                    {
-                                        type: "textarea",
-                                        rows: 8,
-                                        helpText:
-                                            "describe how you govern the issuance of this credential",
-                                        validator(v) {
-                                            if (v.length < 100)
-                                                return "Please provide more detail (at least 100 characters)";
-                                        },
-                                    }
-                                )}
                                 <tr>
                                     <th></th>
                                 </tr>
