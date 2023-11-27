@@ -1,0 +1,206 @@
+module specializedCapo
+
+// exports a Datum and Redeemer.  
+//! the Datum and Redeemer of specializations
+//  MUST include the same enum variants as in this
+//  unspecialized version.  if you're specializing 
+//  ... and you get a Helios compiler error,
+// ... these are the first things you should check!
+//! Your specialization MAY include any 
+// ... additional functions, imports or methods
+
+import { 
+    RelativeDelegateLink,
+    requiresValidDelegateOutput
+} from CapoDelegateHelpers
+
+import {
+    getOutputForInput,
+    outputDatum
+} from StellarHeliosHelpers
+
+
+
+struct CredStruct {
+    credType: String
+    credName: String
+    credDesc: String
+    credIssuerDID: String
+    issuerName: String
+    expectations: []String
+    issuingGovInfo: String
+    // regSpace: String
+                //  "Cardano on-chain"
+    issuancePlatform: String
+    issuanceUrl: String
+    props: Map[String]String
+    createdAt: Int
+    updatedAt: Int
+    expiresAt: Int
+}
+enum Datum {
+    CharterToken {
+        govAuthorityLink: RelativeDelegateLink
+        mintDelegateLink: RelativeDelegateLink
+    }
+    RegisteredCredential {
+        credAuthority: RelativeDelegateLink
+        cred: CredStruct
+    }
+
+    //! datum-validation only supports checks of absolute spendability, 
+    //  ... and can't check details of the Activity/Redeemer being used.
+    func validateSpend(self, ctx: ScriptContext, mph : MintingPolicyHash) -> Bool {
+        true ||
+        ( 
+            self.serialize() /* never */ == ctx.serialize() ||
+            mph.serialize() /* never */ == ctx.serialize()  
+        )
+    } 
+
+    func validateCredential(self) -> Bool{
+        self.switch{
+            RegisteredCredential{_, cred} => {
+                needsLength : (String, String, Int) -> () = (v : String, fn : String, min : Int) -> {
+                    assert(v.encode_utf8().length >= min,
+                        "length error"//, fn + " needs " +min.show() + " chars or more"
+                    )
+                };
+
+                goodTypes = Map[String]Bool{
+                    "person":true, 
+                    "skill": true, 
+                    "experience": true, 
+                    "training cert": true, 
+                    "aptitude": true,
+                     "other": true
+                };
+                goodPlatforms = Map[String]Bool{
+                    "ATALA Prism":true, 
+                     "other": true
+                };
+                assert(goodTypes.get_safe(cred.credType).switch{
+                    None => error("invalid credType"),
+                    _ => true
+                }, ""); // already failed as invalid ^^
+
+                assert(goodPlatforms.get_safe(cred.issuancePlatform).switch{
+                    None => error("invalid issuancePlatform"),
+                    _ => true
+                }, ""); // already failed as invalid ^^
+
+                needsLength(cred.credName, "credName", 10);
+                needsLength(cred.credDesc, "credDesc", 40);
+                needsLength(cred.issuingGovInfo, "issuingGovInfo", 100);
+                needsLength(cred.issuerName, "issuerName", 4);
+                // assert(cred.credName.encode_utf8().length > 10, needsLength("credName", 10));
+                // assert(cred.credDesc.encode_utf8().length > 40, needsLength("credDesc", 40));
+                // assert(cred.issuingGovInfo.length > 100, needsLength("issuingGovInfo", 100));
+                // assert(cred.issuerName.length > 4, needsLength("issuerName", 4));
+
+                assert(
+                    cred.credIssuerDID.encode_utf8().length == 0 || 
+                    cred.credIssuerDID.starts_with("did:"), 
+                    "invalid DID"//"credIssuerDID must start with 'did:' if specified"
+                );
+                true
+            },
+            _ => error("wrong datum")//"validateCredential only works on RegisteredCredential datum")
+        }
+    }
+}
+
+enum Activity {
+    // standard redeemer types:
+    spendingDatum
+    updatingCharter    
+    usingAuthority
+
+    //custom redeemer types:
+    // registeringCredential can't be from this script unless there's a spend
+    updatingCredential
+    retiringCredential
+
+    // func allowRetiringCredential(_,_,_) -> Bool {
+       func allowRetiringCredential(self, datum: Datum, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+        // rc -> if is severely outdated, burn the UUT and allow minUtxo recovery
+        false && ( 
+            self.serialize() /* never */ == datum.serialize()  ||
+            self.serialize() /* never */ == mph.serialize()  ||
+            self.serialize() /* never */ == ctx.serialize() 
+        )
+    }
+
+    // func allowUpdatingCredential(_,_,_) -> Bool {
+    func allowUpdatingCredential(self, credAuthority: RelativeDelegateLink, oldListing: CredStruct, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+        txnTime : TimeRange = ctx.tx.time_range;        
+        newTxo : TxOutput = getOutputForInput(ctx, ctx.get_current_input());
+        // already checked by getOutputForInput()
+        // assert(newTxo.value.get_assets().to_map().length == 1, "invalid token bundle with various assets");
+        // assert(newTxo.value.get_policy(mph).length == 1, "invalid with multiple tokens in the utxo");
+
+        newDatum : Datum = outputDatum[Datum](newTxo);
+        Datum::RegisteredCredential{newAuthority, newListing} = newDatum;
+        assert(newAuthority == credAuthority, "authority change invalid");
+
+        // createdAt: Int
+        assert(newListing.createdAt == oldListing.createdAt, "createdAt must not be modified");
+        // updatedAt: Int
+        assert(txnTime.contains(Time::new(newListing.updatedAt)), "incorrect updatedAt");
+        // expiresAt: Int
+        assert(Time::new(newListing.expiresAt) < Time::new(newListing.updatedAt) + (365 * Duration::DAY),
+            "expiry must be less than 1y"
+        );
+        // lastExpiredAt: Int
+    
+            
+        ( 
+            // rc + delegated approval -> rc with validation
+            // or rc + charter -> rc with validation
+            requiresValidDelegateOutput(credAuthority, mph, ctx) &&
+                newDatum.validateCredential() 
+        ) ||
+        ( 
+            ( self.serialize() /* never */ == oldListing.serialize() )  ||
+            (  self.serialize() /* never */ == ctx.serialize()  )
+        )
+    }
+
+    func allowActivity(self, datum: Datum, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+        //! Note: an overridden Reedeemer def doesn't have to replicate the checks
+        // ... for the baseline enum variants; it's not called in those cases.
+
+        txnTime : TimeRange = ctx.tx.time_range;        
+        assert(/* ✅ limited txn validity */ 
+            (txnTime.end - txnTime.start) < 1 * Duration::HOUR, 
+            "bad validity"
+            // + ": validity period must be less than 1h"); 
+        );
+
+        datum.switch{
+            RegisteredCredential{credAuthority, cred} => {
+                self.switch{
+                    updatingCredential => self.allowUpdatingCredential(credAuthority, cred, ctx, mph),
+                    retiringCredential => self.allowRetiringCredential(datum, ctx, mph),
+                    // registeringCredential => assert(false, "unreachable code"),
+                    _ => error("unreachable code")
+                }
+               // not executed, but prevents the args from showing up as unused:
+                || ( credAuthority.serialize() != cred.serialize() )
+            },
+            _ => error("unhandled datum type")
+            // not executed, but prevents the args from showing up as unused:
+        } || ( ctx.tx.serialize() /* never */ == datum.serialize() )
+    }
+}
+
+struct typeInfo {
+    credStruct: CredStruct
+    datum: Datum
+    redeemers: Activity
+}
+const types : typeInfo = typeInfo {
+    CredStruct::from_data(Data{}),
+    Datum::from_data(Data{}),
+    Activity::from_data(Data{})
+}

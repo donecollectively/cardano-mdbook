@@ -1,0 +1,211 @@
+module specializedMintDelegate
+
+//! provides a basic version, not actually specialized,
+// of the "specializedMintDelegate" interface, which simply
+// exports a DelegateDatum enum and DelegateActivities (redeemer enum).  
+//! these specializations MAY include additional enum variants, and 
+//  ... they MUST include the same enum variants found in this
+//  ... unspecialized version.  
+//  If you're specializing and you get a Helios compiler error,
+// ... these are the first things you should check!
+//! Your specialization MAY include any 
+// ... additional functions, imports or methods
+
+import {
+     DelegationDetail,
+     unmodifiedDelegation,
+     tvAuthorityToken    
+} from CapoDelegateHelpers
+
+import {
+    getOutputWithValue,
+    mkTv,
+    outputDatum
+} from StellarHeliosHelpers
+
+import {
+    Activity as MinterActivity,
+    mkUutTnFactory
+} from CapoMintHelpers
+
+import {
+    Datum as CCRegDatum
+} from specializedCapo
+
+// struct DredRegistrationSettings {
+//     currentPrice,
+//     currentActiveNodeCount,
+//     currentRevenuePerWeek,
+//     previouslyMintedNftCount
+// }
+
+enum MintDelegateDatum {
+    IsDelegation {
+        dd: DelegationDetail
+        customConfig : String // DredRegistrationSettings
+    }
+    
+    func validateCDConfig(self, updated: MintDelegateDatum::IsDelegation) -> Bool {
+        self.switch {
+            ddd: IsDelegation => {
+                (ddd.customConfig == "") &&
+                (updated == self)
+            },
+            _ => error("unreachable")
+        }
+    }
+}
+
+enum MintDelegateActivity {
+    Authorizing
+    Reassigning
+    Retiring
+    Modifying
+    //! used only for validating IsDelegation datum, that is,
+    //   ... to approve minting requests or any customize spending modes 
+    //   ... of that datum.  In this unspecialized version, 
+    //   ... the "Modify" activity is an unsupported stand-in for that use-case, always rejecting.
+    //! in a real-life customization case, additional custom IsDelegation config can be
+    //   ... enforced in "Modify" event the second field of IsDelegation (the "CDConfig" stand-in here)
+    //   ... the BasicMintDelegate allows for that field's presence, without any assumptions
+    //   ... about its type.
+    //  Note that the basic mint delegate
+    //   ... enforces the authZor UUT being returned to the delegate script,
+    //   ... and other basic administrative expectations, so any specialization
+    //   ... can focus on higher-level policy considerations.
+    func additionalDelegateValidation( self,
+        priorMddd: MintDelegateDatum::IsDelegation, 
+        ctx: ScriptContext
+    ) -> Bool {
+        self.switch {
+            Authorizing => {
+                //!!! For communityCerts project:
+                //! 1. only allows minting CredRegistry records (regCred uut + credListingAuthz uut)
+                //! 2a. createdAt has to match "now"
+                //! 2b. updatedAt should be 0
+                //! 2c. only allows the transaction to be valid for 1 hour
+                //! 3. only allows the cred expiration to be 1 year in the future
+                //! 4. doesn't allow the delegation details to be modified
+
+                mph : MintingPolicyHash = priorMddd.dd.mph;                
+                k : ScriptPurpose = ctx.tx.redeemers.find_key( 
+                    (purpose : ScriptPurpose) -> { purpose.switch{ 
+                        sp: Minting => {
+                            sp.policy_hash == mph
+                        }, 
+                        _ => false 
+                    } }
+                );
+
+                // mintRedeemerData : Data = ctx.tx.redeemers.get(k);
+                // print("::::::: mintRedeemer: "+ mintRedeemerData.serialize().show());
+                // mintingActivity : MinterActivity = MinterActivity::from_data(mintRedeemerData);
+                // isMintingRegistryEntry : Bool = mintingActivity.switch {
+                //     mintingUuts{_, _, purposes} => {
+                //         purposes.length == 2 &&
+                //         purposes.get(0) == "regCred" &&
+                //         purposes.get(1) == "credListingAuthz"
+                //     },
+                // //  fails with surprising error:
+                // targetValue : Value = mintingActvity.tvForPurpose(regCredPurpose)
+
+                regCredPurpose : String = "regCred";
+                credAuthzPurpose : String = "credListingAuthz";
+                newDatum : CCRegDatum = ctx.tx.redeemers.get(k).switch {
+                    (index: Int, fields: []Data) => {
+                        assert (index == 1 && fields.length == 3,
+                           "wrong activity"//  "authz token not spent with mintingUuts activity!"
+                        );
+                        purposes : []String = []String::from_data(fields.get(2));
+
+                        // 1. ✅ only CredRegistry & its authority delegate can be minted
+                        isMintingRegistryEntry : Bool = 
+                            purposes.length == 2 &&
+                            purposes.get(0) == regCredPurpose &&
+                            purposes.get(1) == credAuthzPurpose;
+                        assert(isMintingRegistryEntry, "wrong uuts");// "not minting correct UUTs for credential registry");
+
+                        txId: TxId = TxId::from_data(fields.get(0));
+                        txoIndex : Int = Int::from_data(fields.get(1));
+                        mkTokenName : (String) -> String = mkUutTnFactory(txId, txoIndex);
+                        credListingId : Value = mkTv(mph, mkTokenName(regCredPurpose));
+
+                        newTxo : TxOutput = getOutputWithValue(ctx, credListingId);
+                        assert(
+                            newTxo.value.get_assets().to_map().length == 1,
+                            //  "too many policies"  
+                             "invalid token bundle with various assets: "+newTxo.value.show()
+                        );
+                        assert(
+                            newTxo.value.get_policy(mph).length == 1, 
+                            // "too many tokens"
+                            "invalid with multiple tokens in the utxo"
+                        );
+                
+                        // print("parsing datum on "+newTxo.value.show());
+                        // print ("  -> "+ newTxo.datum.get_inline_data().serialize().show());
+                        // newDatum : CCRegDatum = // outputDatum[CCRegDatum](newTxo);
+
+                        CCRegDatum::from_data(newTxo.datum.get_inline_data())
+                    },
+                    _ => error("missing or wrong mint redeemer for our mph")
+                };
+
+
+                CCRegDatum::RegisteredCredential{_, newListing} = newDatum;
+        
+                txnTime : TimeRange = ctx.tx.time_range;        
+                now : Time = txnTime.start;
+                assert(/* 2a. ✅ */ 
+                    txnTime.contains(Time::new(newListing.createdAt)),
+                    "creationTime incorrect"); 
+                assert(/*  2b. ✅ */ 
+                    newListing.updatedAt == 0,
+                    "must not have updatedAt"
+                ); 
+                assert(/*  2c. ✅ */ 
+                    (txnTime.end - txnTime.start) < 1 * Duration::HOUR, 
+                    "validity period must be less than 1h"
+                    //    +", got "
+                    //    + ((txnTime.end - txnTime.start) / Duration::new(1)).show() + 
+                    // "ms instead" 
+                ); 
+                assert(/* 3. ✅ */ 
+                    Time::new(newListing.expiresAt) < ( now + 365*Duration::DAY ),
+                        "expiration time must be less than 1y") ; 
+
+                // 4. ✅ 
+                notModified : Bool = unmodifiedDelegation(priorMddd.serialize(), ctx);
+                
+                notModified && newDatum.validateCredential()
+
+                // for DRED node operations:
+                // DON'T unmodifiedDelegation(priorMddd.serialize(), ctx) && 
+                // instead:
+                //  - enforce that the fee === old price is being paid
+                //  - enforce that the new price for the next Dred Operator NFT is 2.04 * the earlier price
+            },
+            // Modifying => {
+            //     // require that the charter is providing its authority
+            //     // allow a change to the currentPrice
+            // }
+            _ => false //!!! doesn't allow any activity except Authorizing!
+        } || ctx.tx.serialize() /* never */ == priorMddd.serialize()
+        // ^^^ this is a no-op, uses this syntax to avoid unused variable errors
+    }
+
+    //! used only for validating non-IsDelegation datum types.
+    //   if you have any admininstrative data structures that inform
+    func otherDatumValidation( self,
+        mdd: MintDelegateDatum, 
+        ctx: ScriptContext
+    ) -> Bool {
+        // this is a no-op, structured this way only 
+        //  ... to avoid unused variable errors
+        self.switch{
+            Authorizing => error("never called"),
+            _ => true
+        } || ctx.tx.serialize() != mdd.serialize()
+    }
+}
+
