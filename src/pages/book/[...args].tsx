@@ -112,7 +112,7 @@ let mountCount = 0;
 
 //   _x_   ?.  add actor collateral to TCX, on-demand and/or during addScript (when??)
 
-export class CertsPage extends React.Component<paramsType, stateType> {
+export class BookHomePage extends React.Component<paramsType, stateType> {
     bf: hBlockfrost;
     bfFast: hTxChain;
     static notProse = true;
@@ -757,7 +757,7 @@ export class CertsPage extends React.Component<paramsType, stateType> {
     }
     static nextPrev = false;
 }
-const certsPageWithRouter = withRouter(CertsPage);
+const bookHomePageWithRouter = withRouter(BookHomePage);
 //@ts-expect-error
-certsPageWithRouter.nextPrev = false;
-export default certsPageWithRouter;
+bookHomePageWithRouter.nextPrev = false;
+export default bookHomePageWithRouter;

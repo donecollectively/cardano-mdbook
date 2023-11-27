@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router.js'
 
-import { CertsPage } from './[...args].js';
+import { BookHomePage } from './[...args].js';
 
 // function RemoveSlash() {
 //     const router = useRouter()
@@ -14,7 +14,7 @@ import { CertsPage } from './[...args].js';
   
 export default  function withSlash(...props) {
     const router = useRouter()
-    return <CertsPage router={router} />
+    return <BookHomePage router={router} />
 }
 
 withSlash.nextPrev = false
