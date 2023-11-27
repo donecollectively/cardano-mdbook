@@ -145,14 +145,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         }
 
         await this.updateState("", {}, "//triggering creation screen");
-        this.router.push(`/certifications/create`, "", { shallow: true });
-        // window.history.pushState("", "", "/certifications/create")
+        this.router.push(`/book/create`, "", { shallow: true });
+        // window.history.pushState("", "", "/book/create")
     }
 
     editCredential(id: string) {
         throw new Error(`unused`);
         this.updateState("", {}, "//edit credential via router");
-        // this.router.push(`/certifications/${id}/edit`);
+        // this.router.push(`/book/${id}/edit`);
     }
 
     closeForm() {

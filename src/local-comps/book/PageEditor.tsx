@@ -231,7 +231,7 @@ export class CredForm extends React.Component<propsType, stateType> {
                 </Head>
                 <header className="mb-9 space-y-1">
                     <p className="font-display text-sm font-medium text-sky-500">
-                        Certifications
+                        Table of Contents
                     </p>
                 </header>
                 {sidebarContent}
@@ -665,7 +665,7 @@ export class CredForm extends React.Component<propsType, stateType> {
                 await new Promise((res) => setTimeout(res, 3000));
                 updateState("");
             });
-            router.push("/certifications");
+            router.push("/book");
             // this.setState({modified: true})
         } catch (error) {
             console.error(error.stack);

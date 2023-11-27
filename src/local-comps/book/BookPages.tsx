@@ -46,7 +46,7 @@ export class CredsList extends React.Component<paramsType, stateType> {
                                 <tr key={`table-${id}`}>
                                     <td>{cred.credType}</td>
                                     <td>
-                                        <Link href={`/certifications/${id}`}>
+                                        <Link href={`/book/${id}`}>
                                             {cred.credName}
                                         </Link>
                                     </td>
