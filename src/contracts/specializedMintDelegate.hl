@@ -79,13 +79,17 @@ enum MintDelegateActivity {
     ) -> Bool {
         self.switch {
             Authorizing => {
-                //!!! For communityCerts project:
-                //! 1. only allows minting CredRegistry records (regCred uut + credListingAuthz uut)
-                //! 2a. createdAt has to match "now"
-                //! 2b. updatedAt should be 0
-                //! 2c. only allows the transaction to be valid for 1 hour
-                //! 3. only allows the cred expiration to be 1 year in the future
-                //! 4. doesn't allow the delegation details to be modified
+                //! 1. allows minting BookPage records (bkpg- uut + optional suggAuthz uut [required when the record is a suggestion] )
+                //! 1a. creating a (non-suggestion, type=pg) BookPage requires charter authority
+                //! 1b. creating a Suggested Page (type=spg) requires a collaborator token
+                //! 1c. creating a Suggested Change (type=ssg) requires a collaborator token
+                //! 2. Allows minting collaborator tokens, by authority of the charter token
+                //! 2a. collaborator token is sent to a provided address
+                //! 3a. createdAt has to match "now"
+                //! 3b. updatedAt should be 0
+                //! 3c. only allows the transaction to be valid for 1 hour
+                //! 4. only allows the page expiration to be 1 year in the future
+                //! 5. doesn't allow the delegation details to be modified
 
                 mph : MintingPolicyHash = priorMddd.dd.mph;                
                 k : ScriptPurpose = ctx.tx.redeemers.find_key( 
@@ -100,17 +104,17 @@ enum MintDelegateActivity {
                 // mintRedeemerData : Data = ctx.tx.redeemers.get(k);
                 // print("::::::: mintRedeemer: "+ mintRedeemerData.serialize().show());
                 // mintingActivity : MinterActivity = MinterActivity::from_data(mintRedeemerData);
-                // isMintingRegistryEntry : Bool = mintingActivity.switch {
+                // isMintingBookPage : Bool = mintingActivity.switch {
                 //     mintingUuts{_, _, purposes} => {
                 //         purposes.length == 2 &&
                 //         purposes.get(0) == "regCred" &&
                 //         purposes.get(1) == "credListingAuthz"
                 //     },
                 // //  fails with surprising error:
-                // targetValue : Value = mintingActvity.tvForPurpose(regCredPurpose)
+                // targetValue : Value = mintingActvity.tvForPurpose(pgIdPurpose)
 
-                regCredPurpose : String = "regCred";
-                credAuthzPurpose : String = "credListingAuthz";
+                pgIdPurpose : String = "regCred";
+                suggAuthzPurpose : String = "suggAuthz";
                 newDatum : CCRegDatum = ctx.tx.redeemers.get(k).switch {
                     (index: Int, fields: []Data) => {
                         assert (index == 1 && fields.length == 3,
@@ -118,8 +122,7 @@ enum MintDelegateActivity {
                         );
                         purposes : []String = []String::from_data(fields.get(2));
 
-                        // 1. ✅ only CredRegistry & its authority delegate can be minted
-                        isMintingRegistryEntry : Bool = 
+                        // 1. ✅ a BookPage & its authority delegate can be minted
                             purposes.length == 2 &&
                             purposes.get(0) == regCredPurpose &&
                             purposes.get(1) == credAuthzPurpose;
