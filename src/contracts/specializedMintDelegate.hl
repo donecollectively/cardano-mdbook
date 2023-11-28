@@ -92,7 +92,7 @@ enum MintDelegateActivity {
                 //! 5. doesn't allow the delegation details to be modified
 
                 mph : MintingPolicyHash = priorMddd.dd.mph;                
-                k : ScriptPurpose = ctx.tx.redeemers.find_key( 
+                ourMinter : ScriptPurpose = ctx.tx.redeemers.find_key( 
                     (purpose : ScriptPurpose) -> { purpose.switch{ 
                         sp: Minting => {
                             sp.policy_hash == mph
@@ -104,7 +104,7 @@ enum MintDelegateActivity {
                 // mintRedeemerData : Data = ctx.tx.redeemers.get(k);
                 // print("::::::: mintRedeemer: "+ mintRedeemerData.serialize().show());
                 // mintingActivity : MinterActivity = MinterActivity::from_data(mintRedeemerData);
-                // isMintingBookPage : Bool = mintingActivity.switch {
+                // isMintingBookEntry : Bool = mintingActivity.switch {
                 //     mintingUuts{_, _, purposes} => {
                 //         purposes.length == 2 &&
                 //         purposes.get(0) == "eid" &&
@@ -112,14 +112,14 @@ enum MintDelegateActivity {
                 // //  fails with surprising error:
                 // targetValue : Value = mintingActvity.tvForPurpose(pgIdPurpose)
 
+                collaboratorPurpose : String = "collab";
                 eidPurpose : String = "eid";
-                // removed: suggAuthzPurpose : String = "suggAuthz";
-                newDatum : CMDBookDatum = ctx.tx.redeemers.get(k).switch {
-                    (index: Int, fields: []Data) => {
+                ctx.tx.redeemers.get(ourMinter).switch {
+                    (index: Int, fields: []Data) => { // MintingUUTs activity
                         assert (index == 1 && fields.length == 3,
-                           "wrong activity"//  "authz token not spent with mintingUuts activity!"
+                           "authz token not spent with mintingUuts activity!"
                         );
-                        purposes : []String = []String::from_data(fields.get(2));
+                        purposes: []String = []String::from_data(fields.get(2));
 
                         // 1. ✅ a BookEntry & its authority delegate can be minted
                         // !!! more options to honor suggested-page and suggested-change scenarios
@@ -127,69 +127,126 @@ enum MintDelegateActivity {
                             purposes.length == 1 &&
                             purposes.get(0) == eidPurpose;
 
-                        assert(isMintingBookEntry, "wrong uuts");
+                        //! 2. Allows minting collaborator tokens, by authority of the charter's govAuthz
+                        //! 2a. collaborator token is sent to a provided address
+                        isMintingCollaboratorToken : Bool = 
+                            purposes.length == 1 &&
+                            purposes.get(0) == collaboratorPurpose;
+
+                        assert(isMintingBookEntry || isMintingCollaboratorToken, 
+                            "minting unrecognized UUTs "
+                            ///BAD: + purposes.show()
+                        );
 
                         txId: TxId = TxId::from_data(fields.get(0));
                         txoIndex : Int = Int::from_data(fields.get(1));
+            
                         mkTokenName : (String) -> String = mkUutTnFactory(txId, txoIndex);
-                        bookEntryId : Value = mkTv(mph, mkTokenName(eidPurpose));
-
-                        newTxo : TxOutput = getOutputWithValue(ctx, bookEntryId);
-                        assert(
-                            newTxo.value.get_assets().to_map().length == 1,
-                            //  "too many policies"  
-                             "invalid token bundle with various assets: "+newTxo.value.show()
-                        );
-                        assert(
-                            newTxo.value.get_policy(mph).length == 1, 
-                            // "too many tokens"
-                            "invalid with multiple tokens in the utxo"
-                        );
                 
-                        // print("parsing datum on "+newTxo.value.show());
-                        // print ("  -> "+ newTxo.datum.get_inline_data().serialize().show());
-                        // newDatum : CMDBookDatum = // outputDatum[CMDBookDatum](newTxo);
-
-                        CMDBookDatum::from_data(newTxo.datum.get_inline_data())
+                        if (isMintingCollaboratorToken) {
+                            self.checkCollaboratorTokenMint(priorMddd, collaboratorPurpose, mkTokenName, ctx)
+                        } else if (isMintingBookEntry) {
+                            self.checkBookEntryMint(priorMddd, eidPurpose, mkTokenName, ctx)
+                        } else {
+                            error("unreachable")
+                        }
                     },
                     _ => error("missing or wrong mint redeemer for our mph")
-                };
-
-
-                CMDBookDatum::BookEntry{_, newListing} = newDatum;
-        
-                txnTime : TimeRange = ctx.tx.time_range;        
-                now : Time = txnTime.start;
-                assert(/* 2a. ✅ */ 
-                    txnTime.contains(Time::new(newListing.createdAt)),
-                    "creationTime incorrect"); 
-                assert(/*  2b. ✅ */ 
-                    newListing.updatedAt == 0,
-                    "must not have updatedAt"
-                ); 
-                assert(/*  2c. ✅ */ 
-                    (txnTime.end - txnTime.start) < 1 * Duration::HOUR, 
-                    "validity period must be less than 1h"
-                    //    +", got "
-                    //    + ((txnTime.end - txnTime.start) / Duration::new(1)).show() + 
-                    // "ms instead" 
-                ); 
-                assert(/* 3. ✅ */ 
-                    Time::new(newListing.expiresAt) < ( now + 365*Duration::DAY ),
-                        "expiration time must be less than 1y") ; 
-
-                // 4. ✅ 
-                notModified : Bool = unmodifiedDelegation(priorMddd.serialize(), ctx);
-                
-                notModified && newDatum.validateEntry()
+                }
             },
             // Modifying => {
             //     // require that the charter is providing its authority
             //     // allow a change to the currentPrice
-            // }
+            // },
             _ => false //!!! doesn't allow any activity except Authorizing!
         } || ctx.tx.serialize() /* never */ == priorMddd.serialize()
         // ^^^ this is a no-op, uses this syntax to avoid unused variable errors
+    }
+
+    func checkCollaboratorTokenMint( self,
+        mintDelegateData: MintDelegateDatum::IsDelegation, 
+        purpose: String,
+        mkTokenName: (String) -> String,
+        ctx: ScriptContext
+    ) -> Bool { 
+        mph : MintingPolicyHash = mintDelegateData.dd.mph;                
+        expectedUutValue : Value = mkTv(mph, mkTokenName(purpose));
+        newTxo : TxOutput = getOutputWithValue(ctx, expectedUutValue);
+        assert(
+            newTxo.value.get_assets().to_map().length == 1,
+            //  "too many policies"  
+             "invalid token bundle with various assets: "+newTxo.value.show()
+        );
+        assert(
+            newTxo.value.contains_policy(mph),
+            "output doesn't have expected mph"
+        );
+        assert(
+            newTxo.value.get_policy(mph).length == 1, 
+            // "too many tokens"
+            "invalid with multiple tokens in the utxo"
+        );
+        true ||
+            self.serialize() /*never executed */ == ctx.serialize()
+    }
+
+    func checkBookEntryMint( self,
+        mintDelegateData: MintDelegateDatum::IsDelegation, 
+        purpose: String,
+        mkTokenName: (String) -> String,
+        ctx: ScriptContext
+    ) -> Bool {
+        //!!! self is an Authorizing activity
+        mph : MintingPolicyHash = mintDelegateData.dd.mph;                
+        expectedUutValue : Value = mkTv(mph, mkTokenName(purpose));
+        newTxo : TxOutput = getOutputWithValue(ctx, expectedUutValue);
+        assert(
+            newTxo.value.get_assets().to_map().length == 1,
+            //  "too many policies"  
+            "invalid token bundle with various assets: "+newTxo.value.show()
+        );
+        assert(
+            newTxo.value.contains_policy(mph),
+            "output doesn't have expected mph"
+        );
+        assert(
+            newTxo.value.get_policy(mph).length == 1, 
+            "invalid with multiple tokens in the utxo"
+        );
+    
+        // print("parsing datum on "+newTxo.value.show());
+        // print ("  -> "+ newTxo.datum.get_inline_data().serialize().show());
+        // newDatum : CMDBookDatum = // outputDatum[CMDBookDatum](newTxo);
+
+        newDatum : CMDBookDatum = CMDBookDatum::from_data(newTxo.datum.get_inline_data());
+        CMDBookDatum::BookEntry{_, newListing} = newDatum;
+
+        txnTime : TimeRange = ctx.tx.time_range;        
+        now : Time = txnTime.start;
+        assert(/* 2a. ✅ */ 
+            txnTime.contains(Time::new(newListing.createdAt)),
+            "creationTime incorrect"); 
+        assert(/*  2b. ✅ */ 
+            newListing.updatedAt == 0,
+            "must not have updatedAt"
+        ); 
+        assert(/*  2c. ✅ */ 
+            (txnTime.end - txnTime.start) < 1 * Duration::HOUR, 
+            "validity period must be less than 1h"
+            //    +", got "
+            //    + ((txnTime.end - txnTime.start) / Duration::new(1)).show() + 
+            // "ms instead" 
+        ); 
+        assert(/* 3. ✅ */ 
+            Time::new(newListing.expiresAt) < ( now + 365*Duration::DAY ),
+                "expiration time must be less than 1y") ; 
+
+        // 4. ✅ 
+        notModified : Bool = unmodifiedDelegation(mintDelegateData.serialize(), ctx);
+        
+        (notModified && newDatum.validateEntry()  ) ||
+            self.serialize() /*never executed */ == ctx.serialize()
+
     }
 
     //! used only for validating non-IsDelegation datum types.

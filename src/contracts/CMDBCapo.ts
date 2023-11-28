@@ -16,6 +16,7 @@ import {
     helios,
     txn,
     dumpAny,
+    hasUutContext,
 } from "@donecollectively/stellar-contracts";
 
 const { Value, TxOutput, Datum } = helios;
@@ -332,6 +333,26 @@ export class CMDBCapo extends DefaultCapo {
             entry.ownerAuthority
         );
         return delegate;
+    }
+
+    /**
+     * Creates a transaction minting a collaborator token 
+     * @remarks
+     * 
+     * Sends the collaborator token to the provided address
+     * @param address - recipient of the collaborator token
+     * @public
+     **/
+    @txn
+    async mkTxnMintCollaboratorToken(addr: Address) {
+        const tcx: hasUutContext<"collab"> = new StellarTxnContext();
+        const tcx2 = await this.mkTxnMintingUuts(tcx, ["collab"] )
+        return tcx2.addOutput(
+            new helios.TxOutput(
+                addr, 
+                this.mkMinTv(this.mph, tcx2.state.uuts.collab)
+            )
+        )
     }
 
     /**

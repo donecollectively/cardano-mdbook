@@ -21,11 +21,9 @@ import { BookHomePage } from "../../pages/book/[...args].jsx";
 import { NextRouter } from "next/router.js";
 import { PageView } from "./PageView.jsx";
 
-type stateUpdaterFunc = BookHomePage["updateState"];
 type propsType = {
     entry?: BookEntryForUpdate;
     create?: boolean;
-    updateState: stateUpdaterFunc;
     refresh: Function;
     router: NextRouter;
     onSave: Function;

@@ -11,15 +11,15 @@
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
     mph: {
-        bytes: "4024e18a73da770228ddd87935003be273caf7149d764879338afcd6",
+        bytes: "3abe04e0f54900c20105d33319c79264dd78920fd999584ad7f9b6ea",
     },
     rev: "1",
     seedTxn: {
-        bytes: "eba50171233c7581b03063485035114d5095c20ac50a520d021b620e2cbc366b",
+        bytes: "23fe32d5648699aa1b08f82ff808c3c39be974cc90f706beb5227799bf92243a",
     },
     seedIndex: "3",
     rootCapoScriptHash: {
-        bytes: "27feff2a4e4e2cb429faacf9d9b818875457181af816a1c509f97d14",
+        bytes: "6fc3cbd716bbaaea5e7bef6e7856966c9b2a013e0792dfde38130142",
     },
 };
 
@@ -132,6 +132,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         super(props);
         this.i = mountCount += 1;
         this.updateState = this.updateState.bind(this);
+        this.reportError = this.reportError.bind(this);
         this.goToInvite = this.goToInvite.bind(this);
         this.createBookEntry = this.createBookEntry.bind(this);
         this.fetchBookEntries = this.fetchBookEntries.bind(this);
@@ -313,7 +314,15 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             results = inPortal("topCenter", loading);
         } else if ("invite" == route) {
             if (wallet) {
-                results = <Invitation bookContract={bookContract} />;
+                results = (
+                    <Invitation
+                        {...{
+                            updateState: this.updateState,
+                            reportError: this.reportError,
+                            bookContract: bookContract,
+                        }}
+                    />
+                );
             } else {
                 this.connectWallet(false);
             }
@@ -327,6 +336,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                             walletHelper,
                             walletUtxos,
                             updateState: this.updateState,
+                            reportError: this.reportError,
                             refresh: this.fetchBookEntries,
                             router,
                         }}
@@ -340,14 +350,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             }
         } else if ("edit" == route) {
             if (wallet) {
-                const { updateState } = this;
                 const editing = this.state.bookEntryIndex[id];
                 results = (
                     <PageEditor
                         {...{
                             bookContract,
                             wallet,
-                            updateState,
+                            updateState: this.updateState,
+                            reportError: this.reportError,
                             refresh: this.fetchBookEntries,
                             router,
                         }}
@@ -364,7 +374,16 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             // status = "";
             const entry = this.state.bookEntryIndex[id];
             results = (
-                <PageView {...{ entry, wallet, walletUtxos, bookContract }} />
+                <PageView
+                    {...{
+                        entry,
+                        updateState: this.updateState,
+                        reportError: this.reportError,
+                        wallet,
+                        walletUtxos,
+                        bookContract,
+                    }}
+                />
             );
         } else {
             results = (
@@ -631,9 +650,9 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 );
             for (const tokenName of tokenNames) {
                 const role = tokenName.replace(/-.*/, "");
-                let label = 
-                    "capoGov" == role ? "editor" :
-                    "contrib" == role ? "contributor" : role;
+                let label =
+                    "capoGov" == role ? "editor" :  
+                    "contrib" == role ? "contributor" : role; //prettier-ignore
 
                 roles.push(label);
             }
@@ -784,6 +803,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
     reportError(e: Error, prefix: string, addlAttrs: Partial<stateType>) {
         console.error(e.stack || e.message);
+        debugger;
         return this.updateState(`${prefix} "${e.message}"`, {
             error: true,
             ...addlAttrs,

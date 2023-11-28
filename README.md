@@ -11,7 +11,7 @@ Please use `pnpm`, not `npm`.
 ### TODO
 
   - ✅ when not a collaborator, connecting the wallet should guide people to request a collaborator invite from the book's editor(s)
-  - enable collaborator-token minting with address
+  - ✅ enable collaborator-token minting with address
   - arrange ownerAuthority for each book entry using  collaborator token
   - enable markdown editor for page-creation
   - enable direct editing by page-owner
