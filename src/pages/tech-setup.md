@@ -28,6 +28,10 @@ Remember to click the Plug icon to enable the wallet to connect to dApps, and yo
 
 If you already have a preprod testnet wallet using some other wallet software, feel free to restore that same wallet into Eternl, using your existing mnemonics.  Simply select the Restore wallet option in Eternl after choosing the preprod testnet.
 
+### Getting an invitation
+
+Please reach out in Gimbalabs or ODIN's discord server to get a Collaborator invite.  
+
 ## Be Careful!
 
 A few pointers and recommendations for wallet safety:
