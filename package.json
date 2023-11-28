@@ -1,7 +1,11 @@
 {
     "name": "cardano-md-book",
     "version": "0.1.0",
-    "homepage": "https://donecollectively.github.io/cMDbook",
+    "engine-strict": true,
+    "engines": {
+        "node": ">=18"
+    },
+    "homepage": "https://donecollectively.github.io/cardano-mdbook",
     "description": "Markdown-based content management on Cardano",
     "license": "SEE LICENSE IN LICENSE.TXT",
     "main": "./dist/cardano-md-book.mjs",
@@ -32,7 +36,6 @@
     "browserslist": "defaults, not ie <= 11",
     "dependencies": {
         "@docsearch/react": "^3.2.1",
-        "@donecollectively/CaaSC": "../CaaSC",
         "@donecollectively/stellar-contracts": "../stellar-contracts",
         "@headlessui/react": "^1.7.2",
         "@markdoc/markdoc": "0.1.7",

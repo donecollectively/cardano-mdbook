@@ -1,6 +1,15 @@
 "use client";
 
-const ccrConfig = {
+// Making your own Cardano MDBook?  
+//   First, use the "null" config here.
+//   Next, charter your MDBook using the guide in the README file.
+//   Paste the configuration in place of the non-null config structure below.
+// 
+// 
+// const CMDB_BookContractConfig = null
+
+//!!! comment out the following block while using the "null" config.
+const CMDB_BookContractConfig = {
     mph: {
         bytes: "b1a0634ae5601f1922724edd9b29a097dd9b7ffa0b481dfaac4aaec6",
     },
@@ -536,8 +545,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             await this.connectWallet();
         }
         const { networkParams, wallet } = this.state;
-        let config = ccrConfig
-            ? { config: CMDBCapo.parseConfig(ccrConfig) }
+        let config = CMDB_BookContractConfig
+            ? { config: CMDBCapo.parseConfig(CMDB_BookContractConfig) }
             : { partialConfig: {} };
 
         if (!wallet) console.warn("connecting to registry with no wallet");
