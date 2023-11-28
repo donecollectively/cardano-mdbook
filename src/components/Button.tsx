@@ -21,6 +21,16 @@ const styles = {
         "focus:outline-none focus-visible:outline-2 "+
         "focus-visible:outline-offset-2 focus-visible:outline-white/50 "+
         "active:text-slate-400",
+    },
+    "secondary-sm": {
+        className: "not-prose rounded-md bg-blue-900 px-2 text-sm "+
+        "border border-solid border-blue-700/50 "+
+        "text-neutral-400 hover:bg-slate-700 "+
+        "disabled:bg-slate-700 disabled:border-blue-900 "+
+        "focus:outline-none focus-visible:outline-2 "+
+        "focus-visible:outline-offset-2 focus-visible:outline-white/50 "+
+        "active:text-slate-400",
+
     }
 };
 
@@ -28,14 +38,14 @@ type SpecialButtonProps =
 ( React.ComponentPropsWithoutRef<"button"> |
 React.ComponentPropsWithoutRef<typeof Link> ) & 
 {
-    variant? : "primary" | "secondary",
+    variant? : "primary" | "secondary" | "secondary-sm",
     href? : string
 }
 
 interface propsType {
     children: any,
     style?: Record<string,any>;
-    variant? : "primary" | "secondary",
+    variant? : "primary" | "secondary" | "secondary-sm",
     onClick: MouseEventHandler<any>,
     className? : string,
     href? : string

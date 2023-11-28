@@ -1,25 +1,25 @@
 "use client";
 
-// Making your own Cardano MDBook?  
+// Making your own Cardano MDBook?
 //   First, use the "null" config here.
 //   Next, charter your MDBook using the guide in the README file.
 //   Paste the configuration in place of the non-null config structure below.
-// 
-// 
+//
+//
 // const CMDB_BookContractConfig = null
 
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
     mph: {
-        bytes: "b1a0634ae5601f1922724edd9b29a097dd9b7ffa0b481dfaac4aaec6",
+        bytes: "db61925295a4bcb6aa28a0b9c9f6457354ae0fea7bc23272ffe10d68",
     },
     rev: "1",
     seedTxn: {
-        bytes: "8aa1c2ad2cb24794640f80903c61e2f06a172634e472adec5dd00fadc2fa1eb0",
+        bytes: "d249afac75097b735f444bbeff0e8ca3a3629b735e51b7048b4dee2373385711",
     },
-    seedIndex: "1",
+    seedIndex: "2",
     rootCapoScriptHash: {
-        bytes: "aeda5453e72ca3aa62b1aed0add11f51f1c81562f78d07d78d51938f",
+        bytes: "657760af82e464c23e1533c5f3c81e3971f25ed60f6a293fb9d7938c",
     },
 };
 
@@ -56,6 +56,7 @@ import { Button } from "../../components/Button.js";
 import { ClientSideOnly } from "../../components/ClientSideOnly.js";
 import { inPortal } from "../../inPortal.js";
 import { Progress } from "../../components/Progress.js";
+import { Invitation } from "../../local-comps/book/Invitation.jsx";
 
 // Helios types
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
@@ -83,6 +84,7 @@ type stateType = PageStatus & {
     walletHelper?: WalletHelper;
     walletUtxos?: TxInput[];
     networkName?: string;
+    roles?: string[];
     connectingWallet?: boolean;
     showDetail?: string;
     tcx?: StellarTxnContext<any>;
@@ -130,6 +132,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         super(props);
         this.i = mountCount += 1;
         this.updateState = this.updateState.bind(this);
+        this.goToInvite = this.goToInvite.bind(this);
         this.createBookEntry = this.createBookEntry.bind(this);
         this.fetchBookEntries = this.fetchBookEntries.bind(this);
         this.closeForm = this.closeForm.bind(this);
@@ -174,11 +177,15 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     }
 
     get currentRoute(): [
-        "list" | "view" | "create" | "edit",
+        "invite" | "list" | "view" | "create" | "edit",
         string | undefined
     ] {
         const { router } = this.props;
         const [arg1, arg2] = router.query.args || [];
+
+        if ("invite" == arg1) {
+            return ["invite", undefined];
+        }
 
         if ("create" == arg1) {
             return ["create", undefined];
@@ -203,6 +210,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             walletUtxos,
             walletHelper,
             status,
+            roles,
             showDetail,
             error,
             nextAction,
@@ -222,7 +230,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         }
 
         const loading = <Progress key={status}>loading</Progress>;
-        const walletInfo = inPortal("topRight", this.renderWalletInfo());
+        const walletInfo = this.renderWalletInfo();
         const showProgressBar = !!progressBar;
 
         const doNextAction = !!nextAction && (
@@ -248,6 +256,12 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 {moreInstructions}
             </>
         ) : null;
+        const roleInfo =  this.renderRoleInfo()
+        const inviteLink = roles?.includes("editor") ? this.inviteButton() : ""
+const topRightContent = inPortal("topRight", <>
+    {roleInfo} {walletInfo}
+    {inviteLink}
+</>);
 
         const progressLabel = "string" == typeof progressBar ? progressBar : "";
         const renderedStatus =
@@ -294,6 +308,12 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
         if (!bookDetails) {
             results = inPortal("topCenter", loading);
+        } else if ("invite" == route) {
+            if (wallet) {
+                results = <Invitation bookContract={bookContract} />
+            } else {
+                this.connectWallet(false);
+            }
         } else if ("create" == route) {
             if (wallet) {
                 results = (
@@ -358,7 +378,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
         const detail = showDetail ? (
             <Prose className={``}>
-                SHOWDETAIL
+                DETAILS
                 <pre>{showDetail}</pre>
             </Prose>
         ) : (
@@ -370,7 +390,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                     <title>‹proj title here?›- Cardano MDBook</title>
                 </Head>
                 {renderedStatus}
-                {walletInfo}
+                {topRightContent}
                 {detail}
                 {results}
                 {this.txnDump()}
@@ -380,6 +400,33 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 </Prose> */}
             </div>
         );
+    }
+
+    inviteButton() {
+        return <Button
+            variant="secondary-sm"
+            className="ml-2"
+            onClick={this.goToInvite}
+        >
+            Invite Collaborators
+        </Button>
+    }
+
+    goToInvite() {
+        this.props.router.push("/book/invite")
+    }
+
+    renderRoleInfo() {
+        const {roles} = this.state;
+        if (!roles) return
+
+        return <>
+            {roles.map(r => {
+                return <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                    {r}
+                </span>
+            })}
+        </>
     }
 
     doAction(action) {
@@ -395,7 +442,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         const { wallet, networkName, connectingWallet } = this.state;
 
         if (wallet) {
-            return <div>connected to {networkName}</div>;
+             return <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-blue-900 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+{networkName}</span>;
         } else if (connectingWallet) {
             return (
                 <div>
@@ -526,28 +574,73 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         }
 
         const walletHelper = new helios.WalletHelper(wallet);
+        await this.checkWalletTokens(wallet);
         await this.updateState("initializing registry with wallet connected", {
             wallet,
             connectingWallet: false,
             walletHelper,
             networkName,
         });
+
         walletHelper.getUtxos().then((walletUtxos) => {
             this.updateState(undefined, { walletUtxos });
         });
         return this.connectBookContract(autoNext);
     }
 
+    async checkWalletTokens(wallet: typeof helios.Cip30Wallet) {
+        const { bookContract } = this.state;
+        if (!bookContract) {
+            await this.updateState(
+                "no bookContract yet",
+                {},
+                "/// no book contract, skipping scan for authority tokens"
+            );
+            return;
+        }
+        const utxos: TxInput[] = await wallet.utxos;
+        const { mph } = bookContract;
+
+        await this.updateState(
+            "checking wallet for authority tokens ",
+            {},
+            "/// looking for authority tokens  in policy " + mph.hex
+        );
+        debugger;
+        const roles = [];
+        for (const u of utxos) {
+            const tokenNames = u.value.assets
+                .getTokenNames(mph)
+                .map((x) => helios.bytesToText(x.bytes))
+                .filter(
+                    (x) => x.startsWith("capoGov-") || x.startsWith("contrib-")
+                );
+            for (const tokenName of tokenNames) {
+                const role = tokenName.replace(/-.*/, "");
+                let label = 
+                    "capoGov" == role ? "editor" :
+                    "contrib" == role ? "contributor" : role;
+
+                roles.push(label);
+            }
+        }
+        const message = roles.includes("contributor") ? "" : 
+            "To be a contributor on this project, please send your wallet address to the book editor"
+        
+        this.updateState(message, { roles }, "/// found roles");
+    }
+
     // -- step 3 - check if the book contract is ready for use
-    async connectBookContract(autoNext = true) {
+    async connectBookContract(autoNext = true, reset?: "reset") {
         const [route] = this.currentRoute;
         if ("create" == route || "edit" == route) {
             await this.connectWallet();
         }
         const { networkParams, wallet } = this.state;
-        let config = CMDB_BookContractConfig
-            ? { config: CMDBCapo.parseConfig(CMDB_BookContractConfig) }
-            : { partialConfig: {} };
+        let config =
+            !reset && CMDB_BookContractConfig
+                ? { config: CMDBCapo.parseConfig(CMDB_BookContractConfig) }
+                : { partialConfig: {} };
 
         if (!wallet) console.warn("connecting to registry with no wallet");
         let cfg: StellarConstructorArgs<ConfigFor<CMDBCapo>> = {
@@ -565,11 +658,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             const bookContract = new CMDBCapo(cfg);
             const isConfigured = await bookContract.isConfigured;
             if (!isConfigured) {
-                // alert("not configured");
-                await this.updateState(
-                    `This Cardano MDBook contract isn't yet created or configured.  Add a configuration if you have it, or create the contract now.`,
-                    { bookContract, nextAction: "initializeBookContract" }
-                );
+                const message = autoNext
+                    ? `Creds Registry contract isn't yet created or configured.  Add a configuration if you have it, or create the registry now.`
+                    : "";
+
+                await this.updateState(message, {
+                    bookContract,
+                    nextAction: "initializeBookContract",
+                });
                 return;
                 // return this.stellarSetup();
             }
@@ -601,12 +697,13 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     async bootstrapBookContract() {
         if (!this.state.wallet) await this.connectWallet();
 
-        await this.updateState(
-            "creating the MDBook charter transaction ...",
-            { progressBar: true }
-        );
-
+        await this.connectBookContract(false, "reset");
         const { bookContract, wallet } = this.state;
+
+        await this.updateState("creating the MDBook charter transaction ...", {
+            progressBar: true,
+        });
+
         let tcx: Awaited<
             ReturnType<stateType["bookContract"]["mkTxnMintCharterToken"]>
         >;

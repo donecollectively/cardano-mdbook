@@ -123,8 +123,10 @@ enum MintDelegateActivity {
 
                         // 1. ✅ a BookEntry & its authority delegate can be minted
                         // !!! more options to honor suggested-page and suggested-change scenarios
+                        isMintingBookEntry : Bool = 
                             purposes.length == 1 &&
-                            purposes.get(0) == eidPurpose
+                            purposes.get(0) == eidPurpose;
+
                         assert(isMintingBookEntry, "wrong uuts");
 
                         txId: TxId = TxId::from_data(fields.get(0));

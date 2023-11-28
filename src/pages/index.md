@@ -23,11 +23,11 @@ People can create a new scope of documentation directly in our application, and 
 
 #### Through the dAPI
 
-cMDBook will also offer a dAPI interface, allowing documentation to be processed programmatically and using command-line tools.  A dAPI works similarly a traditional API or SDK, with well-documented points of access to application-specific details and functionality, yet without any need for a centralized server operated by a SaaS provider.  
+cMDBook will also offer a dAPI interface, allowing documentation to be processed programmatically and using command-line tools.  A dAPI works similarly to a traditional API or SDK, with well-documented points of access to application-specific details and functionality, yet without any need for a centralized server operated by a SaaS provider.  
 
 All functions of an application's UI are typically available within that application's dAPI.  
 
-This supports a CORE PRINCIPLE OF OPENNESS, and is an integration point enabling organizations to conduct mass-importing or mass-exporting activities, custom UI, and other automations for additional use-cases supporting your creativity.
+This supports a CORE PRINCIPLE OF OPENNESS, and is an integration point enabling you to conduct mass-importing or mass-exporting activities, create custom UI and other automations for additional use-cases supporting your creativity.
 
 Read our dAPI docs - TODO: add link(s).
 

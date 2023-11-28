@@ -61,7 +61,7 @@ enum Datum {
                 goodTypes = Map[String]Bool{
                     "pg":true, //page
                     "spg": true,  // suggested page
-                    "chg": true,  // suggested change
+                    "chg": true  // suggested change
                 };
                 assert(goodTypes.get_safe(entry.entryType).switch{
                     None => error("invalid entryType"),

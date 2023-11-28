@@ -21,5 +21,6 @@ export class CMDBMintDelegate extends BasicMintDelegate {
 
         return this._c = mkHeliosModule(CMDBSpecialCapo, "specializedCapo")
     }
-
 }
+
+

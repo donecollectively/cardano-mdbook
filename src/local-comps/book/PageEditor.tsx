@@ -155,7 +155,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         } = this.state || {};
         const { entry, create, onClose, onSave, bookContract } = this.props;
         if (!rec) return ""; //wait for didMount
-        const showTitle = <>{create && "Creating"} Page</>;
+        const showTitle = <>{create ? "Creating new" : "Edit"} page</>;
         let sidebarContent;
         const foundProblems = submitting && Object.keys(problems).length;
         {
@@ -193,7 +193,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
 
                                 <p style={{ fontStyle: "italic" }}>
                                     The page will start in "suggested" state, and will have an expiration date.
-                                    The book administrators can accept the page officially into the book.  You'll
+                                    The book editor(s) can accept the page officially into the book.  You'll
                                     normally continue to have ownership of the page, with the authority to 
                                     approve changes to the page content.
                                 </p>
@@ -205,6 +205,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
             }
         }
 
+        const breadcrumbTitle = create ? "new" : rec.title;
         return (
             <div>
                 <Head>
@@ -212,7 +213,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                 </Head>
                 <header className="mb-9 space-y-1">
                     <p className="font-display text-sm font-medium text-sky-500">
-                        Table of Contents
+                        Book&nbsp;&nbsp;››&nbsp;&nbsp;Topics&nbsp;&nbsp;››&nbsp;&nbsp;&nbsp;{breadcrumbTitle}
                     </p>
                 </header>
                 {sidebarContent}
@@ -269,9 +270,9 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                             return "must be at least 8 characters";
                                     },
                                 })}
-                                {this.field("Content", "pageContent", {
-                                    type: "markdown",
-                                    rows: 50,
+                                {this.field("Content", "content", {
+                                    type: "textarea",
+                                    rows: 15,
                                     validator(v) {
                                         if (v.length < 40)
                                             return "must be at least 40 characters";

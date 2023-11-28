@@ -23,7 +23,7 @@ export function Logo(props) {
         Cardano MDBook {/* !!!customize */}
       </text>
       <text x="38.8" y="45.5" fill="#ffffff" fontWeight="bold" fontSize="small">
-        from Stellar Contracts {/* !!!customize */}
+        created with Stellar Contracts {/* !!!customize */}
       </text>
     </svg>
   )

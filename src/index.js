@@ -15,6 +15,7 @@ export const navigation = [
         title: "More",
         links: [
             { title: "About the project", href: "/about-cmdbook" },
+            { title: "This dApp is self-sovereign", href: "/self-sovereign" },
             { title: "Cardano MDBook Guide", href: "/cmdbook-guide" },
         ],
     },
