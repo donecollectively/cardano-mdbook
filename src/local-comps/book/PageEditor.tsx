@@ -62,18 +62,11 @@ type FieldProps = {
 
 type ChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
 
-const testCredInfo = {
-    expectations: [""],
-//!!! todo
-    // credName: `Sample ${new Date().toUTCString()}`,
-    // credDesc: "test description",
-    // credSummary: "tester",
-    // credType: "testing",
-    // expectations: ["none"],
-    // issuerName: "nobody",
-    // issuingGovInfo: "hi!",
-    // credIssuerDID: "n/a",
-};
+const testCredInfo : Partial<BookEntry> = {
+    title: "Test Page",
+    entryType: "pg",
+    content: "## test page\n\nthis is a sample paragraph",    
+} ;
 
 const buttonStyle = {
     padding: "0.75em",
@@ -118,13 +111,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
 
     async componentDidMount() {
-        const { entry: cred, bookContract: bookContract } = this.props;
+        const { entry, bookContract } = this.props;
         // console.error(`MOUNTED CredForm ${this.i}`)
         const current =
-            cred?.cred ||
+            entry?.entry ||
             ({
                 ...testCredInfo,
-                // expectations: ["", ""],
             } as BookEntry);
         await new Promise((res) => {
             this.setState(
@@ -161,7 +153,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
             submitting,
             problems,
         } = this.state || {};
-        const { entry: cred, create, onClose, onSave, bookContract } = this.props;
+        const { entry, create, onClose, onSave, bookContract } = this.props;
         if (!rec) return ""; //wait for didMount
         const showTitle = <>{create && "Creating"} Credential Listing</>;
         let sidebarContent;
@@ -184,17 +176,26 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                         marginTop: "4em",
                                     }}
                                 >
-                                    Your credential will be listed on our
+                                    The page content will shown on this
                                     website and visible in the Cardano
-                                    blockchain. We'll create a bearer token in
-                                    your wallet and a registry entry in our
-                                    Registry smart contract.
+                                    blockchain. 
                                 </p>
+                            
+                                <p
+                                    style={{
+                                        fontStyle: "italic",
+                                        marginTop: "4em",
+                                    }}
+                                >
+                                    Your collaborator-token is required for making modifications to the page, 
+                                    and for accepting changes other collaborators may propose.
+                                </p>                                
+
                                 <p style={{ fontStyle: "italic" }}>
-                                    The listing will have an expiration date,
-                                    and you can update details or extend its
-                                    lifetime just by coming back here, with the
-                                    bearer token still in your Cardano wallet.
+                                    The page will start in "suggested" state, and will have an expiration date.
+                                    The book administrators can accept the page officially into the book.  You'll
+                                    normally continue to have ownership of the page, with the authority to 
+                                    approve changes to the page content.
                                 </p>
                             </Prose>,
                             portalTarget
@@ -346,7 +347,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                             <hr className="not-prose mb-2" />
                             <PageView
                                 {...{
-                                    cred: { ...cred, cred: rec },
+                                    entry: { ...entry, entry: rec },
                                     bookContract,
                                 }}
                                 preview
@@ -495,13 +496,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
     changed: ChangeHandler = (e) => {
         //! adds an empty item at the end of the list of expectations
         const {
-            current: { expectations },
+            current: {  },
             gen = 0,
         } = this.state;
 
         const f = this.form.current;
         const updatedCred = this.capture(f);
-        if (updatedCred.expectations.at(-1)) updatedCred.expectations.push("");
 
         this.setState({
             current: updatedCred,
@@ -516,14 +516,13 @@ export class PageEditor extends React.Component<propsType, stateType> {
         ) as unknown as BookEntry;
         const exp = formData.getAll("expectations") as string[];
 
-        updatedCred.expectations = exp;
         return updatedCred;
     }
 
     async save(e: React.SyntheticEvent) {
         const { current: rec } = this.state;
         const {
-            entry: credForUpdate,
+            entry: entryForUpdate,
             refresh,
             updateState,
             bookContract,
@@ -544,15 +543,13 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const form = e.target as HTMLFormElement;
         const updatedCred = this.capture(form);
 
-        while (!updatedCred.expectations.at(-1)) updatedCred.expectations.pop();
-
         try {
             const txnDescription = `${create ? "creation" : "update"} txn`;
             updateState(`preparing ${txnDescription}`, { progressBar: true });
             const tcx = create
-                ? await bookContract.mkTxnCreatingRegistryEntry(updatedCred)
-                : await bookContract.mkTxnUpdatingRegistryEntry({
-                      ...credForUpdate,
+                ? await bookContract.mkTxnCreatingBookEntry(updatedCred)
+                : await bookContract.mkTxnUpdatingEntry({
+                      ...entryForUpdate,
                       updated: updatedCred,
                   });
             console.warn(dumpAny(tcx));

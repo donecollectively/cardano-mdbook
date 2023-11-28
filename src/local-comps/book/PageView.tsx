@@ -21,7 +21,7 @@ const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hWallet = typeof Cip30Wallet.prototype;
 
 type propsType = {
-    cred: BookEntryForUpdate;
+    entry: BookEntryForUpdate;
     wallet?: hWallet;
     preview? : true
 } & BookManagementProps
@@ -36,7 +36,7 @@ export class PageView extends React.Component<propsType, stateType> {
         if (!rendered) setTimeout(() => this.setState({rendered:true}), 10);
 
         const {
-            cred: { cred: page },
+            entry: { entry: page },
             wallet,
             preview,
         } = this.props;
@@ -47,33 +47,34 @@ export class PageView extends React.Component<propsType, stateType> {
 
         return (
             <>
-                <Head>
+                {preview || <Head>
                     <title>
-                        {page.pageTitle}
+                        {page.title}
                     </title>
-                </Head>
+                </Head>}
 
                 {wallet && (
                     <div className="float-right">
                         {this.possibleEditButton()}
                     </div>
                 )}
-                <h2>{page.pageTitle}</h2>
+                <h2>{page.title}</h2>
+
                 <div>
-                    <Markdoc content={page.pageContent} />
+                    <Markdoc content={page.content} />
                 </div>
             </>
         );
     }
 
     possibleEditButton() {
-        const {walletUtxos, bookContract, cred} = this.props;
+        const {walletUtxos, bookContract, entry} = this.props;
         if (!walletUtxos) return "...loading wallet utxos..."; // undefined
 
-        const tokenPredicate = bookContract.mkDelegatePredicate(cred.credAuthority)
+        const tokenPredicate = bookContract.mkDelegatePredicate(entry.ownerAuthority)
         const foundToken = walletUtxos.find(tokenPredicate)
         if (!foundToken) return "no tokens" //undefined
 
-        return <Button href={`${cred.id}/edit`}>Update Listing</Button>
+        return <Button href={`${entry.id}/edit`}>Update Listing</Button>
     }
 }

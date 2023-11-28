@@ -41,7 +41,7 @@ import {
     BookEntryOnchain,
 } from "../../contracts/CMDBCapo.js";
 import { PageEditor } from "../../local-comps/book/PageEditor.jsx";
-import { CredsList } from "../../local-comps/book/BookPages.jsx";
+import { BookPages } from "../../local-comps/book/BookPages.jsx";
 import { PageView } from "../../local-comps/book/PageView.js";
 import { Button } from "../../components/Button.js";
 import { ClientSideOnly } from "../../components/ClientSideOnly.js";
@@ -79,7 +79,7 @@ type stateType = PageStatus & {
     tcx?: StellarTxnContext<any>;
 
     bookDetails?: BookEntryForUpdate[];
-    bookRecordIndex?: { [k: string]: BookEntryForUpdate };
+    bookEntryIndex?: { [k: string]: BookEntryForUpdate };
 
     nextAction?: keyof typeof actionLabels;
     moreInstructions?: string;
@@ -147,12 +147,6 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         await this.updateState("", {}, "//triggering creation screen");
         this.router.push(`/book/create`, "", { shallow: true });
         // window.history.pushState("", "", "/book/create")
-    }
-
-    editCredential(id: string) {
-        throw new Error(`unused`);
-        this.updateState("", {}, "//edit credential via router");
-        // this.router.push(`/book/${id}/edit`);
     }
 
     closeForm() {
@@ -319,7 +313,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         } else if ("edit" == route) {
             if (wallet) {
                 const { updateState } = this;
-                const editing = this.state.bookRecordIndex[id];
+                const editing = this.state.bookEntryIndex[id];
                 results = (
                     <PageEditor
                         {...{
@@ -340,19 +334,18 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             }
         } else if ("view" == route) {
             // status = "";
-            const cred = this.state.bookRecordIndex[id];
+            const entry = this.state.bookEntryIndex[id];
             results = (
-                <PageView {...{ cred, wallet, walletUtxos, bookContract }} />
+                <PageView {...{ entry, wallet, walletUtxos, bookContract }} />
             );
         } else {
             results = (
-                <CredsList
+                <BookPages
                     {...{
                         bookDetails: bookDetails,
                         createBookEntry: this.createCredential,
                         bookContract,
-                        credsStatus: status,
-                        editCredId: this.editCredential,
+                        bookMgrStatus: status,
                         // refreshCreds
                     }}
                 />
@@ -541,7 +534,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         return this.connectBookContract(autoNext);
     }
 
-    // -- step 3 - check if the creds registry is ready for use
+    // -- step 3 - check if the book contract is ready for use
     async connectBookContract(autoNext = true) {
         const [route] = this.currentRoute;
         if ("create" == route || "edit" == route) {
@@ -579,8 +572,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             if (!autoNext)
                 return this.updateState(
                     "",
-                    { bookContract: bookContract },
-                    "//creds registry connected to wallet, ready to do an on-chain activity"
+                    { bookContract },
+                    "// book manager is connected to wallet, ready to do an on-chain activity"
                 );
 
             await this.updateState(
@@ -688,20 +681,20 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         const found = await this.bf.getUtxos(bookContract.address);
         const { mph } = bookContract;
 
-        const allCreds: BookEntryForUpdate[] = [];
-        const credsIndex = {};
+        const bookDetails: BookEntryForUpdate[] = [];
+        const bookEntryIndex = {};
         const waiting: Promise<any>[] = [];
         for (const utxo of found) {
             waiting.push(
-                bookContract.readRegistryEntry(utxo).then((cred) => {
-                    if (!cred) return;
-                    allCreds.push(cred);
-                    credsIndex[cred.id] = cred;
+                bookContract.readBookEntry(utxo).then((entry) => {
+                    if (!entry) return;
+                    bookDetails.push(entry);
+                    bookEntryIndex[entry.id] = entry;
                 })
             );
         }
         await Promise.all(waiting);
-        this.updateState("", { bookDetails: allCreds, bookRecordIndex: credsIndex });
+        this.updateState("", { bookDetails, bookEntryIndex });
     }
 
     /**

@@ -79,8 +79,8 @@ enum MintDelegateActivity {
     ) -> Bool {
         self.switch {
             Authorizing => {
-                //! 1. allows minting BookPage records (bkpg- uut + optional suggAuthz uut [required when the record is a suggestion] )
-                //! 1a. creating a (non-suggestion, type=pg) BookPage requires charter authority
+                //! 1. allows minting BookEntry records (eid-* uut)
+                //! 1a. creating a (non-suggestion, type=pg) BookEntry requires charter authority
                 //! 1b. creating a Suggested Page (type=spg) requires a collaborator token
                 //! 1c. creating a Suggested Change (type=chg) requires a collaborator token
                 //! 2. Allows minting collaborator tokens, by authority of the charter token
@@ -107,14 +107,13 @@ enum MintDelegateActivity {
                 // isMintingBookPage : Bool = mintingActivity.switch {
                 //     mintingUuts{_, _, purposes} => {
                 //         purposes.length == 2 &&
-                //         purposes.get(0) == "regCred" &&
-                //         purposes.get(1) == "credListingAuthz"
+                //         purposes.get(0) == "eid" &&
                 //     },
                 // //  fails with surprising error:
                 // targetValue : Value = mintingActvity.tvForPurpose(pgIdPurpose)
 
-                pgIdPurpose : String = "regCred";
-                suggAuthzPurpose : String = "suggAuthz";
+                eidPurpose : String = "eid";
+                // removed: suggAuthzPurpose : String = "suggAuthz";
                 newDatum : CCRegDatum = ctx.tx.redeemers.get(k).switch {
                     (index: Int, fields: []Data) => {
                         assert (index == 1 && fields.length == 3,
@@ -122,19 +121,18 @@ enum MintDelegateActivity {
                         );
                         purposes : []String = []String::from_data(fields.get(2));
 
-                        // 1. ✅ a BookPage & its authority delegate can be minted
+                        // 1. ✅ a BookEntry & its authority delegate can be minted
                         // !!! more options to honor suggested-page and suggested-change scenarios
-                            purposes.length == 2 &&
-                            purposes.get(0) == regCredPurpose &&
-                            purposes.get(1) == credAuthzPurpose;
-                        assert(isMintingRegistryEntry, "wrong uuts");// "not minting correct UUTs for credential registry");
+                            purposes.length == 1 &&
+                            purposes.get(0) == regCredPurpose
+                        assert(isMintingRegistryEntry, "wrong uuts");
 
                         txId: TxId = TxId::from_data(fields.get(0));
                         txoIndex : Int = Int::from_data(fields.get(1));
                         mkTokenName : (String) -> String = mkUutTnFactory(txId, txoIndex);
-                        credListingId : Value = mkTv(mph, mkTokenName(regCredPurpose));
+                        bookEntryId : Value = mkTv(mph, mkTokenName(eidPurpose));
 
-                        newTxo : TxOutput = getOutputWithValue(ctx, credListingId);
+                        newTxo : TxOutput = getOutputWithValue(ctx, bookEntryId);
                         assert(
                             newTxo.value.get_assets().to_map().length == 1,
                             //  "too many policies"  
@@ -182,12 +180,6 @@ enum MintDelegateActivity {
                 notModified : Bool = unmodifiedDelegation(priorMddd.serialize(), ctx);
                 
                 notModified && newDatum.validateCredential()
-
-                // for DRED node operations:
-                // DON'T unmodifiedDelegation(priorMddd.serialize(), ctx) && 
-                // instead:
-                //  - enforce that the fee === old price is being paid
-                //  - enforce that the new price for the next Dred Operator NFT is 2.04 * the earlier price
             },
             // Modifying => {
             //     // require that the charter is providing its authority

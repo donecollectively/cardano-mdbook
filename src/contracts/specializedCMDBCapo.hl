@@ -21,19 +21,10 @@ import {
 
 
 
-struct CredStruct {
-    credType: String
-    credName: String
-    credDesc: String
-    credIssuerDID: String
-    issuerName: String
-    expectations: []String
-    issuingGovInfo: String
-    // regSpace: String
-                //  "Cardano on-chain"
-    issuancePlatform: String
-    issuanceUrl: String
-    props: Map[String]String
+struct BookEntryStruct {
+    entryType: String
+    title: String
+    content: String
     createdAt: Int
     updatedAt: Int
     expiresAt: Int
@@ -44,8 +35,8 @@ enum Datum {
         mintDelegateLink: RelativeDelegateLink
     }
     RegisteredCredential {
-        credAuthority: RelativeDelegateLink
-        cred: CredStruct
+        ownerAuthority: RelativeDelegateLink
+        entry: BookEntryStruct
     }
 
     //! datum-validation only supports checks of absolute spendability, 
@@ -60,7 +51,7 @@ enum Datum {
 
     func validateCredential(self) -> Bool{
         self.switch{
-            RegisteredCredential{_, cred} => {
+            RegisteredCredential{_, entry} => {
                 needsLength : (String, String, Int) -> () = (v : String, fn : String, min : Int) -> {
                     assert(v.encode_utf8().length >= min,
                         "length error"//, fn + " needs " +min.show() + " chars or more"
@@ -72,30 +63,14 @@ enum Datum {
                     "spg": true,  // suggested page
                     "chg": true,  // suggested change
                 };
-                assert(goodTypes.get_safe(cred.credType).switch{
-                    None => error("invalid credType"),
+                assert(goodTypes.get_safe(entry.entryType).switch{
+                    None => error("invalid entryType"),
                     _ => true
                 }, ""); // already failed as invalid ^^
 
-                assert(goodPlatforms.get_safe(cred.issuancePlatform).switch{
-                    None => error("invalid issuancePlatform"),
-                    _ => true
-                }, ""); // already failed as invalid ^^
+                needsLength(entry.title, "title", 10);
+                needsLength(entry.content, "content", 40);
 
-                needsLength(cred.credName, "credName", 10);
-                needsLength(cred.credDesc, "credDesc", 40);
-                needsLength(cred.issuingGovInfo, "issuingGovInfo", 100);
-                needsLength(cred.issuerName, "issuerName", 4);
-                // assert(cred.credName.encode_utf8().length > 10, needsLength("credName", 10));
-                // assert(cred.credDesc.encode_utf8().length > 40, needsLength("credDesc", 40));
-                // assert(cred.issuingGovInfo.length > 100, needsLength("issuingGovInfo", 100));
-                // assert(cred.issuerName.length > 4, needsLength("issuerName", 4));
-
-                assert(
-                    cred.credIssuerDID.encode_utf8().length == 0 || 
-                    cred.credIssuerDID.starts_with("did:"), 
-                    "invalid DID"//"credIssuerDID must start with 'did:' if specified"
-                );
                 true
             },
             _ => error("wrong datum")//"validateCredential only works on RegisteredCredential datum")
@@ -125,7 +100,7 @@ enum Activity {
     }
 
     // func allowUpdatingCredential(_,_,_) -> Bool {
-    func allowUpdatingCredential(self, credAuthority: RelativeDelegateLink, oldListing: CredStruct, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+    func allowUpdatingCredential(self, ownerAuthority: RelativeDelegateLink, oldListing: BookEntryStruct, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
         txnTime : TimeRange = ctx.tx.time_range;        
         newTxo : TxOutput = getOutputForInput(ctx, ctx.get_current_input());
         // already checked by getOutputForInput()
@@ -134,7 +109,7 @@ enum Activity {
 
         newDatum : Datum = outputDatum[Datum](newTxo);
         Datum::RegisteredCredential{newAuthority, newListing} = newDatum;
-        assert(newAuthority == credAuthority, "authority change invalid");
+        assert(newAuthority == ownerAuthority, "authority change invalid");
 
         // createdAt: Int
         assert(newListing.createdAt == oldListing.createdAt, "createdAt must not be modified");
@@ -150,7 +125,7 @@ enum Activity {
         ( 
             // rc + delegated approval -> rc with validation
             // or rc + charter -> rc with validation
-            requiresValidDelegateOutput(credAuthority, mph, ctx) &&
+            requiresValidDelegateOutput(ownerAuthority, mph, ctx) &&
                 newDatum.validateCredential() 
         ) ||
         ( 
@@ -171,15 +146,15 @@ enum Activity {
         );
 
         datum.switch{
-            RegisteredCredential{credAuthority, cred} => {
+            RegisteredCredential{ownerAuthority, entry} => {
                 self.switch{
-                    updatingCredential => self.allowUpdatingCredential(credAuthority, cred, ctx, mph),
+                    updatingCredential => self.allowUpdatingCredential(ownerAuthority, entry, ctx, mph),
                     retiringCredential => self.allowRetiringCredential(datum, ctx, mph),
                     // registeringCredential => assert(false, "unreachable code"),
                     _ => error("unreachable code")
                 }
                // not executed, but prevents the args from showing up as unused:
-                || ( credAuthority.serialize() != cred.serialize() )
+                || ( ownerAuthority.serialize() != entry.serialize() )
             },
             _ => error("unhandled datum type")
             // not executed, but prevents the args from showing up as unused:
@@ -188,12 +163,12 @@ enum Activity {
 }
 
 struct typeInfo {
-    credStruct: CredStruct
+    bookEntryStruct: BookEntryStruct
     datum: Datum
     redeemers: Activity
 }
 const types : typeInfo = typeInfo {
-    CredStruct::from_data(Data{}),
+    BookEntryStruct::from_data(Data{}),
     Datum::from_data(Data{}),
     Activity::from_data(Data{})
 }

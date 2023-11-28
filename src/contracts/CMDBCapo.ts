@@ -32,36 +32,31 @@ import specializedCapo from "./specializedCMDBCapo.hl"; // assert { type: 'text'
 import { CMDBMintDelegate } from "./CMDBMintDelegate.js";
 
 export type BookEntryOnchain = {
-    credAuthority: RelativeDelegateLink<AuthorityPolicy>;
-    cred: BookEntry;
+    ownerAuthority: RelativeDelegateLink<AuthorityPolicy>;
+    entry: BookEntry;
 };
 
 export type BookEntry = {
-    credType: string;
-    credName: string;
-    credDesc: string;
-    credIssuerDID: string;
-    issuerName: string;
-    expectations: string[];
-    issuingGovInfo: string;
+    entryType: string;
+    title: string;
+    content: string;
+    suggestedBy: string;
     createdAt: bigint;
     updatedAt: bigint;
     expiresAt: bigint;
-    issuancePlatform: string;
-    issuanceUrl: string;
 };
 
-type credId = BookEntryOnchain["credAuthority"]["uutName"];
+type entryId = string;
 export type BookEntryCreate = BookEntryOnchain & {
-    id: credId;
+    id: entryId;
 };
 
 export type BookEntryForUpdate = BookEntryOnchain & {
-    id: credId;
+    id: entryId;
     utxo: TxInput;
     updated?: BookEntry;
 };
-export type RegisteredCredentialUpdated = {
+export type BookEntryUpdated = {
     updated: BookEntry;
 } & BookEntryForUpdate;
 
@@ -78,7 +73,7 @@ export class CMDBCapo extends DefaultCapo {
     }
 
     @Activity.redeemer
-    protected activityUpdatingCredential(): isActivity {
+    protected activityUpdatingEntry(): isActivity {
         const { updatingCredential } = this.onChainActivitiesType;
         const t = new updatingCredential();
 
@@ -87,62 +82,48 @@ export class CMDBCapo extends DefaultCapo {
 
     @datum
     mkDatumRegisteredCredential<
-        T extends BookEntryCreate | RegisteredCredentialUpdated
+        T extends BookEntryCreate | BookEntryUpdated
     >(d: T): InlineDatum {
         //!!! todo: make it possible to type these datum helpers more strongly
         //  ... at the interface to Helios
         console.log("--> mkDatumCharter", d);
         const { RegisteredCredential: hlRegisteredCredential } =
             this.onChainDatumType;
-        const { CredStruct: hlCredStruct } = this.onChainTypes;
+        const { BookEntryStruct: hlBookEntryStruct } = this.onChainTypes;
 
         //@ts-expect-error can't seem to tell the the Updated alternative actually does have this attribut,
         //    ... just because the Create alternative does not...
-        const rec = d.updated || (d.cred as BookEntry);
+        const rec : BookEntry = d.updated || (d.entry as BookEntry);
 
         //@ts-expect-error
         if (d.updated) {
-            rec.createdAt = d.cred.createdAt;
-            rec.updatedAt = Date.now();
+            rec.createdAt = d.entry.createdAt;
+            rec.updatedAt = BigInt(Date.now());
         } else {
-            rec.createdAt = Date.now();
+            rec.createdAt = BigInt(Date.now());
             rec.updatedAt = 0n;
         }
-        rec.expiresAt = Date.now() + 364 * 24 * 60 * 60 * 1000;
+        rec.expiresAt = BigInt(Date.now() + 364 * 24 * 60 * 60 * 1000);
         const {
-            credType,
-            credName,
-            credDesc,
-            credIssuerDID,
-            issuerName,
-            expectations,
-            issuingGovInfo,
-            issuancePlatform,
-            issuanceUrl,
+            entryType,
+            title,
+            content,
             createdAt,
             updatedAt,
             expiresAt,
         } = rec;
 
-        const credAuthority = this.mkOnchainDelegateLink(d.credAuthority);
+        const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
         debugger;
-        const credStruct = new hlCredStruct(
-            credType,
-            credName,
-            credDesc,
-            credIssuerDID,
-            issuerName,
-            expectations,
-            issuingGovInfo,
-            issuancePlatform,
-            issuanceUrl,
-            new Map(),
+        const bookEntryStruct = new hlBookEntryStruct(
+            entryType,
+            title,
+            content,
             createdAt,
             updatedAt,
             expiresAt
         );
-        const t = new hlRegisteredCredential(credAuthority, credStruct);
-        debugger;
+        const t = new hlRegisteredCredential(ownerAuthority, bookEntryStruct);
         return Datum.inline(t._toUplcData());
     }
 
@@ -152,8 +133,8 @@ export class CMDBCapo extends DefaultCapo {
         const { baseClass, uutPurpose, variants } = pMD;
         return {
             ...inherited,
-            credAuthority: defineRole(
-                "credListingAuthz",
+            ownerAuthority: defineRole(
+                "ownerAuthz",
                 AuthorityPolicy,
                 inherited.govAuthority.variants
             ),
@@ -170,40 +151,39 @@ export class CMDBCapo extends DefaultCapo {
     }
 
     /**
-     * Creates a new credential listing and sends the authority/bearer token to the user's wallet
+     * Creates a new record, marking the record with the collaborator's authority token
      * @remarks
      *
-     * Any user can submit a credential for listing in the registry by submitting key
-     * information about their credential, its meaning, and the governance process used
-     * for people to receive the credential.
-     * @param cred - details of the listing
+     * Any collaborator can create a suggested-page or edit-suggestion, by submitting key
+     * information, along with their collaborator token
+     * 
+     * @param entry - details of the listing
      * @param iTcx - optional initial transaction context
      * @public
      **/
     @txn
-    async mkTxnCreatingRegistryEntry<TCX extends StellarTxnContext<any>>(
-        cred: BookEntry,
+    async mkTxnCreatingBookEntry<TCX extends StellarTxnContext<any>>(
+        entry: BookEntry,
         iTcx?: TCX
     ): Promise<TCX> {
-        // to make a new cred entry, we must:
-        //  - make a UUT for the credential listing (in-contract datum)
-        //  - ... and a UUT for administrative authority on that credential
-        //  -    ^^ includes the mint-delegate for authorizing creation of the credential-listing
-        debugger;
+        // to make a new book entry, we must:
+        //  - make a UUT for the record (in-contract datum)
+        //     - includes the mint-delegate for authorizing creation of the entry
+        //  - assign the user's collaborator token as the administrative authority
+
         const tcx = await this.mkTxnMintingUuts(
             iTcx || new StellarTxnContext<any>(this.myActor),
-            ["regCred", "credListingAuthz"],
+            ["eid" ],
             undefined,
             {
-                regCredential: "regCred",
-                credAuthority: "credListingAuthz",
+                entryId: "eid",
             }
         );
 
-        //  - create a delegate-link connecting the registry to the credAuth
-        const credAuthority = this.txnCreateConfiguredDelegate(
+        //  - create a delegate-link connecting the entry to the collaborator
+        const ownerAuthority = this.txnCreateConfiguredDelegate(
             tcx,
-            "credAuthority",
+            "ownerAuthority",
             {
                 strategyName: "address",
                 config: {
@@ -213,66 +193,67 @@ export class CMDBCapo extends DefaultCapo {
         );
         const tenMinutes = 1000 * 60 * 10;
 
-        const authz: UutName = tcx.state.uuts.credListingAuthz;
-        //  - send the credAuth UUT to the user
-        const tcx2 = await credAuthority.delegate.txnReceiveAuthorityToken(
+
+        const owner: UutName = tcx.state.uuts.ownerAuthz;
+        //  - send the ownerAuthz UUT to the user
+        const tcx2 = await ownerAuthority.delegate.txnReceiveAuthorityToken(
             tcx,
-            this.uutsValue(authz)
+            this.uutsValue(owner)
         );
         tcx2.validFor(tenMinutes);
 
-        //  - combine the delegate-link with the `cred` to package it for on-chain storage
-        //  - send the cred-listing UUT to the contract, with the right on-chain datum
-        const tcx3 = this.txnReceiveRegistryEntry(tcx2, {
-            credAuthority,
+        //  - combine the delegate-link with the entry, to package it for on-chain storage
+        //  - send the entry's UUT to the contract, with the right on-chain datum
+        const tcx3 = this.txnReceiveEntry(tcx2, {
+            ownerAuthority,
             id: tcx.state.uuts.regCred.name,
-            cred,
+            entry: entry,
         });
-        console.warn("after receiveReg", dumpAny(tcx3.tx));
+        console.warn("after receiveEntry", dumpAny(tcx3.tx));
         debugger;
         return tcx3 as TCX & typeof tcx2 & typeof tcx;
     }
 
     /**
-     * adds the indicated credential properties to the current transaction
+     * adds the indicated book-entry to the current transaction
      * @remarks
      *
-     * includes the Credential details in the datum of the output
+     * includes the book entry details in the datum of the output
      * @param tcx: transaction context
-     * @param cred: properties of the new credential
+     * @param entry: properties of the new entry
      * @param existingUtxo: unused existing utxo
      * @public
      **/
     @partialTxn
-    txnReceiveRegistryEntry<TCX extends StellarTxnContext<any>>(
+    txnReceiveEntry<TCX extends StellarTxnContext<any>>(
         tcx: TCX,
-        cred: BookEntryForUpdate | BookEntryCreate
+        entry: BookEntryForUpdate | BookEntryCreate
     ): TCX {
         debugger;
-        const credMinValue = this.mkMinTv(this.mph, cred.id);
+        const entryMinValue = this.mkMinTv(this.mph, entry.id);
         const utxo = new TxOutput(
             this.address,
-            credMinValue,
-            this.mkDatumRegisteredCredential(cred)
+            entryMinValue,
+            this.mkDatumRegisteredCredential(entry)
         );
 
         return tcx.addOutput(utxo);
     }
-    // Address.fromHash(cred.credAuthority.delegateValidatorHash),
+    // Address.fromHash(entry.ownerAuthority.delegateValidatorHash),
 
     /**
      * Finds and returns the UTxO matching the given UUT identifier
      * @remarks
      *
      * Throws an error if it is not found
-     * @param credId - the UUT identifier regCred-xxxxxxxxxx
+     * @param entryId - the UUT identifier regCred-xxxxxxxxxx
      * @public
      **/
-    findRegistryUtxo(credId: string) {
+    findRegistryUtxo(entryId: string) {
         return this.mustFindMyUtxo(
-            "registered cred",
-            this.mkTokenPredicate(this.mph, credId),
-            `not found in registry: credential with id ${credId}`
+            "book entry",
+            this.mkTokenPredicate(this.mph, entryId),
+            `not found in book contract: entry with id ${entryId}`
         );
     }
 
@@ -282,12 +263,12 @@ export class CMDBCapo extends DefaultCapo {
      *
      * Asynchronously reads the UTxO for the given id and returns its underlying datum via {@link CCRegistry.readRegistryEntry}
      *
-     * @param credId - the UUT identifier regCred-xxxxxxxxxx
+     * @param entryId - the UUT identifier regCred-xxxxxxxxxx
      * @public
      **/
-    async findRegistryEntry(credId: string) {
-        const utxo = await this.findRegistryUtxo(credId);
-        return this.readRegistryEntry(utxo);
+    async findBookEntry(entryId: string) {
+        const utxo = await this.findRegistryUtxo(entryId);
+        return this.readBookEntry(utxo);
     }
 
     /**
@@ -296,7 +277,7 @@ export class CMDBCapo extends DefaultCapo {
      *
      * Parses the UTxO for the given id.
      *
-     * If you have a credId, you can use {@link CCRegistry.findRegistryEntry} instead.
+     * If you have a entryId, you can use {@link CCRegistry.findBookEntry} instead.
      *
      * The resulting data structure includes the actual on-chain data
      * as well as the `id` actually found and the `utxo` parsed, for ease
@@ -305,13 +286,13 @@ export class CMDBCapo extends DefaultCapo {
      * @param utxo - a UTxO having a registry-entry datum, such as found with {@link CCRegistry.findRegistryUtxo}
      * @public
      **/
-    async readRegistryEntry(
+    async readBookEntry(
         utxo: TxInput
     ): Promise<BookEntryForUpdate | undefined> {
         const a = utxo.value.assets.getTokenNames(this.mph);
-        const credId = a
+        const entryId = a
             .map((x) => helios.bytesToText(x.bytes))
-            .find((x) => x.startsWith("regCred"));
+            .find((x) => x.startsWith("eid-"));
 
         const result = await this.readDatum<BookEntryOnchain>(
             "RegisteredCredential",
@@ -322,73 +303,74 @@ export class CMDBCapo extends DefaultCapo {
         return {
             ...result,
             utxo,
-            id: credId,
+            id: entryId,
         };
     }
 
     /**
-     * Instantiates and returns a delegate instance for a specific registered credential id
+     * Instantiates and returns a delegate instance for a specific book-entry id
      * @remarks
      *
-     * Resolves the delegate-link by finding the underlying utxo with findRegistryCred,
-     * if that cred is not provided in the second arg
-     * @param cred - an existing credential datum already parsed from utxo
-     * @param credId - the UUT identifier regCred-xxxxxxxxxx
+     * Resolves the delegate-link by finding the underlying utxo with findBookEntry, if needed
+     * @param entry - an existing entry datum already parsed from utxo
+     * @param entryId - the UUT identifier eid-xxxxxxxxxx
      * @public
      **/
-    async getCredEntryDelegate(
-        cred: BookEntryOnchain
+    async getOwnerDelegate(
+        entry: BookEntryOnchain
     ): Promise<AuthorityPolicy>;
-    async getCredEntryDelegate(credId: string): Promise<AuthorityPolicy>;
-    async getCredEntryDelegate(
-        credOrId: string | BookEntryOnchain
+    async getOwnerDelegate(entryId: string): Promise<AuthorityPolicy>;
+    async getOwnerDelegate(
+        entryOrId: string | BookEntryOnchain
     ): Promise<AuthorityPolicy> {
-        const cred: BookEntryOnchain =
-            "string" == typeof credOrId
-                ? await this.findRegistryEntry(credOrId)
-                : credOrId;
+        const entry: BookEntryOnchain =
+            "string" == typeof entryOrId
+                ? await this.findBookEntry(entryOrId)
+                : entryOrId;
 
         const delegate = await this.connectDelegateWithLink(
-            "govAuthority",
-            cred.credAuthority
+            "ownerAuthority",
+            entry.ownerAuthority
         );
         return delegate;
     }
 
     /**
-     * Updates a credential entry's utxo with new details
+     * Updates a book entry's utxo with new details
      * @remarks
      *
      * detailed remarks
      * @param ‹pName› - descr
      * @reqt updates all the details found in the `update`
-     * @reqt fails if the `credId` is not found
-     * @reqt fails if the authority UUT is not found in the user's wallet
+     * @reqt fails if the `entryId` is not found
+     * @reqt fails if the owner UUT (or charter authz) is not found in the user's wallet
      * @public
      **/
     @txn
-    async mkTxnUpdatingRegistryEntry(
-        credForUpdate: RegisteredCredentialUpdated
+    async mkTxnUpdatingEntry(
+        entryForUpdate: BookEntryUpdated
     ): Promise<StellarTxnContext<any>> {
         const {
             // id,
             utxo: currentUtxo,
-            credAuthority,
-            cred,
+            ownerAuthority,
+            entry: entry,
             updated,
-        } = credForUpdate;
+        } = entryForUpdate;
 
-        const authority = await this.getCredEntryDelegate(credForUpdate);
-        const tcx = await authority.txnGrantAuthority(
+        const ownerDelegate = await this.getOwnerDelegate(entryForUpdate);
+        //!!! todo get charter-authz instead if possible, or fail if needed
+
+        const tcx = await ownerDelegate.txnGrantAuthority(
             new StellarTxnContext<any>()
         );
 
         const tenMinutes = 1000 * 60 * 10;
         const tcx2 = tcx
             .attachScript(this.compiledScript)
-            .addInput(currentUtxo, this.activityUpdatingCredential())
+            .addInput(currentUtxo, this.activityUpdatingEntry())
             .validFor(tenMinutes);
-        return this.txnReceiveRegistryEntry(tcx2, credForUpdate);
+        return this.txnReceiveEntry(tcx2, entryForUpdate);
     }
 
     requirements() {
@@ -400,7 +382,8 @@ export class CMDBCapo extends DefaultCapo {
                     "  ... and later, can be decentralized further",
                 ],
                 mech: [
-                    "The holder of the book authority token can directly create book pages",
+                    "The holder of the contract's charter-authority token can directly create book pages",
+                    "Pages are created with type='pg' for Page",
                 ],
                 requires: [
                     "page expiration"
@@ -414,16 +397,33 @@ export class CMDBCapo extends DefaultCapo {
                     "Each book is operated by people who can exercise oversight authority over their books",
                 ],
                 mech: [
-                    "creates page records with type='spg' for suggested",
-                    "the suggestor's collaborator token is referenced in the suggestedBy field",
+                    "creates page records with type='spg' for Suggested Page",
+                    "the suggestor's collaborator token is referenced as the page's ownerAuthority",
                     "the suggestor can make changes to the page before it is accepted",
                 ],
                 requires: [
                     "contributor tokens can be minted by the book's operator",
                     "page expiration",
-                    "the registry's trustee group can govern listed credentials",
                 ],
             },
+
+            "collaborators can suggest changes to an existing book page": {
+                purpose: "testnet: enable collaboration for invitees",
+                details: [
+                    "People can post page suggestions into the book once they have a collaborator token",
+                    "Each book is operated by people who can exercise oversight authority over their books",
+                ],
+                mech: [
+                    "creates page records with type='spg' for Suggested Page",
+                    "the suggestor's collaborator token is referenced as the page's ownerAuthority",
+                    "the suggestor can make changes to the page before it is accepted",
+                ],
+                requires: [
+                    "contributor tokens can be minted by the book's operator",
+                    "page expiration",
+                ],
+            },
+
             "contributor tokens can be minted by the book's operator": {
                 purpose:
                     "creates positive control for who can be a contributor",
@@ -504,12 +504,6 @@ export class CMDBCapo extends DefaultCapo {
                     requires: [],
                 },
 
-            "the registry's trustee group can govern listed credentials": {
-                purpose: "to guard for quality and against abuse",
-                details: ["TODO - use Capo multisig strategy"],
-                mech: [],
-                requires: [],
-            },
         });
     }
 }

@@ -12,13 +12,12 @@ type paramsType = {
     bookContract: CMDBCapo;
     bookDetails: BookEntryForUpdate[];
     // refreshCreds: Function;
-    credsStatus: string;
-    editCredId: Function;
+    bookMgrStatus: string;
     createBookEntry: Function;
 };
 type stateType = {};
 
-export class CredsList extends React.Component<paramsType, stateType> {
+export class BookPages extends React.Component<paramsType, stateType> {
     static notProse = true;
     constructor(props) {
         super(props);
@@ -35,31 +34,32 @@ export class CredsList extends React.Component<paramsType, stateType> {
                 <table>
                     <thead>
                         <tr>
-                            <th scope="col">Type</th>
                             <th scope="col">Name</th>
-                            <th scope="col">Issuer</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Created by</th>
                         </tr>
                     </thead>
                     <tbody>
-                            ({
-                                id, cred
-                            }) => (
-                                <tr key={`table-${id}`}>
-                                    <td>{cred.credType}</td>
-                                    <td>
-                                        <Link href={`/book/${id}`}>
-                                            {cred.credName}
-                                        </Link>
-                                    </td>
-                                    <td>{cred.issuerName}</td>
-                                </tr>
-                            )
-                        )}
-                        {filteredBookDetails.map(({ id, cred }) => (
+                        {filteredBookDetails.map(({ id, entry, ownerAuthority }) => (
+                            <tr key={`table-${id}`}>
+                                <td>
+                                    <Link href={`/book/${id}`}>
+                                        {entry.title}
+                                    </Link>
+                                </td>
+                                <td>
+                                    {"spg" == entry.entryType ? "Suggested" : "Page"}
+                                    &nbsp;{entry.entryType /*temp*/}
+                                </td>
+                                <td>
+                                    {ownerAuthority.uutName}
+                                </td>
+                            </tr>
+                        ))}
                         {!filteredBookDetails.length && (
                             <tr>
-                                <td colSpan={4} style={{ textAlign: "center" }}>
-                                    No credentials are registered yet
+                                <td colSpan={3} style={{ textAlign: "center" }}>
+                                    This book has no topics
                                 </td>
                             </tr>
                         )}
