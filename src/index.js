@@ -6,7 +6,7 @@ export const navigation = [
         ],
     },
     {
-        title: "Cardano MD Book",
+        title: "Cardano MDBook",
         links: [
             { title: "Index", href: "/book" },
         ],
@@ -15,7 +15,7 @@ export const navigation = [
         title: "More",
         links: [
             { title: "About the project", href: "/about-cmdbook" },
-            { title: "CMD Book Guide", href: "/cmdbook-guide" },
+            { title: "Cardano MDBook Guide", href: "/cmdbook-guide" },
         ],
     },
 ]

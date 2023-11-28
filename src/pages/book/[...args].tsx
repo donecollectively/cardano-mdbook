@@ -87,8 +87,8 @@ type stateType = PageStatus & {
 };
 
 const actionLabels = {
-    initializeRegistry: "Create Registry",
-    retryRegistry: "Retry",
+    initializeBookContract: "Create a Book",
+    retryCreation: "Retry",
 };
 
 const networkNames = {
@@ -121,8 +121,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         super(props);
         this.i = mountCount += 1;
         this.updateState = this.updateState.bind(this);
-        this.createCredential = this.createCredential.bind(this);
-        this.fetchRegistryEntries = this.fetchRegistryEntries.bind(this);
+        this.createBookEntry = this.createBookEntry.bind(this);
+        this.fetchBookEntries = this.fetchBookEntries.bind(this);
         this.closeForm = this.closeForm.bind(this);
         this.connectWallet = this.connectWallet.bind(this);
         this.state = { status: "connecting to blockfrost" };
@@ -138,7 +138,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         return this.props.router;
     }
 
-    async createCredential() {
+    async createBookEntry() {
         const { wallet } = this.state;
         if (!wallet) {
             await this.connectWallet(false);
@@ -162,10 +162,6 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             {},
             "//saved!  : )"
         );
-    }
-
-    refreshCreds() {
-        throw new Error(`TODO`);
     }
 
     get currentRoute(): [
@@ -299,7 +295,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                             walletHelper,
                             walletUtxos,
                             updateState: this.updateState,
-                            refresh: this.fetchRegistryEntries,
+                            refresh: this.fetchBookEntries,
                             router,
                         }}
                         create
@@ -320,7 +316,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                             bookContract,
                             wallet,
                             updateState,
-                            refresh: this.fetchRegistryEntries,
+                            refresh: this.fetchBookEntries,
                             router,
                         }}
                         entry={editing}
@@ -343,10 +339,9 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 <BookPages
                     {...{
                         bookDetails: bookDetails,
-                        createBookEntry: this.createCredential,
+                        createBookEntry: this.createBookEntry,
                         bookContract,
                         bookMgrStatus: status,
-                        // refreshCreds
                     }}
                 />
             );
@@ -363,7 +358,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         return (
             <div>
                 <Head>
-                    <title>Credentials Registry</title>
+                    <title>‹proj title here?›- Cardano MDBook</title>
                 </Head>
                 {renderedStatus}
                 {walletInfo}
@@ -380,8 +375,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
     doAction(action) {
         const actions = {
-            initializeRegistry: this.bootstrapRegistry,
-            retryRegistry: this.connectBookContract,
+            initializeBookContract: this.bootstrapBookContract,
+            retryCreation: this.connectBookContract,
         };
         const thisAction = actions[action];
         thisAction.call(this);
@@ -563,8 +558,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             if (!isConfigured) {
                 // alert("not configured");
                 await this.updateState(
-                    `Creds Registry contract isn't yet created or configured.  Add a configuration if you have it, or create the registry now.`,
-                    { bookContract, nextAction: "initializeRegistry" }
+                    `This Cardano MDBook contract isn't yet created or configured.  Add a configuration if you have it, or create the contract now.`,
+                    { bookContract, nextAction: "initializeBookContract" }
                 );
                 return;
                 // return this.stellarSetup();
@@ -584,21 +579,21 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 "//searching (or freshening search after wallet connection)"
             );
 
-            this.fetchRegistryEntries();
+            this.fetchBookEntries();
         } catch (error) {
             this.reportError(error, "checking registry configuration: ", {
-                nextAction: "initializeRegistry",
-                actionLabel: "Create New Registry",
+                nextAction: "initializeBookContract",
+                actionLabel: "Create New Book",
             });
         }
     }
 
     //  -- step 3a - initialize the registry if needed
-    async bootstrapRegistry() {
+    async bootstrapBookContract() {
         if (!this.state.wallet) await this.connectWallet();
 
         await this.updateState(
-            "creating Creds Registry charter transaction ...",
+            "creating the MDBook charter transaction ...",
             { progressBar: true }
         );
 
@@ -623,7 +618,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         } catch (e) {
             console.error(e);
             this.reportError(e, "creating charter: ", {
-                nextAction: "retryRegistry",
+                nextAction: "retryCreation",
             });
             debugger;
             return;
@@ -640,7 +635,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         try {
             await bookContract.submit(tcx);
             await this.updateState(
-                `Registry creation submitted.  Deploy the following details...`,
+                `Book contract creation submitted.  Deploy the following details...`,
                 {
                     showDetail: JSON.stringify(
                         tcx.state.bootstrappedConfig,
@@ -661,7 +656,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             this.updateState(`wallet reported "${e.message}"`, {
                 bookContract: undefined,
                 error: true,
-                nextAction: "retryRegistry",
+                nextAction: "retryCreation",
             });
         }
     }
@@ -675,7 +670,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     }
 
     //  -- step 4: Read registry entries from chain
-    async fetchRegistryEntries() {
+    async fetchBookEntries() {
         const { bookContract } = this.state;
 
         const found = await this.bf.getUtxos(bookContract.address);

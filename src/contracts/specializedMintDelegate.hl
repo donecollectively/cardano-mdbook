@@ -29,7 +29,7 @@ import {
 } from CapoMintHelpers
 
 import {
-    Datum as CCRegDatum
+    Datum as CMDBookDatum
 } from specializedCapo
 
 // struct DredRegistrationSettings {
@@ -114,7 +114,7 @@ enum MintDelegateActivity {
 
                 eidPurpose : String = "eid";
                 // removed: suggAuthzPurpose : String = "suggAuthz";
-                newDatum : CCRegDatum = ctx.tx.redeemers.get(k).switch {
+                newDatum : CMDBookDatum = ctx.tx.redeemers.get(k).switch {
                     (index: Int, fields: []Data) => {
                         assert (index == 1 && fields.length == 3,
                            "wrong activity"//  "authz token not spent with mintingUuts activity!"
@@ -124,8 +124,8 @@ enum MintDelegateActivity {
                         // 1. ✅ a BookEntry & its authority delegate can be minted
                         // !!! more options to honor suggested-page and suggested-change scenarios
                             purposes.length == 1 &&
-                            purposes.get(0) == regCredPurpose
-                        assert(isMintingRegistryEntry, "wrong uuts");
+                            purposes.get(0) == eidPurpose
+                        assert(isMintingBookEntry, "wrong uuts");
 
                         txId: TxId = TxId::from_data(fields.get(0));
                         txoIndex : Int = Int::from_data(fields.get(1));
@@ -146,15 +146,15 @@ enum MintDelegateActivity {
                 
                         // print("parsing datum on "+newTxo.value.show());
                         // print ("  -> "+ newTxo.datum.get_inline_data().serialize().show());
-                        // newDatum : CCRegDatum = // outputDatum[CCRegDatum](newTxo);
+                        // newDatum : CMDBookDatum = // outputDatum[CMDBookDatum](newTxo);
 
-                        CCRegDatum::from_data(newTxo.datum.get_inline_data())
+                        CMDBookDatum::from_data(newTxo.datum.get_inline_data())
                     },
                     _ => error("missing or wrong mint redeemer for our mph")
                 };
 
 
-                CCRegDatum::RegisteredCredential{_, newListing} = newDatum;
+                CMDBookDatum::BookEntry{_, newListing} = newDatum;
         
                 txnTime : TimeRange = ctx.tx.time_range;        
                 now : Time = txnTime.start;
@@ -179,7 +179,7 @@ enum MintDelegateActivity {
                 // 4. ✅ 
                 notModified : Bool = unmodifiedDelegation(priorMddd.serialize(), ctx);
                 
-                notModified && newDatum.validateCredential()
+                notModified && newDatum.validateEntry()
             },
             // Modifying => {
             //     // require that the charter is providing its authority

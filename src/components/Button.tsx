@@ -61,18 +61,3 @@ export  const Button : React.FC<SpecialButtonProps> = ({
      return <button {...bprops} />
 }
 
-
-{/* <button
-className="btn border rounded float-right"
-style={{
-    padding: "0.75em",
-    marginLeft: "0.5em",
-    // marginTop: '-0.75em',
-    border: "1px solid #162ed5",
-    borderRadius: "0.5em",
-    backgroundColor: "#142281",
-}}
-onClick={this.create}
->
-List a Credential
-</button> */}

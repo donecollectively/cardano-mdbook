@@ -74,20 +74,20 @@ export class CMDBCapo extends DefaultCapo {
 
     @Activity.redeemer
     protected activityUpdatingEntry(): isActivity {
-        const { updatingCredential } = this.onChainActivitiesType;
-        const t = new updatingCredential();
+        const { updatingEntry } = this.onChainActivitiesType;
+        const t = new updatingEntry();
 
         return { redeemer: t._toUplcData() };
     }
 
     @datum
-    mkDatumRegisteredCredential<
+    mkDatumBookEntry<
         T extends BookEntryCreate | BookEntryUpdated
     >(d: T): InlineDatum {
         //!!! todo: make it possible to type these datum helpers more strongly
         //  ... at the interface to Helios
         console.log("--> mkDatumCharter", d);
-        const { RegisteredCredential: hlRegisteredCredential } =
+        const { BookEntry: hlBookEntry } =
             this.onChainDatumType;
         const { BookEntryStruct: hlBookEntryStruct } = this.onChainTypes;
 
@@ -123,7 +123,7 @@ export class CMDBCapo extends DefaultCapo {
             updatedAt,
             expiresAt
         );
-        const t = new hlRegisteredCredential(ownerAuthority, bookEntryStruct);
+        const t = new hlBookEntry(ownerAuthority, bookEntryStruct);
         return Datum.inline(t._toUplcData());
     }
 
@@ -234,7 +234,7 @@ export class CMDBCapo extends DefaultCapo {
         const utxo = new TxOutput(
             this.address,
             entryMinValue,
-            this.mkDatumRegisteredCredential(entry)
+            this.mkDatumBookEntry(entry)
         );
 
         return tcx.addOutput(utxo);
@@ -249,7 +249,7 @@ export class CMDBCapo extends DefaultCapo {
      * @param entryId - the UUT identifier regCred-xxxxxxxxxx
      * @public
      **/
-    findRegistryUtxo(entryId: string) {
+    findBookUtxo(entryId: string) {
         return this.mustFindMyUtxo(
             "book entry",
             this.mkTokenPredicate(this.mph, entryId),
@@ -258,32 +258,32 @@ export class CMDBCapo extends DefaultCapo {
     }
 
     /**
-     * Reads the datum details for a given RegisteredCredential id
+     * Reads the datum details for a given BookEntry id
      * @remarks
      *
-     * Asynchronously reads the UTxO for the given id and returns its underlying datum via {@link CCRegistry.readRegistryEntry}
+     * Asynchronously reads the UTxO for the given id and returns its underlying datum via {@link CMDBCapo.readBookEntry}
      *
      * @param entryId - the UUT identifier regCred-xxxxxxxxxx
      * @public
      **/
     async findBookEntry(entryId: string) {
-        const utxo = await this.findRegistryUtxo(entryId);
+        const utxo = await this.findBookUtxo(entryId);
         return this.readBookEntry(utxo);
     }
 
     /**
-     * Reads the datum details for a RegisteredCredential datum from UTxO
+     * Reads the datum details for a BookEntry datum from UTxO
      * @remarks
      *
      * Parses the UTxO for the given id.
      *
-     * If you have a entryId, you can use {@link CCRegistry.findBookEntry} instead.
+     * If you have a entryId, you can use {@link CMDBCapo.findBookEntry} instead.
      *
      * The resulting data structure includes the actual on-chain data
      * as well as the `id` actually found and the `utxo` parsed, for ease
-     * of updates via {@link CCRegistry.mkTxnUpdatingRegistryEntry}
+     * of updates via {@link CMDBCapo.mkTxnUpdatingEntry}
      *
-     * @param utxo - a UTxO having a registry-entry datum, such as found with {@link CCRegistry.findRegistryUtxo}
+     * @param utxo - a UTxO having a registry-entry datum, such as found with {@link CMDBCapo.findBookUtxo}
      * @public
      **/
     async readBookEntry(
@@ -295,7 +295,7 @@ export class CMDBCapo extends DefaultCapo {
             .find((x) => x.startsWith("eid-"));
 
         const result = await this.readDatum<BookEntryOnchain>(
-            "RegisteredCredential",
+            "BookEntry",
             utxo.origOutput.datum as InlineDatum
         );
         if (!result) return undefined;

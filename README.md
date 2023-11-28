@@ -1,4 +1,4 @@
-## Cardano MD Book
+## Cardano MDBook
 
 This repository provides a Contract-as-a-service-contract for Markdown document repositories
 

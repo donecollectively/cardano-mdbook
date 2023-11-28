@@ -62,7 +62,7 @@ type FieldProps = {
 
 type ChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
 
-const testCredInfo : Partial<BookEntry> = {
+const testBookPage : Partial<BookEntry> = {
     title: "Test Page",
     entryType: "pg",
     content: "## test page\n\nthis is a sample paragraph",    
@@ -116,7 +116,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const current =
             entry?.entry ||
             ({
-                ...testCredInfo,
+                ...testBookPage,
             } as BookEntry);
         await new Promise((res) => {
             this.setState(
@@ -141,7 +141,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
     _unmounting?: true;
     componentWillUnmount(): void {
-        // console.error(`UNMOUNTing CredForm ${this.i}`)
+        // console.error(`UNMOUNTing PageEditor ${this.i}`)
         // this._unmounting = true;
     }
 
@@ -155,7 +155,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         } = this.state || {};
         const { entry, create, onClose, onSave, bookContract } = this.props;
         if (!rec) return ""; //wait for didMount
-        const showTitle = <>{create && "Creating"} Credential Listing</>;
+        const showTitle = <>{create && "Creating"} Page</>;
         let sidebarContent;
         const foundProblems = submitting && Object.keys(problems).length;
         {
@@ -501,22 +501,22 @@ export class PageEditor extends React.Component<propsType, stateType> {
         } = this.state;
 
         const f = this.form.current;
-        const updatedCred = this.capture(f);
+        const updatedEntry = this.capture(f);
 
         this.setState({
-            current: updatedCred,
+            current: updatedEntry,
             modified: true,
             gen: 1 + gen,
         });
     };
     capture(form) {
         const formData = new FormData(form);
-        const updatedCred: BookEntry = Object.fromEntries(
+        const updatedBookEntry: BookEntry = Object.fromEntries(
             formData.entries()
         ) as unknown as BookEntry;
         const exp = formData.getAll("expectations") as string[];
 
-        return updatedCred;
+        return updatedBookEntry;
     }
 
     async save(e: React.SyntheticEvent) {
@@ -541,16 +541,16 @@ export class PageEditor extends React.Component<propsType, stateType> {
         }
 
         const form = e.target as HTMLFormElement;
-        const updatedCred = this.capture(form);
+        const updatedBookEntry = this.capture(form);
 
         try {
             const txnDescription = `${create ? "creation" : "update"} txn`;
             updateState(`preparing ${txnDescription}`, { progressBar: true });
             const tcx = create
-                ? await bookContract.mkTxnCreatingBookEntry(updatedCred)
+                ? await bookContract.mkTxnCreatingBookEntry(updatedBookEntry)
                 : await bookContract.mkTxnUpdatingEntry({
                       ...entryForUpdate,
-                      updated: updatedCred,
+                      updated: updatedBookEntry,
                   });
             console.warn(dumpAny(tcx));
             updateState(

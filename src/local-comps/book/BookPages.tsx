@@ -28,7 +28,6 @@ export class BookPages extends React.Component<paramsType, stateType> {
     }
 
     renderResultsTable(filteredBookDetails: BookEntryForUpdate[]) {
-        const { createBookEntry: createCredential } = this.props;
         return (
             <Prose className="">
                 <table>
@@ -79,7 +78,7 @@ export class BookPages extends React.Component<paramsType, stateType> {
                                     }}
                                     onClick={this.create}
                                 >
-                                    List a Credential
+                                    Add a Topic
                                 </button>
                             </td>
                             <td colSpan={2} style={{ textAlign: "right" }}>
