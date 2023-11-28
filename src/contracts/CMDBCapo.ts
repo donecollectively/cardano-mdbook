@@ -193,7 +193,6 @@ export class CMDBCapo extends DefaultCapo {
         );
         const tenMinutes = 1000 * 60 * 10;
 
-
         const owner: UutName = tcx.state.uuts.ownerAuthz;
         //  - send the ownerAuthz UUT to the user
         const tcx2 = await ownerAuthority.delegate.txnReceiveAuthorityToken(
@@ -340,10 +339,9 @@ export class CMDBCapo extends DefaultCapo {
      * @remarks
      *
      * detailed remarks
-     * @param ‹pName› - descr
-     * @reqt updates all the details found in the `update`
-     * @reqt fails if the `entryId` is not found
-     * @reqt fails if the owner UUT (or charter authz) is not found in the user's wallet
+     * @param entryForUpdate - update details
+     * @reqt updates all the details found in the `entryForUpdate`
+     * @reqt fails if the owner's contributor-token (or charter authz) is not found in the user's wallet
      * @public
      **/
     @txn
