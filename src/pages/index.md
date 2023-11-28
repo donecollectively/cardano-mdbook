@@ -35,7 +35,8 @@ Read our dAPI docs - TODO: add link(s).
 
 cMDBook was originally sponsored by Cardano's Project Catalyst, in a form originally scoped for proprietary integration with an off-chain ("web 2") application.  We have reframed the scope of that work in order to more broadly open the ability for anyone to use the pattern of collaboratively maintaining Markdown documentation, without being bound to a proprietary or centralized application.
 
-cMDBook leverages the Stellar Contracts dApp-development library and Cardano's own Helios smart-contract language.  We included the Stellar CaaSC protocol to support the SaaS pattern, enabling new projects to be created at the touch of a button.
+cMDBook leverages the Stellar Contracts dApp-development library and Cardano's own Helios smart-contract language.  
+
 
 We owe a debt of gratitude (and contributor tokens!) to a whole bunch of people and organizsations, including (in no special order) Maija, Adam, Peter, Alex, Nori, Tevo, Jo, Session, Piotr, James, Tom, George, Felix, Project Catalyst, Gimbalabs, ODIN, and many others.  If you're on this list, or think you should be, please be in touch with us
 
