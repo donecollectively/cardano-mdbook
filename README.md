@@ -16,7 +16,8 @@ Please use `pnpm`, not `npm`.
   - enable markdown editor for page-creation
   - enable direct editing by page-owner
   - enable change-suggestion by non-owner, post 'chg' record
-  - integrate suggested changes to page View
+  - gather topic index and include in site menu
+  - optionally integrate suggested changes to page View
 
 #### future:
   - display each page's change-history using on-chain records
