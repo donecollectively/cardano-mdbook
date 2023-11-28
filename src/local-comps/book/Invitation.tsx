@@ -66,7 +66,7 @@ export class Invitation extends React.Component<propsType, stateType> {
     getAddr(e) {
         const addr = e.target.value;
         const newState: Partial<stateType> = { addrString: addr };
-        debugger
+        
         try {
             const address : AddressType = new helios.Address(addr);
             newState.address = address;

@@ -11,15 +11,15 @@
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
     mph: {
-        bytes: "db61925295a4bcb6aa28a0b9c9f6457354ae0fea7bc23272ffe10d68",
+        bytes: "4024e18a73da770228ddd87935003be273caf7149d764879338afcd6",
     },
     rev: "1",
     seedTxn: {
-        bytes: "d249afac75097b735f444bbeff0e8ca3a3629b735e51b7048b4dee2373385711",
+        bytes: "eba50171233c7581b03063485035114d5095c20ac50a520d021b620e2cbc366b",
     },
-    seedIndex: "2",
+    seedIndex: "3",
     rootCapoScriptHash: {
-        bytes: "657760af82e464c23e1533c5f3c81e3971f25ed60f6a293fb9d7938c",
+        bytes: "27feff2a4e4e2cb429faacf9d9b818875457181af816a1c509f97d14",
     },
 };
 
@@ -256,12 +256,15 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 {moreInstructions}
             </>
         ) : null;
-        const roleInfo =  this.renderRoleInfo()
-        const inviteLink = roles?.includes("editor") ? this.inviteButton() : ""
-const topRightContent = inPortal("topRight", <>
-    {roleInfo} {walletInfo}
-    {inviteLink}
-</>);
+        const roleInfo = this.renderRoleInfo();
+        const inviteLink = roles?.includes("editor") ? this.inviteButton() : "";
+        const topRightContent = inPortal(
+            "topRight",
+            <>
+                {roleInfo} {walletInfo}
+                {inviteLink}
+            </>
+        );
 
         const progressLabel = "string" == typeof progressBar ? progressBar : "";
         const renderedStatus =
@@ -310,7 +313,7 @@ const topRightContent = inPortal("topRight", <>
             results = inPortal("topCenter", loading);
         } else if ("invite" == route) {
             if (wallet) {
-                results = <Invitation bookContract={bookContract} />
+                results = <Invitation bookContract={bookContract} />;
             } else {
                 this.connectWallet(false);
             }
@@ -403,30 +406,36 @@ const topRightContent = inPortal("topRight", <>
     }
 
     inviteButton() {
-        return <Button
-            variant="secondary-sm"
-            className="ml-2"
-            onClick={this.goToInvite}
-        >
-            Invite Collaborators
-        </Button>
+        return (
+            <Button
+                variant="secondary-sm"
+                className="ml-2"
+                onClick={this.goToInvite}
+            >
+                Invite Collaborators
+            </Button>
+        );
     }
 
     goToInvite() {
-        this.props.router.push("/book/invite")
+        this.props.router.push("/book/invite");
     }
 
     renderRoleInfo() {
-        const {roles} = this.state;
-        if (!roles) return
+        const { roles } = this.state;
+        if (!roles) return;
 
-        return <>
-            {roles.map(r => {
-                return <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
-                    {r}
-                </span>
-            })}
-        </>
+        return (
+            <>
+                {roles.map((r) => {
+                    return (
+                        <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                            {r}
+                        </span>
+                    );
+                })}
+            </>
+        );
     }
 
     doAction(action) {
@@ -442,8 +451,11 @@ const topRightContent = inPortal("topRight", <>
         const { wallet, networkName, connectingWallet } = this.state;
 
         if (wallet) {
-             return <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-blue-900 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
-{networkName}</span>;
+            return (
+                <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-blue-900 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                    {networkName}
+                </span>
+            );
         } else if (connectingWallet) {
             return (
                 <div>
@@ -574,7 +586,9 @@ const topRightContent = inPortal("topRight", <>
         }
 
         const walletHelper = new helios.WalletHelper(wallet);
-        await this.checkWalletTokens(wallet);
+        if (this.state?.bookContract?.configIn) {
+            await this.checkWalletTokens(wallet);
+        }
         await this.updateState("initializing registry with wallet connected", {
             wallet,
             connectingWallet: false,
@@ -606,7 +620,7 @@ const topRightContent = inPortal("topRight", <>
             {},
             "/// looking for authority tokens  in policy " + mph.hex
         );
-        debugger;
+
         const roles = [];
         for (const u of utxos) {
             const tokenNames = u.value.assets
@@ -624,9 +638,10 @@ const topRightContent = inPortal("topRight", <>
                 roles.push(label);
             }
         }
-        const message = roles.includes("contributor") ? "" : 
-            "To be a contributor on this project, please send your wallet address to the book editor"
-        
+        const message = roles.includes("contributor")
+            ? ""
+            : "To be a contributor on this project, please send your wallet address to the book editor";
+
         this.updateState(message, { roles }, "/// found roles");
     }
 
