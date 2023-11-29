@@ -10,7 +10,8 @@ Please use `pnpm`, not `npm`.
 
 ### TODO
 
-  - ✅ when not a collaborator, connecting the wallet should guide people to request a collaborator invite from the book's editor(s)
+  - ✅ when not a collaborator, connecting the wallet should guide people to request a 
+    collaborator invite from the book's editor(s)
   - ✅ enable collaborator-token minting with address
   - arrange ownerAuthority for each book entry using  collaborator token
   - enable markdown editor for page-creation
@@ -22,35 +23,55 @@ Please use `pnpm`, not `npm`.
 #### future:
   - display each page's change-history using on-chain records
   - cache page data in browser using Dexie
-  - do occasional background fetches to keep cache fresh and promptly show changes that may arrive from other users
-  - complete the TSDoc for all of the book's StellarContract function-points (until then: Use the Source, Luke)
+  - do occasional background fetches to keep cache fresh and promptly show 
+    changes that may arrive from other users
+  - complete the TSDoc for all of the book's StellarContract function-points 
+    (until then: Use the Source, Luke)
  - generate dAPI docs from TSDoc
- -  include the Stellar CaaSC protocol to support the SaaS pattern, enabling new projects to be created at the touch of a button.
+ -  include the Stellar CaaSC protocol to support the SaaS pattern, enabling new 
+ projects to be created at the touch of a button.
 
 ## Making your own Cardano MDBook
 
 To make your own on-chain MDBook:
 
-  1.  fork this repo in Github.  We kindly request that you (a) rename your MDBook repo and (b) remove or replace this README. :pray:
-  2.  ensure `pnpm` is installed, and that you have NodeJS version 18 (we like `nvm` to help with that).
+  1.  fork this repo in Github.  We kindly request that you (a) rename your MDBook repo 
+    and (b) remove or replace this README. :pray:
+  2.  ensure `pnpm` is installed, and that you have NodeJS version 18 (we like `nvm` 
+  to help with that).
   3.  run `pnpm install` to ensure all deps are ready  
-  4.  run `pnpm dev` on the console, and connect your local browser to the URL shown there (powered by Next.js).  You should see a site that looks the same as the Cardano MDBook website, including its book contents.  
-  4a.  Customize if desired: we suggest editing `Hero.jsx``, `Icon.tsx`` and `index.md`` (or,  more generally, find !!!customize to find spots good for configuring further).
-  5.  edit the file `src/pages/book/[...args].tsx``, using the "null" config at the top of the file, as guided in the comments there.
-  6. Reload the browser if needed, and follow the prompts to create a new MDBook contract.  Make sure you have a Cardano wallet on preprod network.
-  7. The creation process should offer you a transaction to be signed, chartering a brand new Book contract for you and your org.
-  8.  Once your book is chartered, the dApp should show you a chunk of JSON data with guidance to "... deploy the following ...".  Its shape should be similar to the version you're replacing.
-  9.  Feel free to create initial MDBook content using your local Next.js environment; the pages created will be stored on-chain, connected with the details from the prior step.
-  10.  Commit all changes in git, and push to your forked repository (whose name SHOULD NOT be the same as our repo name :pray:) to Github or another repository storage provider.
-  11.  Check Github Actions, which may require some small configuration at Github, but should otherwise deploy to Github Pages without difficulty.
+  4.  run `pnpm dev` on the console, and connect your local browser to the URL shown 
+    there (powered by Next.js).  You should see a site that looks the same as the Cardano
+    MDBook website, including its book contents.  
+  4a.  Customize if desired: we suggest editing `Hero.jsx`, `Icon.tsx` and `index.md` 
+  (or,  more generally, find !!!customize to find spots good for configuring further).
+  5.  edit the file `src/pages/book/[...args].tsx`, using the "null" config at the top 
+  of the file, as guided in the comments there.
+  6. Reload the browser if needed, and follow the prompts to create a new MDBook 
+  contract.  Make sure you have a Cardano wallet on preprod network.
+  7. The creation process should offer you a transaction to be signed, chartering a brand 
+  new Book contract for you and our org.
+  8.  Once your book is chartered, the dApp should show you a chunk of JSON data 
+  with guidance to "... deploy the following ...".  Its shape should be similar to the 
+  version you're replacing.
+  9.  Feel free to create initial MDBook content using your local Next.js environment; 
+  the pages created will be stored on-chain, connected with the details from the prior 
+  step.
+  10.  Commit all changes in git, and push to your forked repository (whose name 
+  SHOULD NOT be the same as our repo name :pray:) to Github or another repository 
+  storage provider.
+  11.  Check Github Actions, which may require some small configuration at Github, 
+  but should otherwise deploy to Github Pages without difficulty.
   
-  If you're not using Github, you can use `next build` and push the resulting static files to any static hosting provider.
+  If you're not using Github, you can use `next build` and push the resulting static files 
+  to any static hosting provider.
 
 ## Developing
 
-To get started with this template, first install the npm dependencies:
+If you're developing the cardano-mdbook infrastructure project (NOT creating your own MDBook), 
+see `next.config.mjs` to learn how to set an environment variable to prevent startup errors with `BASE_PATH="/cardano-mdbook"``
 
-If you're developing the cardano-mdbook infrastructure project (NOT creating your own MDBook), see `next.config.mjs` to learn how to set an environment variable to prevent startup errors with `BASE_PATH="/cardano-mdbook"``
+To get started with this template, first install the npm dependencies:
 
 ```bash
 pnpm install
