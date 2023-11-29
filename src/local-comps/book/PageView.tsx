@@ -63,18 +63,19 @@ export class PageView extends React.Component<propsType, stateType> {
                 <div>
                     <Markdoc content={page.content} />
                 </div>
+                {this.props.wallet && this.props.roles?.includes("collaborator") || !this.props.connectingWallet ||
+                    <div className="italic text-right text-xs text-[#ccc]">No editing permission; request collaborator privileges from this project's editor</div>
+                }
             </>
         );
     }
 
     possibleEditButton() {
-        const {walletUtxos, bookContract, entry} = this.props;
+        const {walletUtxos, bookContract, entry, roles} = this.props;
         if (!walletUtxos) return "...loading wallet utxos..."; // undefined
 
-        const tokenPredicate = bookContract.mkDelegatePredicate(entry.ownerAuthority)
-        const foundToken = walletUtxos.find(tokenPredicate)
-        if (!foundToken) return "no tokens" //undefined
-
-        return <Button href={`${entry.id}/edit`}>Update Listing</Button>
+        if (roles?.includes("collaborator")) {
+            return <Button href={`${entry.id}/edit`}>Update Listing</Button>
+        }
     }
 }

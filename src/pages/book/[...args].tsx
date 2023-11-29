@@ -40,6 +40,7 @@ import {
     StellarConstructorArgs,
     StellarTxnContext,
     TxInput,
+    UutName,
     WalletHelper,
     dumpAny,
     helios,
@@ -75,7 +76,7 @@ export type PageStatus = {
     progressBar?: true | string;
 };
 
-type stateType = PageStatus & {
+export type BookPageState = PageStatus & {
     bookContract?: CMDBCapo;
     networkParams?: NetParams;
     progResult?: string;
@@ -84,7 +85,8 @@ type stateType = PageStatus & {
     walletHelper?: WalletHelper;
     walletUtxos?: TxInput[];
     networkName?: string;
-    roles?: string[];
+    roles?: ("collaborator" | "editor")[];
+    collabUut? : UutName;
     connectingWallet?: boolean;
     showDetail?: string;
     tcx?: StellarTxnContext<any>;
@@ -123,7 +125,7 @@ let mountCount = 0;
 
 //   _x_   ?.  add actor collateral to TCX, on-demand and/or during addScript (when??)
 
-export class BookHomePage extends React.Component<paramsType, stateType> {
+export class BookHomePage extends React.Component<paramsType, BookPageState> {
     bf: hBlockfrost;
     bfFast: hTxChain;
     static notProse = true;
@@ -209,9 +211,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             wallet,
             progressBar,
             walletUtxos,
+            connectingWallet,
             walletHelper,
             status,
             roles,
+            collabUut: collabUut,
             showDetail,
             error,
             nextAction,
@@ -319,6 +323,9 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 results = (
                     <Invitation
                         {...{
+                            roles,
+                            collabUut,
+                            connectingWallet,
                             updateState: this.updateState,
                             reportError: this.reportError,
                             bookContract: bookContract,
@@ -333,8 +340,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 results = (
                     <PageEditor
                         {...{
+                            roles,
+                            collabUut,
                             bookContract,
                             wallet,
+                            connectingWallet,
                             walletHelper,
                             walletUtxos,
                             updateState: this.updateState,
@@ -356,8 +366,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 results = (
                     <PageEditor
                         {...{
+                            roles,
+                            collabUut,
                             bookContract,
                             wallet,
+                            connectingWallet,
                             updateState: this.updateState,
                             reportError: this.reportError,
                             refresh: this.fetchBookEntries,
@@ -378,7 +391,10 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             results = (
                 <PageView
                     {...{
+                        roles,
+                        collabUut,
                         entry,
+                        connectingWallet,
                         updateState: this.updateState,
                         reportError: this.reportError,
                         wallet,
@@ -571,7 +587,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     }
 
     //  -- step 2: connect to Cardano wallet
-    connectingWallet: Promise<any>;
+    walletConnectPromise: Promise<any>;
     async connectWallet(autoNext = true) {
         const {
             selectedWallet = "eternl",
@@ -583,12 +599,12 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         //! it suppresses lame nextjs/react-sourced double-trigger of mount sequence
         // if (this._unmounted) return
         // debugger
-        if (this.connectingWallet) {
+        if (this.walletConnectPromise) {
             console.warn(
                 "suppressing redundant wallet connect, already pending"
             );
 
-            return this.connectingWallet;
+            return this.walletConnectPromise;
         }
 
         await this.updateState(
@@ -599,12 +615,17 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             },
             "//connecting wallet"
         );
-        const connecting = (this.connectingWallet =
+        const connecting = (this.walletConnectPromise =
             //@ts-expect-error on Cardano
             window.cardano[selectedWallet].enable());
-        const handle: helios.Cip30Handle = await connecting;
+        const handle: helios.Cip30Handle = await connecting.catch((e) => {
+            this.walletConnectPromise = undefined;
+            this.reportError(e, "wallet connect", {});
+        });
+        if (!handle) return;
+
         console.warn("CIP-30 Wallet Handle", handle);
-        
+
         const networkName = networkNames[await handle.getNetworkId()];
         if (networkName !== "preprod") {
             return this.updateState(
@@ -670,7 +691,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     async checkWalletTokens(wallet: helios.Cip30Wallet) {
         const { bookContract } = this.state;
         if (!bookContract?.myActor) {
-            debugger
+            debugger;
             await this.updateState(
                 "no bookContract yet, or not connected to wallet",
                 {},
@@ -687,10 +708,13 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         );
 
         const roles = [];
-        const isCollab = await bookContract.findRoleUtxo("collab");
+        const collabUtxo = await bookContract.findRoleUtxo("collab");
         const isEditor = await bookContract.findRoleUtxo("capoGov");
 
-        if (!!isCollab) {
+        let collabToken
+        if (!!collabUtxo) {
+            collabToken = bookContract.mkUutName("collab", collabUtxo);
+
             roles.push("collaborator");
             if ("undefined" !== typeof window) {
                 if (!window.localStorage.getItem("autoConnect")) {
@@ -707,7 +731,9 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
         this.updateState(
             message,
-            { roles },
+            { roles, 
+                collabUut: collabToken
+             },
             `/// found ${roles.length} roles: ${roles.join(", ")}}`
         );
     }
@@ -772,7 +798,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             this.checkWalletTokens(wallet);
             this.fetchBookEntries();
         } catch (error) {
-            this.reportError(error, "checking registry configuration: ", {
+            this.reportError(error, "checking registry configuration", {
                 nextAction: "initializeBookContract",
                 actionLabel: "Create New Book",
             });
@@ -795,7 +821,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         );
 
         let tcx: Awaited<
-            ReturnType<stateType["bookContract"]["mkTxnMintCharterToken"]>
+            ReturnType<BookPageState["bookContract"]["mkTxnMintCharterToken"]>
         >;
         try {
             const addresses = await wallet.usedAddresses;
@@ -813,7 +839,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             });
         } catch (e) {
             console.error(e);
-            this.reportError(e, "creating charter: ", {
+            this.reportError(e, "creating charter", {
                 nextAction: "retryCreation",
             });
             debugger;
@@ -863,11 +889,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         }
     }
 
-    reportError(e: Error, prefix: string, addlAttrs: Partial<stateType>) {
+    reportError(e: Error, prefix: string, addlAttrs: Partial<BookPageState>) {
         console.error(e.stack || e.message);
         debugger;
         return this.updateState(
-            `${prefix} "${e.message}"`,
+            `${prefix}: "${e.message}"`,
             {
                 error: true,
                 ...addlAttrs,
@@ -918,7 +944,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
      **/
     updateState(
         status: string | undefined,
-        stateProps: Omit<stateType, "status"> = {},
+        stateProps: Omit<BookPageState, "status"> = {},
         extraComment: string
     ): Promise<any> {
         const {

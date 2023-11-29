@@ -35,6 +35,7 @@ type stateType = {
     gen: number;
     error?: string;
     submitting?: boolean;
+    saveAs?: "suggestion" | "update";
     problems: Record<string, string>;
     current: BookEntry;
 };
@@ -44,7 +45,7 @@ type FieldProps = {
     fn: string;
     as?: React.ElementType;
     rows?: number;
-    options?: string[];
+    options?: HtmlSelectOptions;
     placeholder?: string;
     label: string;
     defaultValue: string;
@@ -60,11 +61,11 @@ type FieldProps = {
 
 type ChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
 
-const testBookPage : Partial<BookEntry> = {
+const testBookPage: Partial<BookEntry> = {
     title: "Test Page",
     entryType: "spg",
-    content: "## test page\n\nthis is a sample paragraph",    
-} ;
+    content: "## test page\n\nthis is a sample paragraph",
+};
 
 const buttonStyle = {
     padding: "0.75em",
@@ -80,6 +81,8 @@ const buttonStyle = {
     backgroundColor: "#142281",
 };
 
+type HtmlSelectOptions = string[] | Record<string, string>;
+
 type fieldOptions =
     | {
           array?: true;
@@ -91,7 +94,7 @@ type fieldOptions =
           style?: Record<string, any>;
           tableCellStyle?: Record<string, any>;
           validator?: Function;
-          options?: string[];
+          options?: HtmlSelectOptions;
           type?: "textarea" | "input" | "select";
       }
     | undefined;
@@ -143,18 +146,57 @@ export class PageEditor extends React.Component<propsType, stateType> {
         // this._unmounting = true;
     }
 
+    onSaveAsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        if (value !== "suggestion" && value !== "update") {
+            return this.props.reportError(
+                new Error(`bad value for radio button: ${value}`),
+                "saveAs",
+                {}
+            );
+        }
+        // alert("save as "+value);
+        this.setState({ saveAs: value });
+    };
+
     render() {
         const {
             current: rec,
             modified,
             error,
             submitting,
+            saveAs: saveAsState,
             problems,
         } = this.state || {};
-        const { entry, create, onClose, onSave, bookContract } = this.props;
+        const { entry, create, roles, onClose, onSave, bookContract } =
+            this.props;
         if (!rec) return ""; //wait for didMount
         const showTitle = <>{create ? "Creating new" : "Edit"} page</>;
         let sidebarContent;
+
+        const hasAuthority =
+            entry.ownerAuthority.uutName == this.props.collabUut?.name;
+        const isEditor = roles?.includes("editor");
+        //! when the user has authority to apply changes, use "update" mode by default,
+        //   ... but allow them to save it as a suggestion instead.
+        //! if they don't have authority, they can only make a suggestion.
+        let saveAs = saveAsState;
+        if (!("saveAs" in (this.state || {}))) {
+            if (this.props.collabUut) {
+                saveAs = hasAuthority ? "update" : "suggestion";
+                setTimeout(() => {
+                    // alert("appkying " +saveAs);
+                    this.setState({
+                        saveAs
+                    });
+                }, 100);
+            }
+        }
+        //! an editor CAN use direct update, but with "suggestion" by default.
+        const canDoDirectUpdate = hasAuthority || isEditor;
+        const isSuggesting = "suggestion" == saveAs;
+        const isUpdating = "update" == saveAs;
+
         const foundProblems = submitting && Object.keys(problems).length;
         {
             if ("undefined" == typeof window) {
@@ -174,26 +216,30 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                         marginTop: "4em",
                                     }}
                                 >
-                                    The page content will shown on this
-                                    website and visible in the Cardano
-                                    blockchain. 
+                                    The page content will be shown on this website
+                                    and visible in the Cardano blockchain.
                                 </p>
-                            
+
                                 <p
                                     style={{
                                         fontStyle: "italic",
                                         marginTop: "4em",
                                     }}
                                 >
-                                    Your collaborator-token is required for making modifications to the page, 
-                                    and for accepting changes other collaborators may propose.
-                                </p>                                
+                                    Your collaborator-token is required for
+                                    making modifications to the page, and for
+                                    accepting changes other collaborators may
+                                    propose.
+                                </p>
 
                                 <p style={{ fontStyle: "italic" }}>
-                                    The page will start in "suggested" state, and will have an expiration date.
-                                    The book editor(s) can accept the page officially into the book.  You'll
-                                    normally continue to have ownership of the page, with the authority to 
-                                    approve changes to the page content.
+                                    The page will start in "suggested" state,
+                                    and will have an expiration date. The book
+                                    editor(s) can accept the page officially
+                                    into the book. You'll normally continue to
+                                    have ownership of the page, with the
+                                    authority to approve changes to the page
+                                    content.
                                 </p>
                             </Prose>,
                             portalTarget
@@ -211,7 +257,8 @@ export class PageEditor extends React.Component<propsType, stateType> {
                 </Head>
                 <header className="mb-9 space-y-1">
                     <p className="font-display text-sm font-medium text-sky-500">
-                        Book&nbsp;&nbsp;››&nbsp;&nbsp;Topics&nbsp;&nbsp;››&nbsp;&nbsp;&nbsp;{breadcrumbTitle}
+                        Book&nbsp;&nbsp;››&nbsp;&nbsp;Topics&nbsp;&nbsp;››&nbsp;&nbsp;&nbsp;
+                        {breadcrumbTitle}
                     </p>
                 </header>
                 {sidebarContent}
@@ -268,6 +315,14 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                             return "must be at least 8 characters";
                                     },
                                 })}
+                                {this.props.roles?.includes("editor") &&
+                                    this.field("Entry Type", "entryType", {
+                                        type: "select",
+                                        options: {
+                                            pg: "Page",
+                                            spg: "Suggested Page",
+                                        },
+                                    })}
                                 {this.field("Content", "content", {
                                     type: "textarea",
                                     rows: 15,
@@ -277,7 +332,49 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                     },
                                 })}
                                 <tr>
-                                    <th></th>
+                                    {modified && (
+                                        <>
+                                            <th className="text-right">Save as...</th>
+                                            <th className="pl-4 align-baseline text-base">
+                                                <label
+                                                    htmlFor="save-as-update"
+                                                    className={`${canDoDirectUpdate ? "" : "opacity-30"} form--radio-label ${isUpdating ? "font-bold text-[#ccc]" : "text-sm"}`}
+                                                >
+                                                    <input
+                                                        id="save-as-update"
+                                                        name="saveAs"
+                                                        type="radio"
+                                                        value="update"
+                                                        checked={isUpdating}
+                                                        onChange={
+                                                            this.onSaveAsChange
+                                                        }
+                                                        disabled={
+                                                            !canDoDirectUpdate
+                                                        }
+                                                    />
+                                                    &nbsp;&nbsp;Direct update
+                                                </label>
+                                                &nbsp;&nbsp;&nbsp;&nbsp;
+                                                <label
+                                                    htmlFor="save-as-suggestion"
+                                                    className={`form--radio-label ${isSuggesting ? "font-bold" : "text-sm "}`}
+                                                >
+                                                    <input
+                                                        id="save-as-suggestion"
+                                                        name="saveAs"
+                                                        type="radio"
+                                                        value="suggestion"
+                                                        checked={isSuggesting}
+                                                        onChange={
+                                                            this.onSaveAsChange
+                                                        }
+                                                    />
+                                                    &nbsp;&nbsp;Suggestion
+                                                </label>
+                                            </th>
+                                        </>
+                                    )}
                                 </tr>
                             </tbody>
                             <tfoot>
@@ -346,8 +443,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
                             <hr className="not-prose mb-2" />
                             <PageView
                                 {...{
-                                    entry: { ...entry, entry: rec },                                    
+                                    entry: { ...entry, entry: rec },
                                     bookContract,
+                                    collabUut: this.props.collabUut,
+                                    connectingWallet:
+                                        this.props.connectingWallet,
+                                    roles: this.props.roles,
                                     updateState: this.props.updateState,
                                     reportError: this.props.reportError,
                                 }}
@@ -435,7 +536,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                 style,
                                 tableCellStyle,
                                 onChange: validator
-                                    ? this.mkChangeValidator(fieldId, validator, rec, index)
+                                    ? this.mkChangeValidator(
+                                          fieldId,
+                                          validator,
+                                          rec,
+                                          index
+                                      )
                                     : this.changed,
                             }}
                         />
@@ -466,7 +572,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
 
     validators: Record<string, ChangeHandler> = {};
-    mkChangeValidator(fieldId: string, validate: Function, rec : BookEntry, index? : number): ChangeHandler {
+    mkChangeValidator(
+        fieldId: string,
+        validate: Function,
+        rec: BookEntry,
+        index?: number
+    ): ChangeHandler {
         const v = this.validators[fieldId];
         if (v) return v;
         const changedWithValidation: ChangeHandler = (e) => {
@@ -479,10 +590,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
                         const newState = {
                             //! clears problems that have been corrected (i.e. [key] => ‹undefined›)
                             //   ... using json-stringifying convention of skipping undef values
-                            problems: JSON.parse(JSON.stringify({
-                                ...problems,
-                                [fieldId]: problem,
-                            }))
+                            problems: JSON.parse(
+                                JSON.stringify({
+                                    ...problems,
+                                    [fieldId]: problem,
+                                })
+                            ),
                         };
                         debugger;
                         return newState;
@@ -497,13 +610,16 @@ export class PageEditor extends React.Component<propsType, stateType> {
     changed: ChangeHandler = (e) => {
         //! adds an empty item at the end of the list of expectations
         const {
-            current: {  },
+            current: {},
             gen = 0,
         } = this.state;
 
         const f = this.form.current;
         const updatedEntry = this.capture(f);
-
+        //@ts-expect-error
+        if (updatedEntry.saveAs) {
+            debugger
+        }
         this.setState({
             current: updatedEntry,
             modified: true,
@@ -516,12 +632,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
             formData.entries()
         ) as unknown as BookEntry;
 
-        const initial = this.props.entry || {}
-        const updatedEntry = { 
-            ... (this.state?.current || {}),
-             ...currentForm 
+        const initial = this.props.entry || {};
+        const updatedEntry = {
+            ...(this.state?.current || {}),
+            ...currentForm,
         };
-        
+
         return updatedEntry;
     }
 
@@ -552,7 +668,11 @@ export class PageEditor extends React.Component<propsType, stateType> {
 
         try {
             const txnDescription = `${create ? "creation" : "update"} txn`;
-            updateState(`preparing ${txnDescription}`, { progressBar: true }, `//mkTxn ${txnDescription}`);
+            updateState(
+                `preparing ${txnDescription}`,
+                { progressBar: true },
+                `//mkTxn ${txnDescription}`
+            );
             const tcx = create
                 ? await bookContract.mkTxnCreatingBookEntry(updatedBookEntry)
                 : await bookContract.mkTxnUpdatingEntry({
@@ -574,8 +694,9 @@ export class PageEditor extends React.Component<propsType, stateType> {
             // updateState(`submitting the ${txnDescription} to the network`,);
             refresh().then(async () => {
                 updateState(
-                    `The update will take a few moments before it's confirmed`, 
-                    {}, "//@user: be patient"
+                    `The update will take a few moments before it's confirmed`,
+                    {},
+                    "//@user: be patient"
                 );
                 await new Promise((res) => setTimeout(res, 3000));
                 updateState("", {}, "// clear patience msg");
@@ -625,12 +746,20 @@ function Field({
     const arrayTableStyle = isOnlyOrLastRow ? {} : noBottomBorder;
     const helpId = fn;
     const errorId = problem ? `problem-${fieldId}` : "";
-    const renderedOptions = options
-        ? options.map((s) => {
-              const selected = value == s ? { selected: true } : {};
+    const optionsAsKV =
+        options && Array.isArray(options)
+            ? Object.fromEntries(
+                  options.map((s) => {
+                      return [s, s];
+                  })
+              )
+            : options;
+
+    const renderedOptions = optionsAsKV
+        ? Object.entries(optionsAsKV).map(([k, v]) => {
               return (
-                  <option key={s} value={s} {...selected}>
-                      {s}
+                  <option key={k} value={k}>
+                      {v}
                   </option>
               );
           })

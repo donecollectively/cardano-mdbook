@@ -37,7 +37,7 @@ Please use `pnpm`, not `npm`.
 
 To make your own on-chain MDBook:
 
-  1.  fork this repo in Github.  We kindly request that you (a) rename your MDBook repo 
+  1.  fork this repo in Github.  We request that you kindly (a) rename your MDBook repo 
     and (b) remove or replace this README. :pray:
   2.  ensure `pnpm` is installed, and that you have NodeJS version 18 (we like `nvm` 
   to help with that).

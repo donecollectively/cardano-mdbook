@@ -83,12 +83,12 @@ export class Invitation extends React.Component<propsType, stateType> {
         const { bookContract, updateState, reportError } = this.props;
         const {address} = this.state;
 
-        await updateState("building txn to mint collaborator token", {});
+        await updateState("building txn to mint collaborator token", {}, "//mkTxnMintCollaboratorToken()");
         const tcx = await bookContract.mkTxnMintCollaboratorToken(address);
-        await updateState("loading collaborator-mint txn to wallet", {});
+        await updateState("loading collaborator-mint txn to wallet", {}, "//collab-mint -> wallet");
         
         return bookContract.submit(tcx).then(
-            () => updateState("submitted", {}),
+            () => updateState("submitted", {}, "//submit collab-creation"),
             (e) => reportError(e, "submitting collaborator-mint txn", {
                 // nextAction: "initializeBookContract",
                 // actionLabel: "Create New Book",
