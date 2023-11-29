@@ -346,8 +346,10 @@ export class PageEditor extends React.Component<propsType, stateType> {
                             <hr className="not-prose mb-2" />
                             <PageView
                                 {...{
-                                    entry: { ...entry, entry: rec },
+                                    entry: { ...entry, entry: rec },                                    
                                     bookContract,
+                                    updateState: this.props.updateState,
+                                    reportError: this.props.reportError,
                                 }}
                                 preview
                             />

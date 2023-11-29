@@ -7,7 +7,7 @@
         "strict": false,
         // "strict": true,  // prevents decorator signature errors
         "experimentalDecorators": true,
-        "emitDecoratorMetadata": true,
+        // "emitDecoratorMetadata": true,
         "forceConsistentCasingInFileNames": true,
         "noEmit": true,
         "incremental": true,
@@ -34,7 +34,9 @@
         //   "noImplicitAny": false,
         //   "rootDir": ".",
         //   "sourceMap": true
-        "isolatedModules": true
+
+
+        // "isolatedModules": true
     },
     "include": [
         "next-env.d.ts",

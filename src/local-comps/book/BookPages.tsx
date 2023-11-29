@@ -8,16 +8,17 @@ import { Prose } from "../../components/Prose.jsx";
 import link from "next/link.js";
 const Link = link.default;
 
-type paramsType = {
-    bookContract: CMDBCapo;
+type propsType = {
+    bookContract: CMDBCapo;    
     bookDetails: BookEntryForUpdate[];
     // refreshCreds: Function;
     bookMgrStatus: string;
     createBookEntry: Function;
+    isCollaborator?: true
 };
 type stateType = {};
 
-export class BookPages extends React.Component<paramsType, stateType> {
+export class BookPages extends React.Component<propsType, stateType> {
     static notProse = true;
     constructor(props) {
         super(props);
@@ -28,6 +29,7 @@ export class BookPages extends React.Component<paramsType, stateType> {
     }
 
     renderResultsTable(filteredBookDetails: BookEntryForUpdate[]) {
+        const {isCollaborator} = this.props
         return (
             <Prose className="">
                 <table>
@@ -66,7 +68,7 @@ export class BookPages extends React.Component<paramsType, stateType> {
                     <tfoot>
                         <tr>
                             <td colSpan={2}>
-                                <button
+                                {isCollaborator && <button
                                     className="btn border rounded"
                                     style={{
                                         padding: "0.75em",
@@ -79,7 +81,7 @@ export class BookPages extends React.Component<paramsType, stateType> {
                                     onClick={this.create}
                                 >
                                     Add a Topic
-                                </button>
+                                </button>}
                             </td>
                             <td colSpan={2} style={{ textAlign: "right" }}>
                                 {(filteredBookDetails.length || "") && (

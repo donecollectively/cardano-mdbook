@@ -393,6 +393,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                         createBookEntry: this.createBookEntry,
                         bookContract,
                         bookMgrStatus: status,
+                        ... ( roles?.includes("collaborator") ? {isCollaborator: true} : {} ),
                     }}
                 />
             );
@@ -448,7 +449,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             <>
                 {roles.map((r) => {
                     return (
-                        <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                        <span className="ml-1 inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
                             {r}
                         </span>
                     );
@@ -631,8 +632,6 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             );
             return;
         }
-        const utxos: TxInput[] = await wallet.utxos;
-        const { mph } = bookContract;
 
         await this.updateState(
             "checking wallet for authority tokens ",
@@ -641,22 +640,12 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         );
 
         const roles = [];
-        for (const u of utxos) {
-            const tokenNames = u.value.assets
-                .getTokenNames(mph)
-                .map((x) => helios.bytesToText(x.bytes))
-                .filter(
-                    (x) => x.startsWith("capoGov-") || x.startsWith("contrib-")
-                );
-            for (const tokenName of tokenNames) {
-                const role = tokenName.replace(/-.*/, "");
-                let label =
-                    "capoGov" == role ? "editor" :  
-                    "contrib" == role ? "contributor" : role; //prettier-ignore
+        const isCollab = await bookContract.findRoleUtxo("collab")
+        const isEditor = await bookContract.findRoleUtxo("capoGov")
 
-                roles.push(label);
-            }
-        }
+        if (!!isCollab) roles.push("collaborator");
+        if (!!isEditor) roles.push("editor");
+
         const message = roles.includes("contributor")
             ? ""
             : "To be a contributor on this project, please send your wallet address to the book editor";

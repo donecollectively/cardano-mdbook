@@ -85,11 +85,14 @@ export class Invitation extends React.Component<propsType, stateType> {
 
         await updateState("building txn to mint collaborator token", {});
         const tcx = await bookContract.mkTxnMintCollaboratorToken(address);
-        await updateState("loading mint txn to wallet", {});
+        await updateState("loading collaborator-mint txn to wallet", {});
         
         return bookContract.submit(tcx).then(
             () => updateState("submitted", {}),
-            (e) => reportError(e)
+            (e) => reportError(e, "submitting collaborator-mint txn", {
+                // nextAction: "initializeBookContract",
+                // actionLabel: "Create New Book",
+            })
         );
     };
 }

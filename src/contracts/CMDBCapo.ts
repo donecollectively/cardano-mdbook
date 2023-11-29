@@ -20,11 +20,14 @@ import {
 } from "@donecollectively/stellar-contracts";
 
 const { Value, TxOutput, Datum } = helios;
-import type {
-    InlineDatum,
-    isActivity,
+import {
     TxInput,
     UutName,
+} from "@donecollectively/stellar-contracts";
+
+import type {
+    isActivity,
+    InlineDatum,
 } from "@donecollectively/stellar-contracts";
 
 //@ts-expect-error importing a file typescript isn't expected to understand
@@ -212,6 +215,23 @@ export class CMDBCapo extends DefaultCapo {
         console.warn("after receiveEntry", dumpAny(tcx3.tx));
         debugger;
         return tcx3 as TCX & typeof tcx2 & typeof tcx;
+
+    async findRoleUtxo(roleUutPrefix: string) : Promise<TxInput | undefined> {
+        const utxos: TxInput[] = await this.wallet.utxos;
+
+        for (const u of utxos) {
+            const tokenNames = u.value.assets
+                .getTokenNames(this.mph)
+                .map((x) => helios.bytesToText(x.bytes))
+                .filter(
+                    (x) => x.startsWith(`${roleUutPrefix}-`)
+                );
+            for (const tokenName of tokenNames) {
+                const thisUutPrefix = tokenName.replace(/-.*/, "");
+                if (thisUutPrefix == roleUutPrefix) return u
+            }
+        }
+        return undefined
     }
 
     /**
