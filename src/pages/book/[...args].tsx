@@ -11,15 +11,15 @@
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
     mph: {
-        bytes: "3abe04e0f54900c20105d33319c79264dd78920fd999584ad7f9b6ea",
+        bytes: "e70140a7f9383d8a8a512aec01c02b1b0d3b6a1ef35378390ef8e187",
     },
     rev: "1",
     seedTxn: {
-        bytes: "23fe32d5648699aa1b08f82ff808c3c39be974cc90f706beb5227799bf92243a",
+        bytes: "a222e13f5904ca4ef1ae2163da6b44b9a73d67e406afe41682a230ecf0bb330a",
     },
     seedIndex: "3",
     rootCapoScriptHash: {
-        bytes: "6fc3cbd716bbaaea5e7bef6e7856966c9b2a013e0792dfde38130142",
+        bytes: "e3c11d02c3124bfd64f75b5338754056b7ed408bd4372e41c2502966",
     },
 };
 
@@ -271,8 +271,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         const renderedStatus =
             (status &&
                 inPortal(
-                    "topCenter",
-                    <>
+                    "topLeft",
+                    <div className="absolute z-40 opacity-60 top-0">
                         {showProgressBar ? (
                             <Progress>{progressLabel}</Progress>
                         ) : (
@@ -280,7 +280,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                         )}
                         {error ? (
                             <div
-                                className="error border rounded relative mb-4"
+                                className="error border rounded relative left-0 top-0 mb-4 min-w-screen-md max-w-screen-md sm:max-w-screen-sm"
                                 role="alert"
                                 style={{ marginBottom: "0.75em" }}
                             >
@@ -288,25 +288,25 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                                 <strong className="font-bold">
                                     Whoops! &nbsp;&nbsp;
                                 </strong>
-                                <span className="block inline">{status}</span>
+                                <span key="status-err" className="block inline">{status}</span>
 
                                 {showMoreInstructions}
                             </div>
                         ) : (
                             <div
-                                className="status border rounded relative mb-4"
+                                className="status border rounded relative left-0 top-0 mb-4 min-w-screen-md max-w-screen-md sm:max-w-screen-sm"
                                 role="banner"
                                 // style={{ marginBottom: "-7em" }}
                             >
                                 {doNextAction}
-                                <span className="block sm:inline">
+                                <span key="status" className="block sm:inline">
                                     {status}
                                 </span>
 
                                 {showMoreInstructions}
                             </div>
                         )}
-                    </>
+                    </div>
                 )) ||
             "";
 
@@ -393,7 +393,9 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                         createBookEntry: this.createBookEntry,
                         bookContract,
                         bookMgrStatus: status,
-                        ... ( roles?.includes("collaborator") ? {isCollaborator: true} : {} ),
+                        ...(roles?.includes("collaborator")
+                            ? { isCollaborator: true }
+                            : {}),
                     }}
                 />
             );
@@ -449,7 +451,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             <>
                 {roles.map((r) => {
                     return (
-                        <span className="ml-1 inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                        <span key={`role-${r}`} className="ml-1 inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
                             {r}
                         </span>
                     );
@@ -472,7 +474,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
         if (wallet) {
             return (
-                <span className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-blue-900 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                <span key="chip-networkName" className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-blue-900 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
                     {networkName}
                 </span>
             );
@@ -571,10 +573,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             return this.connectingWallet;
         }
 
-        await this.updateState("connecting to Cardano wallet", {
-            connectingWallet: true,
-            progressBar: true,
-        });
+        await this.updateState(
+            "connecting to Cardano wallet",
+            {
+                connectingWallet: true,
+                progressBar: true,
+            },
+            "//connecting wallet"
+        );
         const connecting = (this.connectingWallet =
             //@ts-expect-error on Cardano
             window.cardano[selectedWallet].enable());
@@ -584,14 +590,16 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         if (networkName !== "preprod") {
             return this.updateState(
                 `This application is only released on the preprod testnet for now.  Please switch to a preprod wallet.`,
-                { error: true }
+                { error: true },
+                "//wallet not on preprod"
             );
         }
         if (this.bf.networkName !== networkName) {
             //! checks that wallet network matches network params / bf
             this.updateState(
                 `wallet network mismatch; expected ${this.bf.networkName}, wallet ${networkName}`,
-                { error: true }
+                { error: true },
+                "//wallet network doesn't match bf network"
             );
             return;
         }
@@ -599,30 +607,44 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
         const collateralUtxos = await handle.getCollateral();
         if (!collateralUtxos?.length) {
-            this.updateState(`Error: no collateral UTxO set in wallet config`, {
-                error: true,
-            });
+            this.updateState(
+                `Error: no collateral UTxO set in wallet config`,
+                {
+                    error: true,
+                },
+                "//no collateral"
+            );
             return;
         }
 
         const walletHelper = new helios.WalletHelper(wallet);
-        if (this.state?.bookContract?.configIn) {
-            await this.checkWalletTokens(wallet);
-        }
-        await this.updateState("initializing registry with wallet connected", {
-            wallet,
-            connectingWallet: false,
-            walletHelper,
-            networkName,
-        });
+        await this.updateState(
+            "initializing registry with wallet connected",
+            {
+                wallet,
+                connectingWallet: false,
+                walletHelper,
+                networkName,
+            },
+            "//reinit after wallet"
+        );
 
         walletHelper.getUtxos().then((walletUtxos) => {
-            this.updateState(undefined, { walletUtxos });
+            this.updateState(
+                undefined,
+                { walletUtxos },
+                "//found wallet utxos"
+            );
         });
-        return this.connectBookContract(autoNext);
+        return this.connectBookContract(autoNext).then(async () => {
+            debugger;
+            if (this.state?.bookContract?.configIn) {
+                await this.checkWalletTokens(wallet);
+            }
+        });
     }
 
-    async checkWalletTokens(wallet: typeof helios.Cip30Wallet) {
+    async checkWalletTokens(wallet: helios.Cip30Wallet) {
         const { bookContract } = this.state;
         if (!bookContract) {
             await this.updateState(
@@ -636,21 +658,23 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         await this.updateState(
             "checking wallet for authority tokens ",
             {},
-            "/// looking for authority tokens  in policy " + mph.hex
+            "/// looking for authority tokens  from policy " +
+                bookContract.mph.hex
         );
 
         const roles = [];
-        const isCollab = await bookContract.findRoleUtxo("collab")
-        const isEditor = await bookContract.findRoleUtxo("capoGov")
+        const isCollab = await bookContract.findRoleUtxo("collab");
+        const isEditor = await bookContract.findRoleUtxo("capoGov");
 
         if (!!isCollab) roles.push("collaborator");
         if (!!isEditor) roles.push("editor");
 
-        const message = roles.includes("contributor")
+        const message = roles.includes("collaborator")
             ? ""
-            : "To be a contributor on this project, please send your wallet address to the book editor";
+            : `To be a collaborator on this CMDBook, please send your wallet address to the book editor,` +
+              `or connect a wallet having a collab-* token from policyId ${bookContract.mph.hex}`;
 
-        this.updateState(message, { roles }, "/// found roles");
+        this.updateState(message, { roles }, `/// found ${roles.length} roles: ${roles.join(", ")}}`);
     }
 
     // -- step 3 - check if the book contract is ready for use
@@ -685,10 +709,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                     ? `Creds Registry contract isn't yet created or configured.  Add a configuration if you have it, or create the registry now.`
                     : "";
 
-                await this.updateState(message, {
-                    bookContract,
-                    nextAction: "initializeBookContract",
-                });
+                await this.updateState(
+                    message,
+                    {
+                        bookContract,
+                        nextAction: "initializeBookContract",
+                    },
+                    "//bootstrap needed"
+                );
                 return;
                 // return this.stellarSetup();
             }
@@ -723,9 +751,13 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         await this.connectBookContract(false, "reset");
         const { bookContract, wallet } = this.state;
 
-        await this.updateState("creating the MDBook charter transaction ...", {
-            progressBar: true,
-        });
+        await this.updateState(
+            "creating the MDBook charter transaction ...",
+            {
+                progressBar: true,
+            },
+            "//creating charter txn"
+        );
 
         let tcx: Awaited<
             ReturnType<stateType["bookContract"]["mkTxnMintCharterToken"]>
@@ -759,7 +791,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 progressBar: true,
                 moreInstructions:
                     "If it looks right, sign the transaction to finish initializing the registry.",
-            }
+            },
+            "//push bootstrap txn to wallet"
         );
         try {
             await bookContract.submit(tcx);
@@ -771,7 +804,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                         null,
                         2
                     ),
-                }
+                },
+                "//ok: charter txn submitted to network"
             );
             console.warn(
                 "------------------- Boostrapped Config -----------------------\n",
@@ -782,21 +816,29 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             // this.seekConfirmation()
         } catch (e) {
             console.error(e);
-            this.updateState(`wallet reported "${e.message}"`, {
-                bookContract: undefined,
-                error: true,
-                nextAction: "retryCreation",
-            });
+            this.updateState(
+                `wallet reported "${e.message}"`,
+                {
+                    bookContract: undefined,
+                    error: true,
+                    nextAction: "retryCreation",
+                },
+                "//wallet error during charter"
+            );
         }
     }
 
     reportError(e: Error, prefix: string, addlAttrs: Partial<stateType>) {
         console.error(e.stack || e.message);
         debugger;
-        return this.updateState(`${prefix} "${e.message}"`, {
-            error: true,
-            ...addlAttrs,
-        });
+        return this.updateState(
+            `${prefix} "${e.message}"`,
+            {
+                error: true,
+                ...addlAttrs,
+            },
+            "//error msg to user"
+        );
     }
 
     //  -- step 4: Read registry entries from chain
@@ -819,7 +861,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             );
         }
         await Promise.all(waiting);
-        this.updateState("", { bookDetails, bookEntryIndex });
+        this.updateState(
+            "",
+            { bookDetails, bookEntryIndex },
+            "// finished reading book entries"
+        );
     }
 
     /**
@@ -836,9 +882,9 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
      * @public
      **/
     updateState(
-        status?: string,
+        status: string | undefined,
         stateProps: Omit<stateType, "status"> = {},
-        extraComment?: string
+        extraComment: string
     ): Promise<any> {
         const {
             nextAction = undefined,
@@ -868,7 +914,15 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             ...stateProps,
             ...stateUpdate,
         };
-        console.error(extraComment || "", { newState });
+        const doneWith =
+            ("" == status &&
+                this.state.status &&
+                `(done: ${this.state.status})`) ||
+            "";
+
+        console.error(new Date(), extraComment || "" + doneWith || "", {
+            newState,
+        });
         return new Promise<void>((resolve) => {
             this.setState(newState, resolve);
         });

@@ -118,7 +118,6 @@ export class CMDBCapo extends DefaultCapo {
         } = rec;
 
         const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
-        debugger;
         const bookEntryStruct = new hlBookEntryStruct(
             entryType,
             title,
@@ -175,56 +174,85 @@ export class CMDBCapo extends DefaultCapo {
         //     - includes the mint-delegate for authorizing creation of the entry
         //  - assign the user's collaborator token as the administrative authority
 
-        const tcx = await this.mkTxnMintingUuts(
+        const myContribToken = await this.findRoleUtxo("collab");
+        if (!myContribToken) {            
+            const message = `It looks like you're not a collaborator on this project.  Are you connected with a wallet having collab-* token from policyId ${this.mph.hex} ?`;
+
+            throw new Error(message);
+        }
+
+        const tcx1 = await this.mkTxnMintingUuts(
             iTcx || new StellarTxnContext<any>(this.myActor),
-            ["eid" ],
+            [ "eid" ],
             undefined,
             {
                 entryId: "eid",
             }
         );
+        const tcx1a : typeof tcx1 & hasUutContext<"ownerAuthority" | "collab"> = tcx1.addInput(myContribToken);
+        const collaborator: UutName = tcx1.state.uuts.ownerAuthority = tcx1.state.uuts.collab = this.mkUutName("collab", myContribToken);
 
         //  - create a delegate-link connecting the entry to the collaborator
         const ownerAuthority = this.txnCreateConfiguredDelegate(
-            tcx,
+            tcx1a,
             "ownerAuthority",
             {
                 strategyName: "address",
-                config: {
-                    addrHint: await this.wallet.usedAddresses,
+                config: { // !!! TODO: look into why this shows up as type Partial<any>
+                    addrHint: [ myContribToken.origOutput.address ]
                 },
             }
         );
         const tenMinutes = 1000 * 60 * 10;
 
-        const owner: UutName = tcx.state.uuts.ownerAuthz;
         //  - send the ownerAuthz UUT to the user
         const tcx2 = await ownerAuthority.delegate.txnReceiveAuthorityToken(
-            tcx,
-            this.uutsValue(owner)
+            tcx1a,
+            this.uutsValue(collaborator)
         );
         tcx2.validFor(tenMinutes);
 
         //  - combine the delegate-link with the entry, to package it for on-chain storage
         //  - send the entry's UUT to the contract, with the right on-chain datum
-        const tcx3 = this.txnReceiveEntry(tcx2, {
+        const tcx3 = this.txnReceiveBookEntry(tcx2, {
             ownerAuthority,
-            id: tcx.state.uuts.regCred.name,
+            id: tcx2.state.uuts.entryId.name,
             entry: entry,
         });
-        console.warn("after receiveEntry", dumpAny(tcx3.tx));
-        debugger;
-        return tcx3 as TCX & typeof tcx2 & typeof tcx;
+        console.warn("after receiveBookEntry", dumpAny(tcx3.tx));
+        // debugger;
+        return tcx3 as TCX & typeof tcx2 & typeof tcx1a;
+    }
+
+    mkUutName(purpose: string, txin : TxInput) {
+        const tokenNames = txin.value.assets
+            .getTokenNames(this.mph)
+            .map((x) => helios.bytesToText(x.bytes))
+            .filter(
+                (x) => x.startsWith(`${purpose}-`)
+            );
+
+        if (tokenNames.length > 1) console.warn(
+            `mkUutName() found multiple ${purpose} tokens in one Utxo.  This one has ${tokenNames.length} that match: ` + tokenNames.join(", ")
+        );
+
+        return new UutName(purpose, tokenNames[0]);
+    }
 
     async findRoleUtxo(roleUutPrefix: string) : Promise<TxInput | undefined> {
         const utxos: TxInput[] = await this.wallet.utxos;
-
+        console.info(`found ${utxos.length} wallet utxos, in pursuit of ${roleUutPrefix}-* token from ${this.mph.hex}` )
         for (const u of utxos) {
-            const tokenNames = u.value.assets
+            const tokenNamesExisting = u.value.assets
                 .getTokenNames(this.mph)
-                .map((x) => helios.bytesToText(x.bytes))
+                .map((x) => helios.bytesToText(x.bytes));
+            // if (tokenNamesExisting.length) debugger
+            const tokenNames = tokenNamesExisting
                 .filter(
-                    (x) => x.startsWith(`${roleUutPrefix}-`)
+                    (x) => {
+                        // console.info("   - token name: "+x);
+                        return !!x.startsWith(`${roleUutPrefix}-`)
+                    }
                 );
             for (const tokenName of tokenNames) {
                 const thisUutPrefix = tokenName.replace(/-.*/, "");
@@ -245,11 +273,10 @@ export class CMDBCapo extends DefaultCapo {
      * @public
      **/
     @partialTxn
-    txnReceiveEntry<TCX extends StellarTxnContext<any>>(
+    txnReceiveBookEntry<TCX extends StellarTxnContext<any>>(
         tcx: TCX,
         entry: BookEntryForUpdate | BookEntryCreate
     ): TCX {
-        debugger;
         const entryMinValue = this.mkMinTv(this.mph, entry.id);
         const utxo = new TxOutput(
             this.address,
@@ -409,7 +436,7 @@ export class CMDBCapo extends DefaultCapo {
             .attachScript(this.compiledScript)
             .addInput(currentUtxo, this.activityUpdatingEntry())
             .validFor(tenMinutes);
-        return this.txnReceiveEntry(tcx2, entryForUpdate);
+        return this.txnReceiveBookEntry(tcx2, entryForUpdate);
     }
 
     requirements() {

@@ -62,7 +62,7 @@ type ChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
 
 const testBookPage : Partial<BookEntry> = {
     title: "Test Page",
-    entryType: "pg",
+    entryType: "spg",
     content: "## test page\n\nthis is a sample paragraph",    
 } ;
 
@@ -512,12 +512,17 @@ export class PageEditor extends React.Component<propsType, stateType> {
     };
     capture(form) {
         const formData = new FormData(form);
-        const updatedBookEntry: BookEntry = Object.fromEntries(
+        const currentForm: BookEntry = Object.fromEntries(
             formData.entries()
         ) as unknown as BookEntry;
-        const exp = formData.getAll("expectations") as string[];
 
-        return updatedBookEntry;
+        const initial = this.props.entry || {}
+        const updatedEntry = { 
+            ... (this.state?.current || {}),
+             ...currentForm 
+        };
+        
+        return updatedEntry;
     }
 
     async save(e: React.SyntheticEvent) {
@@ -526,6 +531,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
             entry: entryForUpdate,
             refresh,
             updateState,
+            reportError,
             bookContract,
             router,
             create,
@@ -546,7 +552,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
 
         try {
             const txnDescription = `${create ? "creation" : "update"} txn`;
-            updateState(`preparing ${txnDescription}`, { progressBar: true });
+            updateState(`preparing ${txnDescription}`, { progressBar: true }, `//mkTxn ${txnDescription}`);
             const tcx = create
                 ? await bookContract.mkTxnCreatingBookEntry(updatedBookEntry)
                 : await bookContract.mkTxnUpdatingEntry({
@@ -558,26 +564,28 @@ export class PageEditor extends React.Component<propsType, stateType> {
                 `sending the ${txnDescription} to your wallet for approval`,
                 {
                     progressBar: true,
-                }
+                },
+                "// submit book entry to wallet"
             );
             const minDelay = new Promise((res) => setTimeout(res, 2000));
 
             await bookContract.submit(tcx);
             await minDelay;
-            updateState(`submitting the ${txnDescription} to the network`);
+            // updateState(`submitting the ${txnDescription} to the network`,);
             refresh().then(async () => {
                 updateState(
-                    `The update will take a few moments before it's confirmed`
+                    `The update will take a few moments before it's confirmed`, 
+                    {}, "//@user: be patient"
                 );
                 await new Promise((res) => setTimeout(res, 3000));
-                updateState("");
+                updateState("", {}, "// clear patience msg");
             });
             router.push("/book");
             // this.setState({modified: true})
         } catch (error) {
             console.error(error.stack);
             debugger;
-            updateState(error.message, { error: true });
+            reportError(error, "submitting book-entry txn", {});
         }
     }
     mkFieldId(fn: string, index?: number): string {

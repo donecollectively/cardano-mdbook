@@ -44,13 +44,13 @@ export class BookPages extends React.Component<propsType, stateType> {
                         {filteredBookDetails.map(({ id, entry, ownerAuthority }) => (
                             <tr key={`table-${id}`}>
                                 <td>
-                                    <Link href={`/book/${id}`}>
+                                    <Link href={`/book/${id}` }>
                                         {entry.title}
                                     </Link>
                                 </td>
                                 <td>
-                                    {"spg" == entry.entryType ? "Suggested" : "Page"}
-                                    &nbsp;{entry.entryType /*temp*/}
+                                    {"spg" == entry.entryType ? "Suggested Page" : "Page"}
+                                    {/* &nbsp;{entry.entryType /*temp*/}
                                 </td>
                                 <td>
                                     {ownerAuthority.uutName}

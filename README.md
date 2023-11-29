@@ -13,11 +13,13 @@ Please use `pnpm`, not `npm`.
   - ✅ when not a collaborator, connecting the wallet should guide people to request a 
     collaborator invite from the book's editor(s)
   - ✅ enable collaborator-token minting with address
-  - arrange ownerAuthority for each book entry using  collaborator token
-  - enable markdown editor for page-creation
+  - ✅ create book entries, with ownerAuthority for each book entry using collaborator token
   - enable direct editing by page-owner
-  - enable change-suggestion by non-owner, post 'chg' record
+  - allow editor to promote a suggested-page to a page
+  - enable direct editing by editor
+  - enable change-suggestion by non-owner; post 'chg' entry
   - gather topic index and include in site menu
+  - enable markdown editor for page-creation
   - optionally integrate suggested changes to page View
 
 #### future:

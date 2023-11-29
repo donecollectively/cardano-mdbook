@@ -29,10 +29,18 @@ struct BookEntryStruct {
     updatedAt: Int
     expiresAt: Int
 }
+
+// struct LocalCapoConfig {
+//     openCreate: Bool "@opn"
+//     openSuggestion: Bool "@osg"
+//     
+// }
+
 enum Datum {
     CharterToken {
-        govAuthorityLink: RelativeDelegateLink
-        mintDelegateLink: RelativeDelegateLink
+        govAuthorityLink: RelativeDelegateLink 
+        mintDelegateLink: RelativeDelegateLink 
+        // config: LocalCapoConfig
     }
     BookEntry {
         ownerAuthority: RelativeDelegateLink
