@@ -534,8 +534,13 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         const networkParams: NetParams = await this.bf.getParameters();
         console.log("ok: got blockfrost network params");
 
+        if ("undefined" != typeof window) {
+            if (window.localStorage.getItem("autoConnect")) {
+                await this.connectWallet();
+            }
+        }
+
         // await this.updateState('connecting to wallet', {
-        // this.connectWallet();
         await this.updateState(
             "initializing registry",
             {
@@ -560,7 +565,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     //  -- step 2: connect to Cardano wallet
     connectingWallet: Promise<any>;
     async connectWallet(autoNext = true) {
-        const { selectedWallet = "eternl" } = this.state;
+        const { selectedWallet = "eternl", wallet:alreadyConnected,  bookContract} = this.state;
+        if (alreadyConnected) return true;
 
         //! it suppresses lame nextjs/react-sourced double-trigger of mount sequence
         // if (this._unmounted) return
@@ -618,16 +624,6 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         }
 
         const walletHelper = new helios.WalletHelper(wallet);
-        await this.updateState(
-            "initializing registry with wallet connected",
-            {
-                wallet,
-                connectingWallet: false,
-                walletHelper,
-                networkName,
-            },
-            "//reinit after wallet"
-        );
 
         walletHelper.getUtxos().then((walletUtxos) => {
             this.updateState(
@@ -636,12 +632,27 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 "//found wallet utxos"
             );
         });
-        return this.connectBookContract(autoNext).then(async () => {
-            debugger;
-            if (this.state?.bookContract?.configIn) {
-                await this.checkWalletTokens(wallet);
-            }
-        });
+        const newState = {
+            wallet,
+            connectingWallet: false,
+            walletHelper,
+            networkName,
+        };
+        if (bookContract) {
+            await this.updateState(
+                "reinitializing registry with wallet connected",
+                newState,
+                "//reinit after wallet"
+            );
+            return this.connectBookContract(autoNext).then(async () => {
+                debugger;
+                if (this.state?.bookContract?.configIn) {
+                    await this.checkWalletTokens(wallet);
+                }
+            });
+        } else {
+            return this.updateState("", newState, "//wallet connected; no existing bookContract: not reinitializing")
+        }
     }
 
     async checkWalletTokens(wallet: helios.Cip30Wallet) {
@@ -666,7 +677,14 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
         const isCollab = await bookContract.findRoleUtxo("collab");
         const isEditor = await bookContract.findRoleUtxo("capoGov");
 
-        if (!!isCollab) roles.push("collaborator");
+        if (!!isCollab) {
+            roles.push("collaborator");
+            if ("undefined" !== typeof window) {
+                if (!window.localStorage.getItem("autoConnect")) {
+                    window.localStorage.setItem("autoConnect", "1")
+                }
+            }
+        }
         if (!!isEditor) roles.push("editor");
 
         const message = roles.includes("collaborator")
