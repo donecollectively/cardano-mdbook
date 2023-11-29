@@ -288,7 +288,9 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                                 <strong className="font-bold">
                                     Whoops! &nbsp;&nbsp;
                                 </strong>
-                                <span key="status-err" className="block inline">{status}</span>
+                                <span key="status-err" className="block inline">
+                                    {status}
+                                </span>
 
                                 {showMoreInstructions}
                             </div>
@@ -451,7 +453,10 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             <>
                 {roles.map((r) => {
                     return (
-                        <span key={`role-${r}`} className="ml-1 inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                        <span
+                            key={`role-${r}`}
+                            className="ml-1 inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-emerald-800 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text"
+                        >
                             {r}
                         </span>
                     );
@@ -474,7 +479,10 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
 
         if (wallet) {
             return (
-                <span key="chip-networkName" className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-blue-900 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text">
+                <span
+                    key="chip-networkName"
+                    className="inline-block mb-0 rounded border border-slate-500 text-slate-400 text-sm px-2 py-0 bg-blue-900 shadow-none outline-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:cursor-text"
+                >
                     {networkName}
                 </span>
             );
@@ -565,7 +573,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
     //  -- step 2: connect to Cardano wallet
     connectingWallet: Promise<any>;
     async connectWallet(autoNext = true) {
-        const { selectedWallet = "eternl", wallet:alreadyConnected,  bookContract} = this.state;
+        const {
+            selectedWallet = "eternl",
+            wallet: alreadyConnected,
+            bookContract,
+        } = this.state;
         if (alreadyConnected) return true;
 
         //! it suppresses lame nextjs/react-sourced double-trigger of mount sequence
@@ -591,7 +603,8 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             //@ts-expect-error on Cardano
             window.cardano[selectedWallet].enable());
         const handle: helios.Cip30Handle = await connecting;
-
+        console.warn("CIP-30 Wallet Handle", handle);
+        
         const networkName = networkNames[await handle.getNetworkId()];
         if (networkName !== "preprod") {
             return this.updateState(
@@ -644,22 +657,22 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 newState,
                 "//reinit after wallet"
             );
-            return this.connectBookContract(autoNext).then(async () => {
-                debugger;
-                if (this.state?.bookContract?.configIn) {
-                    await this.checkWalletTokens(wallet);
-                }
-            });
+            return this.connectBookContract(autoNext);
         } else {
-            return this.updateState("", newState, "//wallet connected; no existing bookContract: not reinitializing")
+            return this.updateState(
+                "",
+                newState,
+                "//wallet connected; no existing bookContract: not reinitializing"
+            );
         }
     }
 
     async checkWalletTokens(wallet: helios.Cip30Wallet) {
         const { bookContract } = this.state;
-        if (!bookContract) {
+        if (!bookContract?.myActor) {
+            debugger
             await this.updateState(
-                "no bookContract yet",
+                "no bookContract yet, or not connected to wallet",
                 {},
                 "/// no book contract, skipping scan for authority tokens"
             );
@@ -681,7 +694,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             roles.push("collaborator");
             if ("undefined" !== typeof window) {
                 if (!window.localStorage.getItem("autoConnect")) {
-                    window.localStorage.setItem("autoConnect", "1")
+                    window.localStorage.setItem("autoConnect", "1");
                 }
             }
         }
@@ -692,7 +705,11 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
             : `To be a collaborator on this CMDBook, please send your wallet address to the book editor,` +
               `or connect a wallet having a collab-* token from policyId ${bookContract.mph.hex}`;
 
-        this.updateState(message, { roles }, `/// found ${roles.length} roles: ${roles.join(", ")}}`);
+        this.updateState(
+            message,
+            { roles },
+            `/// found ${roles.length} roles: ${roles.join(", ")}}`
+        );
     }
 
     // -- step 3 - check if the book contract is ready for use
@@ -752,7 +769,7 @@ export class BookHomePage extends React.Component<paramsType, stateType> {
                 },
                 "//searching (or freshening search after wallet connection)"
             );
-
+            this.checkWalletTokens(wallet);
             this.fetchBookEntries();
         } catch (error) {
             this.reportError(error, "checking registry configuration: ", {

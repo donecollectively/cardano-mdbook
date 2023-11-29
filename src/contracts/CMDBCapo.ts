@@ -20,10 +20,7 @@ import {
 } from "@donecollectively/stellar-contracts";
 
 const { Value, TxOutput, Datum } = helios;
-import {
-    TxInput,
-    UutName,
-} from "@donecollectively/stellar-contracts";
+import { TxInput, UutName } from "@donecollectively/stellar-contracts";
 
 import type {
     isActivity,
@@ -85,19 +82,18 @@ export class CMDBCapo extends DefaultCapo {
     }
 
     @datum
-    mkDatumBookEntry<
-        T extends BookEntryCreate | BookEntryUpdated
-    >(d: T): InlineDatum {
+    mkDatumBookEntry<T extends BookEntryCreate | BookEntryUpdated>(
+        d: T
+    ): InlineDatum {
         //!!! todo: make it possible to type these datum helpers more strongly
         //  ... at the interface to Helios
         console.log("--> mkDatumCharter", d);
-        const { BookEntry: hlBookEntry } =
-            this.onChainDatumType;
+        const { BookEntry: hlBookEntry } = this.onChainDatumType;
         const { BookEntryStruct: hlBookEntryStruct } = this.onChainTypes;
 
         //@ts-expect-error can't seem to tell the the Updated alternative actually does have this attribut,
         //    ... just because the Create alternative does not...
-        const rec : BookEntry = d.updated || (d.entry as BookEntry);
+        const rec: BookEntry = d.updated || (d.entry as BookEntry);
 
         //@ts-expect-error
         if (d.updated) {
@@ -108,14 +104,8 @@ export class CMDBCapo extends DefaultCapo {
             rec.updatedAt = 0n;
         }
         rec.expiresAt = BigInt(Date.now() + 364 * 24 * 60 * 60 * 1000);
-        const {
-            entryType,
-            title,
-            content,
-            createdAt,
-            updatedAt,
-            expiresAt,
-        } = rec;
+        const { entryType, title, content, createdAt, updatedAt, expiresAt } =
+            rec;
 
         const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
         const bookEntryStruct = new hlBookEntryStruct(
@@ -159,7 +149,7 @@ export class CMDBCapo extends DefaultCapo {
      *
      * Any collaborator can create a suggested-page or edit-suggestion, by submitting key
      * information, along with their collaborator token
-     * 
+     *
      * @param entry - details of the listing
      * @param iTcx - optional initial transaction context
      * @public
@@ -175,7 +165,7 @@ export class CMDBCapo extends DefaultCapo {
         //  - assign the user's collaborator token as the administrative authority
 
         const myContribToken = await this.findRoleUtxo("collab");
-        if (!myContribToken) {            
+        if (!myContribToken) {
             const message = `It looks like you're not a collaborator on this project.  Are you connected with a wallet having collab-* token from policyId ${this.mph.hex} ?`;
 
             throw new Error(message);
@@ -183,14 +173,18 @@ export class CMDBCapo extends DefaultCapo {
 
         const tcx1 = await this.mkTxnMintingUuts(
             iTcx || new StellarTxnContext<any>(this.myActor),
-            [ "eid" ],
+            ["eid"],
             undefined,
             {
                 entryId: "eid",
             }
         );
-        const tcx1a : typeof tcx1 & hasUutContext<"ownerAuthority" | "collab"> = tcx1.addInput(myContribToken);
-        const collaborator: UutName = tcx1.state.uuts.ownerAuthority = tcx1.state.uuts.collab = this.mkUutName("collab", myContribToken);
+        const tcx1a: typeof tcx1 & hasUutContext<"ownerAuthority" | "collab"> =
+            tcx1.addInput(myContribToken);
+        const collaborator: UutName =
+            (tcx1.state.uuts.ownerAuthority =
+            tcx1.state.uuts.collab =
+                this.mkUutName("collab", myContribToken));
 
         //  - create a delegate-link connecting the entry to the collaborator
         const ownerAuthority = this.txnCreateConfiguredDelegate(
@@ -198,8 +192,9 @@ export class CMDBCapo extends DefaultCapo {
             "ownerAuthority",
             {
                 strategyName: "address",
-                config: { // !!! TODO: look into why this shows up as type Partial<any>
-                    addrHint: [ myContribToken.origOutput.address ]
+                config: {
+                    // !!! TODO: look into why this shows up as type Partial<any>
+                    addrHint: [myContribToken.origOutput.address],
                 },
             }
         );
@@ -224,42 +219,78 @@ export class CMDBCapo extends DefaultCapo {
         return tcx3 as TCX & typeof tcx2 & typeof tcx1a;
     }
 
-    mkUutName(purpose: string, txin : TxInput) {
+    /**
+     * Updates a book entry's utxo with new details
+     * @remarks
+     *
+     * detailed remarks
+     * @param entryForUpdate - update details
+     * @reqt updates all the details found in the `entryForUpdate`
+     * @reqt fails if the owner's contributor-token (or charter authz) is not found in the user's wallet
+     * @public
+     **/
+    @txn
+    async mkTxnUpdatingEntry(
+        entryForUpdate: BookEntryUpdated
+    ): Promise<StellarTxnContext<any>> {
+        const {
+            // id,
+            utxo: currentEntryUtxo,
+            ownerAuthority,
+            entry: entry,
+            updated,
+        } = entryForUpdate;
+
+        const ownerDelegate = await this.getOwnerDelegate(entryForUpdate);
+        //!!! todo get charter-authz instead if possible, or fail if needed
+
+        const tcx = await ownerDelegate.txnGrantAuthority(
+            new StellarTxnContext<any>()
+        );
+
+        const tenMinutes = 1000 * 60 * 10;
+        const tcx2 = tcx
+            .attachScript(this.compiledScript)
+            .addInput(currentEntryUtxo, this.activityUpdatingEntry())
+            .validFor(tenMinutes);
+        return this.txnReceiveBookEntry(tcx2, entryForUpdate);
+    }
+
+    mkUutName(purpose: string, txin: TxInput) {
         const tokenNames = txin.value.assets
             .getTokenNames(this.mph)
             .map((x) => helios.bytesToText(x.bytes))
-            .filter(
-                (x) => x.startsWith(`${purpose}-`)
-            );
+            .filter((x) => x.startsWith(`${purpose}-`));
 
-        if (tokenNames.length > 1) console.warn(
-            `mkUutName() found multiple ${purpose} tokens in one Utxo.  This one has ${tokenNames.length} that match: ` + tokenNames.join(", ")
-        );
+        if (tokenNames.length > 1)
+            console.warn(
+                `mkUutName() found multiple ${purpose} tokens in one Utxo.  This one has ${tokenNames.length} that match: ` +
+                    tokenNames.join(", ")
+            );
 
         return new UutName(purpose, tokenNames[0]);
     }
 
-    async findRoleUtxo(roleUutPrefix: string) : Promise<TxInput | undefined> {
+    async findRoleUtxo(roleUutPrefix: string): Promise<TxInput | undefined> {
         const utxos: TxInput[] = await this.wallet.utxos;
-        console.info(`found ${utxos.length} wallet utxos, in pursuit of ${roleUutPrefix}-* token from ${this.mph.hex}` )
+        console.info(
+            `found ${utxos.length} wallet utxos, in pursuit of ${roleUutPrefix}-* token from ${this.mph.hex}`
+        );
         for (const u of utxos) {
             const tokenNamesExisting = u.value.assets
                 .getTokenNames(this.mph)
                 .map((x) => helios.bytesToText(x.bytes));
             // if (tokenNamesExisting.length) debugger
-            const tokenNames = tokenNamesExisting
-                .filter(
-                    (x) => {
-                        // console.info("   - token name: "+x);
-                        return !!x.startsWith(`${roleUutPrefix}-`)
-                    }
-                );
+            const tokenNames = tokenNamesExisting.filter((x) => {
+                // console.info("   - token name: "+x);
+                return !!x.startsWith(`${roleUutPrefix}-`);
+            });
             for (const tokenName of tokenNames) {
                 const thisUutPrefix = tokenName.replace(/-.*/, "");
-                if (thisUutPrefix == roleUutPrefix) return u
+                if (thisUutPrefix == roleUutPrefix) return u;
             }
         }
-        return undefined
+        return undefined;
     }
 
     /**
@@ -363,9 +394,7 @@ export class CMDBCapo extends DefaultCapo {
      * @param entryId - the UUT identifier eid-xxxxxxxxxx
      * @public
      **/
-    async getOwnerDelegate(
-        entry: BookEntryOnchain
-    ): Promise<AuthorityPolicy>;
+    async getOwnerDelegate(entry: BookEntryOnchain): Promise<AuthorityPolicy>;
     async getOwnerDelegate(entryId: string): Promise<AuthorityPolicy>;
     async getOwnerDelegate(
         entryOrId: string | BookEntryOnchain
@@ -383,9 +412,9 @@ export class CMDBCapo extends DefaultCapo {
     }
 
     /**
-     * Creates a transaction minting a collaborator token 
+     * Creates a transaction minting a collaborator token
      * @remarks
-     * 
+     *
      * Sends the collaborator token to the provided address
      * @param address - recipient of the collaborator token
      * @public
@@ -393,50 +422,13 @@ export class CMDBCapo extends DefaultCapo {
     @txn
     async mkTxnMintCollaboratorToken(addr: Address) {
         const tcx: hasUutContext<"collab"> = new StellarTxnContext();
-        const tcx2 = await this.mkTxnMintingUuts(tcx, ["collab"] )
+        const tcx2 = await this.mkTxnMintingUuts(tcx, ["collab"]);
         return tcx2.addOutput(
             new helios.TxOutput(
-                addr, 
+                addr,
                 this.mkMinTv(this.mph, tcx2.state.uuts.collab)
             )
-        )
-    }
-
-    /**
-     * Updates a book entry's utxo with new details
-     * @remarks
-     *
-     * detailed remarks
-     * @param entryForUpdate - update details
-     * @reqt updates all the details found in the `entryForUpdate`
-     * @reqt fails if the owner's contributor-token (or charter authz) is not found in the user's wallet
-     * @public
-     **/
-    @txn
-    async mkTxnUpdatingEntry(
-        entryForUpdate: BookEntryUpdated
-    ): Promise<StellarTxnContext<any>> {
-        const {
-            // id,
-            utxo: currentUtxo,
-            ownerAuthority,
-            entry: entry,
-            updated,
-        } = entryForUpdate;
-
-        const ownerDelegate = await this.getOwnerDelegate(entryForUpdate);
-        //!!! todo get charter-authz instead if possible, or fail if needed
-
-        const tcx = await ownerDelegate.txnGrantAuthority(
-            new StellarTxnContext<any>()
         );
-
-        const tenMinutes = 1000 * 60 * 10;
-        const tcx2 = tcx
-            .attachScript(this.compiledScript)
-            .addInput(currentUtxo, this.activityUpdatingEntry())
-            .validFor(tenMinutes);
-        return this.txnReceiveBookEntry(tcx2, entryForUpdate);
     }
 
     requirements() {
@@ -451,9 +443,7 @@ export class CMDBCapo extends DefaultCapo {
                     "The holder of the contract's charter-authority token can directly create book pages",
                     "Pages are created with type='pg' for Page",
                 ],
-                requires: [
-                    "page expiration"
-                ],
+                requires: ["page expiration"],
             },
 
             "collaborators can suggest pages to be added in the book": {
@@ -510,17 +500,16 @@ export class CMDBCapo extends DefaultCapo {
                 mech: [
                     "When a suggestion is accepted, its uut is burned, with its minUtxo sent to its originator",
                 ],
-                requires: [
-                    "The workflow guards against change conflict"
-                ]
-            },            
+                requires: ["The workflow guards against change conflict"],
+            },
 
             "page expiration": {
-                purpose: "for proactive freshness even in the face of immutable content",
+                purpose:
+                    "for proactive freshness even in the face of immutable content",
                 details: [
                     "Book pages expire by default, and can be freshened as long as they remain relevant.",
                     "This way, obsolete content is naturally hidden, ",
-                    "  ... while remaining available for review/update/freshening"
+                    "  ... while remaining available for review/update/freshening",
                 ],
                 mech: [
                     "expired pages are hidden by default",
@@ -530,20 +519,19 @@ export class CMDBCapo extends DefaultCapo {
             },
 
             "The workflow guards against change conflict": {
-                purpose: "So that people can easily avoid merging suggestions that have become obsolete",
+                purpose:
+                    "So that people can easily avoid merging suggestions that have become obsolete",
                 details: [
                     "On-chain logic can't be expected to validate diffs.  ",
                     "However, the application layer can validate that diffs can be applied cleanly.",
-                    "And, it can require the person who merges a conflicting change to review the results."
+                    "And, it can require the person who merges a conflicting change to review the results.",
                 ],
                 mech: [
                     "A diff that conflicts can't be merged until it is updated to apply cleanly",
                     "A diff that applies cleanly can be merged with no extra confirmation",
-                    "Two diffs, applied in a different areas of a page, can both be merged without extra confirmation"
+                    "Two diffs, applied in a different areas of a page, can both be merged without extra confirmation",
                 ],
-                requires: [
-
-                ],
+                requires: [],
             },
 
             "page deletion": {
@@ -569,7 +557,6 @@ export class CMDBCapo extends DefaultCapo {
                     mech: [],
                     requires: [],
                 },
-
         });
     }
 }

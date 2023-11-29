@@ -14,7 +14,7 @@ Please use `pnpm`, not `npm`.
     collaborator invite from the book's editor(s)
   - ✅ enable collaborator-token minting with address
   - ✅ create book entries, with ownerAuthority for each book entry using collaborator token
-  - enable direct editing by page-owner
+  - ✅ enable direct editing by page-owner
   - allow editor to promote a suggested-page to a page
   - enable direct editing by editor
   - enable change-suggestion by non-owner; post 'chg' entry

@@ -28,14 +28,13 @@
             //     "node_modules/@donecollectively/stellar-contracts"
             //   ]
         },
+        "isolatedModules": true
         //   "importHelpers": true,
         //   "types": ["node"],
         //   "allowSyntheticDefaultImports": true,
         //   "noImplicitAny": false,
         //   "rootDir": ".",
         //   "sourceMap": true
-
-
         // "isolatedModules": true
     },
     "include": [
