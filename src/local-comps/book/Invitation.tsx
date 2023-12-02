@@ -1,6 +1,7 @@
-import React, { MouseEventHandler } from "react";
-import { BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
-import { BookManagementProps } from "./sharedPropTypes.js";
+import React from "react";
+import type { MouseEventHandler } from "react";
+import type { BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
+import type { BookManagementProps } from "./sharedPropTypes.js";
 import { Button } from "../../components/Button.jsx";
 import { helios, Address as AddressType } from "@donecollectively/stellar-contracts";
 

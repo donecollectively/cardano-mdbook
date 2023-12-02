@@ -1,27 +1,26 @@
 lockfileVersion: 5.4
 
 specifiers:
-  '@docsearch/react': ^3.2.1
-  '@donecollectively/CaaSC': ../CaaSC
-  '@donecollectively/stellar-contracts': ../stellar-contracts
-  '@headlessui/react': ^1.7.2
+  '@docsearch/react': ^3.5.1
+  '@donecollectively/stellar-contracts': github:donecollectively/stellar-contracts#experimental
+  '@headlessui/react': ^1.7.15
   '@markdoc/markdoc': 0.1.7
   '@markdoc/next.js': 0.1.6
-  '@sindresorhus/slugify': ^2.1.0
+  '@sindresorhus/slugify': ^2.2.1
   '@tailwindcss/typography': ^0.5.10
   '@types/react': 18.2.22
-  autoprefixer: ^10.4.12
+  autoprefixer: ^10.4.14
   clsx: ^1.2.1
   cross-fetch: ^4.0.0
   dexie: ^3.2.4
-  dexie-react-hooks: ^1.1.6
+  dexie-react-hooks: ^1.1.7
   eslint: 8.26.0
   eslint-config-next: 13.0.2
   focus-visible: ^5.2.0
   next: ^13.5.6
   postcss-focus-visible: ^6.0.4
   postcss-import: ^14.1.0
-  prettier: ^2.7.1
+  prettier: ^2.8.8
   prettier-plugin-tailwindcss: ^0.1.13
   prism-react-renderer: ^1.3.5
   react: 18.2.0
@@ -34,8 +33,7 @@ specifiers:
 
 dependencies:
   '@docsearch/react': 3.5.1_cccfvuyjnmee77bwg4wjyn6zre
-  '@donecollectively/CaaSC': link:../CaaSC
-  '@donecollectively/stellar-contracts': link:../stellar-contracts
+  '@donecollectively/stellar-contracts': github.com/donecollectively/stellar-contracts/f2e942f377356696cab767180c85b05fbf2e1bc0
   '@headlessui/react': 1.7.15_biqbaboplfbrettd7655fr4n2y
   '@markdoc/markdoc': 0.1.7
   '@markdoc/next.js': 0.1.6_sfilzu25rkwkmvqsscsbq2fr4e
@@ -774,7 +772,7 @@ packages:
       debug: 4.3.4
       globby: 11.1.0
       is-glob: 4.0.3
-      semver: 7.5.3
+      semver: 7.5.4
       tsutils: 3.21.0_typescript@5.2.2
       typescript: 5.2.2
     transitivePeerDependencies:
@@ -1117,7 +1115,7 @@ packages:
       normalize-path: 3.0.0
       readdirp: 3.6.0
     optionalDependencies:
-      fsevents: 2.3.2
+      fsevents: 2.3.3
     dev: false
 
   /client-only/0.0.1:
@@ -1757,8 +1755,8 @@ packages:
   /fs.realpath/1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
-  /fsevents/2.3.2:
-    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+  /fsevents/2.3.3:
+    resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
     requiresBuild: true
@@ -2203,7 +2201,6 @@ packages:
     engines: {node: '>=10'}
     dependencies:
       yallist: 4.0.0
-    dev: true
 
   /magic-string/0.30.3:
     resolution: {integrity: sha512-B7xGbll2fG/VjP+SWg4sX3JynwIU0mjoTc6MPpKNuIvftk6u6vqhDnk1R80b8C2GBR6ywqy+1DcKBrevBg+bmw==}
@@ -2749,7 +2746,7 @@ packages:
     engines: {node: '>=14.18.0', npm: '>=8.0.0'}
     hasBin: true
     optionalDependencies:
-      fsevents: 2.3.2
+      fsevents: 2.3.3
     dev: true
 
   /run-parallel/1.2.0:
@@ -2776,13 +2773,12 @@ packages:
     hasBin: true
     dev: true
 
-  /semver/7.5.3:
-    resolution: {integrity: sha512-QBlUtyVk/5EeHbi7X0fw6liDZc7BBmEaSYn01fMU1OUYbf6GPsbTtd8WmnqbI20SeycoHSeiybkE/q1Q+qlThQ==}
+  /semver/7.5.4:
+    resolution: {integrity: sha512-1bCSESV6Pv+i21Hvpxp3Dx+pSD8lIPt8uVjRrxAUt/nbswYc+tK6Y2btiULjd4+fnq15PX+nqQDC7Oft7WkwcA==}
     engines: {node: '>=10'}
     hasBin: true
     dependencies:
       lru-cache: 6.0.0
-    dev: true
 
   /shebang-command/2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
@@ -3155,7 +3151,7 @@ packages:
       postcss: 8.4.31
       rollup: 3.29.4
     optionalDependencies:
-      fsevents: 2.3.2
+      fsevents: 2.3.3
     dev: true
 
   /vite/4.5.0_@types+node@20.7.1:
@@ -3191,7 +3187,7 @@ packages:
       postcss: 8.4.31
       rollup: 3.29.4
     optionalDependencies:
-      fsevents: 2.3.2
+      fsevents: 2.3.3
     dev: true
 
   /vitest/0.34.5:
@@ -3327,7 +3323,6 @@ packages:
 
   /yallist/4.0.0:
     resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
-    dev: true
 
   /yaml/2.3.1:
     resolution: {integrity: sha512-2eHWfjaoXgTBC2jNM1LRef62VQa0umtvRiDSk6HSzW7RvS5YtkabJrwYLLEKWBc8a5U2PTSCs+dJjUTJdlHsWQ==}
@@ -3343,3 +3338,11 @@ packages:
     resolution: {integrity: sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==}
     engines: {node: '>=12.20'}
     dev: true
+
+  github.com/donecollectively/stellar-contracts/f2e942f377356696cab767180c85b05fbf2e1bc0:
+    resolution: {tarball: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/f2e942f377356696cab767180c85b05fbf2e1bc0}
+    name: '@donecollectively/stellar-contracts'
+    version: 0.8.5-alpha19
+    dependencies:
+      semver: 7.5.4
+    dev: false

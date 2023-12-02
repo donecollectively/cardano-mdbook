@@ -18,6 +18,7 @@
         "module": "nodenext",
         "moduleResolution": "nodenext",
         "preserveSymlinks": false,
+        "verbatimModuleSyntax": true,
         "resolveJsonModule": true,
         "resolvePackageJsonExports": true,
         "jsx": "preserve",

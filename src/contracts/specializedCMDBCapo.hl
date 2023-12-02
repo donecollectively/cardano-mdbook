@@ -14,6 +14,12 @@ import {
     requiresValidDelegateOutput
 } from CapoDelegateHelpers
 
+
+import {
+    mkTv,
+    tvCharter
+} from StellarHeliosHelpers
+
 import {
     getOutputForInput,
     outputDatum
@@ -72,7 +78,9 @@ enum Datum {
                     "chg": true  // suggested change
                 };
                 assert(goodTypes.get_safe(entry.entryType).switch{
-                    None => error("invalid entryType"),
+                    None => {
+                        error("invalid entryType: '"+ entry.entryType + "'")
+                    },
                     _ => true
                 }, ""); // already failed as invalid ^^
 
@@ -85,7 +93,25 @@ enum Datum {
         }
     }
 }
-
+func hasCharterRefInput(
+    ctx: ScriptContext, 
+    mph : MintingPolicyHash
+) -> Option[Datum::CharterToken] {
+    chVal : Value = tvCharter(mph);
+    hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
+    
+    ctx.tx.ref_inputs.find_safe(hasCharter).switch{
+        Some{txin} => Option[Datum::CharterToken]::Some{
+            Datum::from_data( 
+                txin.datum.get_inline_data() 
+            ).switch{
+                c : CharterToken => c,
+                _ => error("wrong enum")
+            }
+        },
+        None => Option[Datum::CharterToken]::None
+    }
+}
 enum Activity {
     // standard redeemer types:
     spendingDatum
@@ -113,6 +139,10 @@ enum Activity {
         // assert(newTxo.value.get_assets().to_map().length == 1, "invalid token bundle with various assets");
         // assert(newTxo.value.get_policy(mph).length == 1, "invalid with multiple tokens in the utxo");
 
+        //!!! todo: require charterDatum in refUtxo (if expected editing delegate not there)
+        //    OR - require delegate as below if charterDatum is not found in refUtxo
+        // if not using editing delegate, require charterAuth instead
+     
         newDatum : Datum = outputDatum[Datum](newTxo);
         Datum::BookEntry{newAuthority, newListing} = newDatum;
         assert(newAuthority == ownerAuthority, "authority change invalid");
@@ -127,12 +157,21 @@ enum Activity {
         );
         // lastExpiredAt: Int
     
-            
+        charterData : Option[Datum::CharterToken] = hasCharterRefInput(ctx, mph);
+        availableAuthority : RelativeDelegateLink = charterData.switch{
+            Some{Datum::CharterToken{govAuthority, _}} => {
+                print("using editor's govAuthority for doc update");
+                govAuthority
+            },
+            None => {                
+                print("no charter-ref; requiring document-owner authority for doc update");
+                ownerAuthority
+            }
+        };
+        hasSufficientAuthority : Bool = requiresValidDelegateOutput(availableAuthority, mph, ctx);
+
         ( 
-            // rc + delegated approval -> rc with validation
-            // or rc + charter -> rc with validation
-            requiresValidDelegateOutput(ownerAuthority, mph, ctx) &&
-                newDatum.validateEntry() 
+            hasSufficientAuthority && newDatum.validateEntry() 
         ) ||
         ( 
             ( self.serialize() /* never */ == oldListing.serialize() )  ||

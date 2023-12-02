@@ -11,33 +11,37 @@
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
     mph: {
-        bytes: "e70140a7f9383d8a8a512aec01c02b1b0d3b6a1ef35378390ef8e187",
+        bytes: "3e00baa9165a93c29a48035a0b4f3356ecf542cfa150fffd4024f5a6",
     },
     rev: "1",
     seedTxn: {
-        bytes: "a222e13f5904ca4ef1ae2163da6b44b9a73d67e406afe41682a230ecf0bb330a",
+        bytes: "9bff5c779b0393d555b2450ef2b2f6c19be06d019746c3e479ad96b4342b7fe1",
     },
-    seedIndex: "3",
+    seedIndex: "2",
     rootCapoScriptHash: {
-        bytes: "e3c11d02c3124bfd64f75b5338754056b7ed408bd4372e41c2502966",
+        bytes: "624fa40c10ddd904af9facde7ad4348d152104f77e2d883b8e92d657",
     },
 };
 
-import { NextPageContext } from "next";
-import { NextRouter, withRouter } from "next/router.js";
+import type { NextRouter } from "next/router.js";
+import { withRouter } from "next/router.js";
 import head from "next/head.js";
 const Head = head.default;
 import link from "next/link.js";
 const Link = link.default;
 
 import { useRouter } from "next/router.js";
-import React, { MouseEventHandler, use, useEffect, useState } from "react";
+import React from "react";
+import type { MouseEventHandler } from "react";
 import { Prose } from "@/components/Prose.jsx";
 import { useLiveQuery } from "dexie-react-hooks";
-import {
-    Address,
+
+import type {
     ConfigFor,
     StellarConstructorArgs,
+} from "@donecollectively/stellar-contracts";
+
+import {
     StellarTxnContext,
     TxInput,
     UutName,
@@ -45,11 +49,9 @@ import {
     dumpAny,
     helios,
 } from "@donecollectively/stellar-contracts";
-import {
-    CMDBCapo,
-    BookEntryForUpdate as BookEntryForUpdate,
-    BookEntryOnchain,
-} from "../../contracts/CMDBCapo.js";
+
+import type { BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
+import { CMDBCapo } from "../../contracts/CMDBCapo.js";
 import { PageEditor } from "../../local-comps/book/PageEditor.jsx";
 import { BookPages } from "../../local-comps/book/BookPages.jsx";
 import { PageView } from "../../local-comps/book/PageView.js";
@@ -86,7 +88,7 @@ export type BookPageState = PageStatus & {
     walletUtxos?: TxInput[];
     networkName?: string;
     roles?: ("collaborator" | "editor")[];
-    collabUut? : UutName;
+    collabUut?: UutName;
     connectingWallet?: boolean;
     showDetail?: string;
     tcx?: StellarTxnContext<any>;
@@ -708,10 +710,11 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
 
         const roles = [];
+        debugger;
         const collabUtxo = await bookContract.findRoleUtxo("collab");
         const isEditor = await bookContract.findRoleUtxo("capoGov");
 
-        let collabToken
+        let collabToken;
         if (!!collabUtxo) {
             collabToken = bookContract.mkUutName("collab", collabUtxo);
 
@@ -731,9 +734,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
 
         this.updateState(
             message,
-            { roles, 
-                collabUut: collabToken
-             },
+            { roles, collabUut: collabToken },
             `/// found ${roles.length} roles: ${roles.join(", ")}}`
         );
     }

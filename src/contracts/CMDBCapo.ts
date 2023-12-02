@@ -1,5 +1,10 @@
-import {
+import type {
     SeedTxnParams,
+    RelativeDelegateLink,
+    hasUutContext,
+} from "@donecollectively/stellar-contracts";
+
+import {
     mkHeliosModule,
     DefaultCapo,
     hasReqts,
@@ -10,13 +15,9 @@ import {
     Address,
     datum,
     AuthorityPolicy,
-    RelativeDelegateLink,
-    stellarSubclass,
-    strategyValidation,
     helios,
     txn,
     dumpAny,
-    hasUutContext,
 } from "@donecollectively/stellar-contracts";
 
 const { Value, TxOutput, Datum } = helios;
@@ -37,6 +38,12 @@ export type BookEntryOnchain = {
     entry: BookEntry;
 };
 
+export type BookEntryUpdateOptions = {
+    isEditor: boolean;
+    hasAuthority: boolean;
+    collabUut: UutName;
+    saveAs: "update" | "suggestion"
+};
 export type BookEntry = {
     entryType: string;
     title: string;
@@ -231,7 +238,9 @@ export class CMDBCapo extends DefaultCapo {
      **/
     @txn
     async mkTxnUpdatingEntry(
-        entryForUpdate: BookEntryUpdated
+        entryForUpdate: BookEntryUpdated & {
+            options: BookEntryUpdateOptions;
+        }
     ): Promise<StellarTxnContext<any>> {
         const {
             // id,
@@ -241,19 +250,47 @@ export class CMDBCapo extends DefaultCapo {
             updated,
         } = entryForUpdate;
 
-        const ownerDelegate = await this.getOwnerDelegate(entryForUpdate);
-        //!!! todo get charter-authz instead if possible, or fail if needed
-
-        const tcx = await ownerDelegate.txnGrantAuthority(
-            new StellarTxnContext<any>()
-        );
-
         const tenMinutes = 1000 * 60 * 10;
-        const tcx2 = tcx
-            .attachScript(this.compiledScript)
-            .addInput(currentEntryUtxo, this.activityUpdatingEntry())
-            .validFor(tenMinutes);
-        return this.txnReceiveBookEntry(tcx2, entryForUpdate);
+
+        const {
+            hasAuthority,
+            collabUut,
+            isEditor,
+            saveAs,
+        } = entryForUpdate.options;
+        const isUpdate = ("update" == saveAs);
+        const isSuggestion = ("suggestion" == saveAs);
+
+        debugger
+        if (hasAuthority && isUpdate) {
+            const ownerDelegate = await this.getOwnerDelegate(entryForUpdate);
+            //!!! todo get charter-authz instead if possible, or fail if needed
+
+            const tcx = await ownerDelegate.txnGrantAuthority(
+                new StellarTxnContext<any>()
+            );
+
+            const tcx2 = tcx
+                .attachScript(this.compiledScript)
+                .addInput(currentEntryUtxo, this.activityUpdatingEntry())
+                .validFor(tenMinutes);
+            return this.txnReceiveBookEntry(tcx2, entryForUpdate);
+        }
+        if (isSuggestion) {
+            // anyone can suggest - use this code path even if they're an owner or editor.
+            throw new Error(`TODO: create new Suggestion record`)
+        }
+
+        if (isEditor) {
+            const tcx = await this.txnAddGovAuthority(new StellarTxnContext<any>());
+
+            const tcx2 = tcx
+                .attachScript(this.compiledScript)
+                .addInput(currentEntryUtxo, this.activityUpdatingEntry())
+                .validFor(tenMinutes);
+
+            return this.txnReceiveBookEntry(tcx2, entryForUpdate);
+        }
     }
 
     mkUutName(purpose: string, txin: TxInput) {

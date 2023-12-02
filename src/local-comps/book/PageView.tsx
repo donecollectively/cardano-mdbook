@@ -1,6 +1,6 @@
 "use client";
 
-import { NextPageContext } from "next";
+import type { NextPageContext } from "next";
 import head from "next/head.js";
 const Head = head.default;
 import { useRouter } from "next/router.js";
@@ -8,10 +8,10 @@ import React, { useState } from "react";
 // import { createPortal } from "react-dom";
 // import { Prose } from "@/components/Prose.jsx";
 // import { useLiveQuery } from "dexie-react-hooks";
-import { BookEntryOnchain, BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
+import type { BookEntryOnchain, BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
 import { helios } from "@donecollectively/stellar-contracts";
 import { Markdoc } from "../../components/Markdoc.jsx";
-import { BookManagementProps } from "./sharedPropTypes.js";
+import type { BookManagementProps } from "./sharedPropTypes.js";
 import { Button } from "../../components/Button.jsx";
 
 import link from "next/link.js";

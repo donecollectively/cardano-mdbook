@@ -17,6 +17,7 @@ export default defineConfig({
     test: {
         // include: ['tests/new*.test.ts', ],
         include: ["tests/*.test.ts", "tests/*.test.js"],
+        globals: true,
         restoreMocks: true,
         testTimeout: 500000,
         hookTimeout: 7000,

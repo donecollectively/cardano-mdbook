@@ -1,6 +1,8 @@
 import React from "react";
 import {
     CMDBCapo,
+} from "../../contracts/CMDBCapo.js";
+import type {
     BookEntryForUpdate,
     BookEntryOnchain,
 } from "../../contracts/CMDBCapo.js";

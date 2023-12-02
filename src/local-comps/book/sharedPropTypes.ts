@@ -1,6 +1,7 @@
 import { TxInput, UutName, WalletHelper, helios } from "@donecollectively/stellar-contracts";
 import { CMDBCapo } from "../../contracts/CMDBCapo.js"
-import { BookHomePage, BookPageState } from "../../pages/book/[...args].jsx";
+import { BookHomePage } from "../../pages/book/[...args].jsx";
+import type { BookPageState } from "../../pages/book/[...args].jsx";
 
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hBlockfrost = typeof BlockfrostV0.prototype;

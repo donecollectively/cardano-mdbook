@@ -200,6 +200,7 @@ enum MintDelegateActivity {
         mph : MintingPolicyHash = mintDelegateData.dd.mph;                
         expectedUutValue : Value = mkTv(mph, mkTokenName(purpose));
         newTxo : TxOutput = getOutputWithValue(ctx, expectedUutValue);
+        
         assert(
             newTxo.value.get_assets().to_map().length == 1,
             //  "too many policies"  

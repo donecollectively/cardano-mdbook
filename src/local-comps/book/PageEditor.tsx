@@ -1,12 +1,8 @@
-import React, {
-    createRef,
-    ChangeEvent,
-    ChangeEventHandler,
-    Component,
-} from "react";
+import React, { createRef, Component } from "react";
+import type { ChangeEvent, ChangeEventHandler } from "react";
 import { createPortal } from "react-dom";
-import {
-    CMDBCapo,
+import { CMDBCapo } from "../../contracts/CMDBCapo.js";
+import type {
     BookEntry,
     BookEntryOnchain,
     BookEntryForUpdate,
@@ -16,9 +12,8 @@ import head from "next/head.js";
 const Head = head.default;
 
 import { TxOutput, Wallet, dumpAny } from "@donecollectively/stellar-contracts";
-import { BookManagementProps } from "./sharedPropTypes.js";
-import { BookHomePage } from "../../pages/book/[...args].jsx";
-import { NextRouter } from "next/router.js";
+import type { BookManagementProps } from "./sharedPropTypes.js";
+import type { NextRouter } from "next/router.js";
 import { PageView } from "./PageView.jsx";
 
 type propsType = {
@@ -159,6 +154,17 @@ export class PageEditor extends React.Component<propsType, stateType> {
         this.setState({ saveAs: value });
     };
 
+    get isEditor() {
+        return this.props?.roles?.includes("editor");
+    }
+
+    get hasAuthority() {
+        const { entry, collabUut } = this.props;
+        if (!entry || !collabUut) return false;
+
+        return entry.ownerAuthority.uutName == collabUut?.name;
+    }
+
     render() {
         const {
             current: rec,
@@ -174,9 +180,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const showTitle = <>{create ? "Creating new" : "Edit"} page</>;
         let sidebarContent;
 
-        const hasAuthority =
-            entry.ownerAuthority.uutName == this.props.collabUut?.name;
-        const isEditor = roles?.includes("editor");
+        const { isEditor, hasAuthority } = this;
         //! when the user has authority to apply changes, use "update" mode by default,
         //   ... but allow them to save it as a suggestion instead.
         //! if they don't have authority, they can only make a suggestion.
@@ -187,7 +191,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                 setTimeout(() => {
                     // alert("appkying " +saveAs);
                     this.setState({
-                        saveAs
+                        saveAs,
                     });
                 }, 100);
             }
@@ -216,8 +220,9 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                         marginTop: "4em",
                                     }}
                                 >
-                                    The page content will be shown on this website
-                                    and visible in the Cardano blockchain.
+                                    The page content will be shown on this
+                                    website and visible in the Cardano
+                                    blockchain.
                                 </p>
 
                                 <p
@@ -332,13 +337,23 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                     },
                                 })}
                                 <tr>
-                                    {modified && (
+                                    {modified && !create && (
                                         <>
-                                            <th className="text-right">Save as...</th>
+                                            <th className="text-right">
+                                                Save as...
+                                            </th>
                                             <th className="pl-4 align-baseline text-base">
                                                 <label
                                                     htmlFor="save-as-update"
-                                                    className={`${canDoDirectUpdate ? "" : "opacity-30"} form--radio-label ${isUpdating ? "font-bold text-[#ccc]" : "text-sm"}`}
+                                                    className={`${
+                                                        canDoDirectUpdate
+                                                            ? ""
+                                                            : "opacity-30"
+                                                    } form--radio-label ${
+                                                        isUpdating
+                                                            ? "font-bold text-[#ccc]"
+                                                            : "text-sm"
+                                                    }`}
                                                 >
                                                     <input
                                                         id="save-as-update"
@@ -358,7 +373,11 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                                 &nbsp;&nbsp;&nbsp;&nbsp;
                                                 <label
                                                     htmlFor="save-as-suggestion"
-                                                    className={`form--radio-label ${isSuggesting ? "font-bold" : "text-sm "}`}
+                                                    className={`form--radio-label ${
+                                                        isSuggesting
+                                                            ? "font-bold"
+                                                            : "text-sm "
+                                                    }`}
                                                 >
                                                     <input
                                                         id="save-as-suggestion"
@@ -618,7 +637,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const updatedEntry = this.capture(f);
         //@ts-expect-error
         if (updatedEntry.saveAs) {
-            debugger
+            debugger;
         }
         this.setState({
             current: updatedEntry,
@@ -642,7 +661,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
 
     async save(e: React.SyntheticEvent) {
-        const { current: rec } = this.state;
+        const { current: rec, saveAs } = this.state;
         const {
             entry: entryForUpdate,
             refresh,
@@ -652,6 +671,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
             router,
             create,
             wallet,
+            collabUut,
         } = this.props;
         e.preventDefault();
         e.stopPropagation();
@@ -665,6 +685,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
 
         const form = e.target as HTMLFormElement;
         const updatedBookEntry = this.capture(form);
+        const { isEditor, hasAuthority } = this;
 
         try {
             const txnDescription = `${create ? "creation" : "update"} txn`;
@@ -678,6 +699,12 @@ export class PageEditor extends React.Component<propsType, stateType> {
                 : await bookContract.mkTxnUpdatingEntry({
                       ...entryForUpdate,
                       updated: updatedBookEntry,
+                      options: {
+                          isEditor,
+                          hasAuthority,
+                          collabUut,
+                          saveAs,
+                      },
                   });
             console.warn(dumpAny(tcx));
             updateState(
