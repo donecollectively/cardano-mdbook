@@ -165,6 +165,83 @@ export class PageEditor extends React.Component<propsType, stateType> {
         return entry.ownerAuthority.uutName == collabUut?.name;
     }
 
+    async save(e: React.SyntheticEvent) {
+        const { current: rec, saveAs } = this.state;
+        const {
+            entry: entryForUpdate,
+            refresh,
+            updateState,
+            reportError,
+            bookContract,
+            router,
+            create,
+            wallet,
+            collabUut,
+        } = this.props;
+        e.preventDefault();
+        e.stopPropagation();
+
+        //! clears "undefined" problems that may have existed temporarily
+        const problems = JSON.parse(JSON.stringify(this.state.problems));
+        if (Object.keys(problems).length) {
+            this.setState({ problems, submitting: true });
+            return;
+        }
+
+        const form = e.target as HTMLFormElement;
+        const updatedBookEntry = this.capture(form);
+        const { isEditor, hasAuthority } = this;
+
+        try {
+            const txnDescription = `${create ? "creation" : "update"} txn`;
+            updateState(
+                `preparing ${txnDescription}`,
+                { progressBar: true },
+                `//mkTxn ${txnDescription}`
+            );
+            const tcx = create
+                ? await bookContract.mkTxnCreatingBookEntry(updatedBookEntry)
+                : await bookContract.mkTxnUpdatingEntry({
+                      ...entryForUpdate,
+                      updated: updatedBookEntry,
+                      options: {
+                          isEditor,
+                          hasAuthority,
+                          collabUut,
+                          saveAs,
+                      },
+                  });
+            console.warn(dumpAny(tcx));
+            updateState(
+                `sending the ${txnDescription} to your wallet for approval`,
+                {
+                    progressBar: true,
+                },
+                "// submit book entry to wallet"
+            );
+            const minDelay = new Promise((res) => setTimeout(res, 2000));
+
+            await bookContract.submit(tcx);
+            await minDelay;
+            // updateState(`submitting the ${txnDescription} to the network`,);
+            refresh().then(async () => {
+                updateState(
+                    `The update will take a few moments before it's confirmed`,
+                    {},
+                    "//@user: be patient"
+                );
+                await new Promise((res) => setTimeout(res, 3000));
+                updateState("", {}, "// clear patience msg");
+            });
+            router.push("/book");
+            // this.setState({modified: true})
+        } catch (error) {
+            console.error(error.stack);
+            debugger;
+            reportError(error, "submitting book-entry txn", {});
+        }
+    }
+
     render() {
         const {
             current: rec,
@@ -658,83 +735,6 @@ export class PageEditor extends React.Component<propsType, stateType> {
         };
 
         return updatedEntry;
-    }
-
-    async save(e: React.SyntheticEvent) {
-        const { current: rec, saveAs } = this.state;
-        const {
-            entry: entryForUpdate,
-            refresh,
-            updateState,
-            reportError,
-            bookContract,
-            router,
-            create,
-            wallet,
-            collabUut,
-        } = this.props;
-        e.preventDefault();
-        e.stopPropagation();
-
-        //! clears "undefined" problems that may have existed temporarily
-        const problems = JSON.parse(JSON.stringify(this.state.problems));
-        if (Object.keys(problems).length) {
-            this.setState({ problems, submitting: true });
-            return;
-        }
-
-        const form = e.target as HTMLFormElement;
-        const updatedBookEntry = this.capture(form);
-        const { isEditor, hasAuthority } = this;
-
-        try {
-            const txnDescription = `${create ? "creation" : "update"} txn`;
-            updateState(
-                `preparing ${txnDescription}`,
-                { progressBar: true },
-                `//mkTxn ${txnDescription}`
-            );
-            const tcx = create
-                ? await bookContract.mkTxnCreatingBookEntry(updatedBookEntry)
-                : await bookContract.mkTxnUpdatingEntry({
-                      ...entryForUpdate,
-                      updated: updatedBookEntry,
-                      options: {
-                          isEditor,
-                          hasAuthority,
-                          collabUut,
-                          saveAs,
-                      },
-                  });
-            console.warn(dumpAny(tcx));
-            updateState(
-                `sending the ${txnDescription} to your wallet for approval`,
-                {
-                    progressBar: true,
-                },
-                "// submit book entry to wallet"
-            );
-            const minDelay = new Promise((res) => setTimeout(res, 2000));
-
-            await bookContract.submit(tcx);
-            await minDelay;
-            // updateState(`submitting the ${txnDescription} to the network`,);
-            refresh().then(async () => {
-                updateState(
-                    `The update will take a few moments before it's confirmed`,
-                    {},
-                    "//@user: be patient"
-                );
-                await new Promise((res) => setTimeout(res, 3000));
-                updateState("", {}, "// clear patience msg");
-            });
-            router.push("/book");
-            // this.setState({modified: true})
-        } catch (error) {
-            console.error(error.stack);
-            debugger;
-            reportError(error, "submitting book-entry txn", {});
-        }
     }
     mkFieldId(fn: string, index?: number): string {
         const idx = index || (index === 0 ? 0 : "");
