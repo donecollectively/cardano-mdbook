@@ -2,7 +2,7 @@ lockfileVersion: 5.4
 
 specifiers:
   '@docsearch/react': ^3.5.1
-  '@donecollectively/stellar-contracts': github:donecollectively/stellar-contracts#experimental
+  '@donecollectively/stellar-contracts': ../stellar-contracts
   '@headlessui/react': ^1.7.15
   '@markdoc/markdoc': 0.1.7
   '@markdoc/next.js': 0.1.6
@@ -27,13 +27,13 @@ specifiers:
   react-dom: 18.2.0
   rollup-plugin-string: ^3.0.0
   tailwindcss: ^3.3.5
-  typescript: 5.2.2
+  typescript: 5.3.3
   vite: ^4.5.0
   vitest: ^0.34.5
 
 dependencies:
   '@docsearch/react': 3.5.1_cccfvuyjnmee77bwg4wjyn6zre
-  '@donecollectively/stellar-contracts': github.com/donecollectively/stellar-contracts/067620c54f3f6338a3c5fc3b67bc9e6b497b4566
+  '@donecollectively/stellar-contracts': link:../stellar-contracts
   '@headlessui/react': 1.7.15_biqbaboplfbrettd7655fr4n2y
   '@markdoc/markdoc': 0.1.7
   '@markdoc/next.js': 0.1.6_sfilzu25rkwkmvqsscsbq2fr4e
@@ -56,11 +56,11 @@ dependencies:
 devDependencies:
   '@types/react': 18.2.22
   eslint: 8.26.0
-  eslint-config-next: 13.0.2_gsb724fc5bwv46dk2ugeyfyj44
+  eslint-config-next: 13.0.2_knjvcufmniaxg3ir3qoiyksaty
   prettier: 2.8.8
   prettier-plugin-tailwindcss: 0.1.13_prettier@2.8.8
   rollup-plugin-string: 3.0.0
-  typescript: 5.2.2
+  typescript: 5.3.3
   vite: 4.5.0
   vitest: 0.34.5
 
@@ -725,7 +725,7 @@ packages:
   /@types/scheduler/0.16.3:
     resolution: {integrity: sha512-5cJ8CB4yAx7BH1oMvdU0Jh9lrEXyPkar6F9G/ERswkCuvP4KQZfZkSjcMbAICCpQTN4OuZn8tz0HiKv9TGZgrQ==}
 
-  /@typescript-eslint/parser/5.60.0_gsb724fc5bwv46dk2ugeyfyj44:
+  /@typescript-eslint/parser/5.60.0_knjvcufmniaxg3ir3qoiyksaty:
     resolution: {integrity: sha512-jBONcBsDJ9UoTWrARkRRCgDz6wUggmH5RpQVlt7BimSwaTkTjwypGzKORXbR4/2Hqjk9hgwlon2rVQAjWNpkyQ==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
     peerDependencies:
@@ -737,10 +737,10 @@ packages:
     dependencies:
       '@typescript-eslint/scope-manager': 5.60.0
       '@typescript-eslint/types': 5.60.0
-      '@typescript-eslint/typescript-estree': 5.60.0_typescript@5.2.2
+      '@typescript-eslint/typescript-estree': 5.60.0_typescript@5.3.3
       debug: 4.3.4
       eslint: 8.26.0
-      typescript: 5.2.2
+      typescript: 5.3.3
     transitivePeerDependencies:
       - supports-color
     dev: true
@@ -758,7 +758,7 @@ packages:
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
     dev: true
 
-  /@typescript-eslint/typescript-estree/5.60.0_typescript@5.2.2:
+  /@typescript-eslint/typescript-estree/5.60.0_typescript@5.3.3:
     resolution: {integrity: sha512-R43thAuwarC99SnvrBmh26tc7F6sPa2B3evkXp/8q954kYL6Ro56AwASYWtEEi+4j09GbiNAHqYwNNZuNlARGQ==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
     peerDependencies:
@@ -773,8 +773,8 @@ packages:
       globby: 11.1.0
       is-glob: 4.0.3
       semver: 7.5.4
-      tsutils: 3.21.0_typescript@5.2.2
-      typescript: 5.2.2
+      tsutils: 3.21.0_typescript@5.3.3
+      typescript: 5.3.3
     transitivePeerDependencies:
       - supports-color
     dev: true
@@ -1391,7 +1391,7 @@ packages:
     engines: {node: '>=12'}
     dev: false
 
-  /eslint-config-next/13.0.2_gsb724fc5bwv46dk2ugeyfyj44:
+  /eslint-config-next/13.0.2_knjvcufmniaxg3ir3qoiyksaty:
     resolution: {integrity: sha512-SrrHp+zBDYLjOFZdM5b9aW/pliK687Xxfa+qpDuL08Z04ReHhmz3L+maXaAqgrEVZHQximP7nh0El4yNDJW+CA==}
     peerDependencies:
       eslint: ^7.23.0 || ^8.0.0
@@ -1402,7 +1402,7 @@ packages:
     dependencies:
       '@next/eslint-plugin-next': 13.0.2
       '@rushstack/eslint-patch': 1.3.2
-      '@typescript-eslint/parser': 5.60.0_gsb724fc5bwv46dk2ugeyfyj44
+      '@typescript-eslint/parser': 5.60.0_knjvcufmniaxg3ir3qoiyksaty
       eslint: 8.26.0
       eslint-import-resolver-node: 0.3.7
       eslint-import-resolver-typescript: 2.7.1_e55ds5l35gpamu3vxkmffm35ca
@@ -1410,7 +1410,7 @@ packages:
       eslint-plugin-jsx-a11y: 6.7.1_eslint@8.26.0
       eslint-plugin-react: 7.32.2_eslint@8.26.0
       eslint-plugin-react-hooks: 4.6.0_eslint@8.26.0
-      typescript: 5.2.2
+      typescript: 5.3.3
     transitivePeerDependencies:
       - eslint-import-resolver-webpack
       - supports-color
@@ -1465,7 +1465,7 @@ packages:
       eslint-import-resolver-webpack:
         optional: true
     dependencies:
-      '@typescript-eslint/parser': 5.60.0_gsb724fc5bwv46dk2ugeyfyj44
+      '@typescript-eslint/parser': 5.60.0_knjvcufmniaxg3ir3qoiyksaty
       debug: 3.2.7
       eslint: 8.26.0
       eslint-import-resolver-node: 0.3.7
@@ -1484,7 +1484,7 @@ packages:
       '@typescript-eslint/parser':
         optional: true
     dependencies:
-      '@typescript-eslint/parser': 5.60.0_gsb724fc5bwv46dk2ugeyfyj44
+      '@typescript-eslint/parser': 5.60.0_knjvcufmniaxg3ir3qoiyksaty
       array-includes: 3.1.6
       array.prototype.flat: 1.3.1
       array.prototype.flatmap: 1.3.1
@@ -2201,6 +2201,7 @@ packages:
     engines: {node: '>=10'}
     dependencies:
       yallist: 4.0.0
+    dev: true
 
   /magic-string/0.30.3:
     resolution: {integrity: sha512-B7xGbll2fG/VjP+SWg4sX3JynwIU0mjoTc6MPpKNuIvftk6u6vqhDnk1R80b8C2GBR6ywqy+1DcKBrevBg+bmw==}
@@ -2779,6 +2780,7 @@ packages:
     hasBin: true
     dependencies:
       lru-cache: 6.0.0
+    dev: true
 
   /shebang-command/2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
@@ -3022,14 +3024,14 @@ packages:
     resolution: {integrity: sha512-mSxlJJwl3BMEQCUNnxXBU9jP4JBktcEGhURcPR6VQVlnP0FdDEsIaz0C35dXNGLyRfrATNofF0F5p2KPxQgB+w==}
     dev: false
 
-  /tsutils/3.21.0_typescript@5.2.2:
+  /tsutils/3.21.0_typescript@5.3.3:
     resolution: {integrity: sha512-mHKK3iUXL+3UF6xL5k0PEhKRUBKPBCv/+RkEOpjRWxxx27KKRBmmA60A9pgOUvMi8GKhRMPEmjBRPzs2W7O1OA==}
     engines: {node: '>= 6'}
     peerDependencies:
       typescript: '>=2.8.0 || >= 3.2.0-dev || >= 3.3.0-dev || >= 3.4.0-dev || >= 3.5.0-dev || >= 3.6.0-dev || >= 3.6.0-beta || >= 3.7.0-dev || >= 3.7.0-beta'
     dependencies:
       tslib: 1.14.1
-      typescript: 5.2.2
+      typescript: 5.3.3
     dev: true
 
   /type-check/0.4.0:
@@ -3057,8 +3059,8 @@ packages:
       is-typed-array: 1.1.10
     dev: true
 
-  /typescript/5.2.2:
-    resolution: {integrity: sha512-mI4WrpHsbCIcwT9cF4FZvr80QUeKvsUsUvKDoR+X/7XHQH98xYD8YHZg7ANtz2GtZt/CBq2QJ0thkGJMHfqc1w==}
+  /typescript/5.3.3:
+    resolution: {integrity: sha512-pXWcraxM0uxAS+tN0AG/BF2TyqmHO014Z070UsJ+pFvYuRSq8KH8DmWpnbXe0pEPDHXZV3FcAbJkijJ5oNEnWw==}
     engines: {node: '>=14.17'}
     hasBin: true
     dev: true
@@ -3323,6 +3325,7 @@ packages:
 
   /yallist/4.0.0:
     resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
+    dev: true
 
   /yaml/2.3.1:
     resolution: {integrity: sha512-2eHWfjaoXgTBC2jNM1LRef62VQa0umtvRiDSk6HSzW7RvS5YtkabJrwYLLEKWBc8a5U2PTSCs+dJjUTJdlHsWQ==}
@@ -3338,11 +3341,3 @@ packages:
     resolution: {integrity: sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==}
     engines: {node: '>=12.20'}
     dev: true
-
-  github.com/donecollectively/stellar-contracts/067620c54f3f6338a3c5fc3b67bc9e6b497b4566:
-    resolution: {tarball: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/067620c54f3f6338a3c5fc3b67bc9e6b497b4566}
-    name: '@donecollectively/stellar-contracts'
-    version: 0.8.5-alpha42
-    dependencies:
-      semver: 7.5.4
-    dev: false

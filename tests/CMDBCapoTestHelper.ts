@@ -41,13 +41,16 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
     }
 
     async editorInvitesCollaborator(collaborator: Wallet) {
-        if (!this.book) await this.bootstrap();
+        await this.bootstrap()
+
         if (this.actorName != "editor") {
             this.currentActor = "editor";
         }
         const { book } = this;
-        console.log("--------------------------- Create collaborator token");
-        const tcx = await book.mkTxnMintCollaboratorToken(collaborator.address);
+        console.log("--------------------------- Test helper: Create collaborator token");
+        const tcx = await book.mkTxnMintCollaboratorToken(
+            (await collaborator.usedAddresses)[0]
+        );
         await book.submit(tcx);
         await this.network.tick(1n);
         return tcx;
@@ -57,7 +60,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         if (!this.book) await this.bootstrap();
 
         console.log(
-            `--------------------------- Create book page '${pageContent.title}'`
+            `--------------------------- Test helper: Create book page '${pageContent.title}'`
         );
         const tcx = await this.book.mkTxnCreatingBookEntry({
             entryType: "spg",
@@ -87,7 +90,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         }
 
         console.log(
-            "--------------------------- Editor modifying book page",
+            "--------------------------- Test helper: Editor modifying book page",
             entry.id
         );
         return this.collaboratorModifiesPage(entry, updates);
@@ -97,7 +100,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         updates: BookEntryUpdateAttrs
     ) {
         console.log(
-            "  ------------------------- modifying book page",
+            "  ------------------------- Test helper: modifying book page",
             entry.id
         );
         debugger;

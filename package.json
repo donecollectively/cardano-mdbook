@@ -36,7 +36,7 @@
     "browserslist": "defaults, not ie <= 11",
     "dependencies": {
         "@docsearch/react": "^3.5.1",
-        "@donecollectively/stellar-contracts": "github:donecollectively/stellar-contracts#experimental",
+        "@donecollectively/stellar-contracts": "../stellar-contracts",
         "@headlessui/react": "^1.7.15",
         "@markdoc/markdoc": "0.1.7",
         "@markdoc/next.js": "0.1.6",
@@ -63,7 +63,7 @@
         "prettier": "^2.8.8",
         "prettier-plugin-tailwindcss": "^0.1.13",
         "rollup-plugin-string": "^3.0.0",
-        "typescript": "5.2.2",
+        "typescript": "5.3.3",
         "vite": "^4.5.0",
         "vitest": "^0.34.5"
     }

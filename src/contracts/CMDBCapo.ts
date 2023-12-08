@@ -21,7 +21,11 @@ import {
 } from "@donecollectively/stellar-contracts";
 
 const { Value, TxOutput, Datum } = helios;
-import { TxInput, UutName } from "@donecollectively/stellar-contracts";
+import { 
+    TxInput, 
+    type TxInput as TxInputType,
+    UutName 
+} from "@donecollectively/stellar-contracts";
 
 import type {
     isActivity,
@@ -123,7 +127,7 @@ export class CMDBCapo extends DefaultCapo {
     ): InlineDatum {
         //!!! todo: make it possible to type these datum helpers more strongly
         //  ... at the interface to Helios
-        console.log("--> mkDatumCharter", d);
+        console.log("--> mkDatumBookEntry", d);
         const { BookEntry: hlBookEntry } = this.onChainDatumType;
         const { BookEntryStruct: hlBookEntryStruct } = this.onChainTypes;
 
@@ -204,9 +208,7 @@ export class CMDBCapo extends DefaultCapo {
         const myCollabRoleInfo = await this.findUserRoleInfo("collab");
         if (!myCollabRoleInfo)
             throw new Error(
-                `connected wallet ${dumpAny(
-                    this.wallet.address
-                )} doesn't have a collab-* token`
+                `connected wallet doesn't have a collab-* token`
             );
         const myEditorToken: TxInput | undefined =
             await this.findGovAuthority();
@@ -301,6 +303,44 @@ export class CMDBCapo extends DefaultCapo {
         return bookDetails;
     }
 
+    async findOwnershipRoleInfo(
+        entryForUpdate: BookEntryForUpdate // !!! or a more generic type
+    ) : Promise<RoleInfo | undefined> {
+        const collabInfo = await this.findUserRoleInfo("collab");
+
+        if (!this.userHasOwnership(entryForUpdate, collabInfo)) return undefined
+        return collabInfo
+    }
+
+    userHasOwnership(
+        entryForUpdate: BookEntryForUpdate, // !!! or a more generic type
+        collabInfo: RoleInfo, 
+    ) {
+        const {
+            ownerAuthority,
+        } = entryForUpdate
+
+        const {uut:{name: userCollabTokenName}} = collabInfo;
+        const {uutName: ownerUutName} = ownerAuthority;
+
+        const hasOwnership = !!(userCollabTokenName == ownerUutName);
+        console.log("     🐞 hasOwnership?: ", {userCollabTokenName, ownerUutName, hasOwnership});
+        return hasOwnership
+    }
+
+    async txnAddOwnershipToken<TCX extends StellarTxnContext<any>>(
+        tcx: TCX,
+        entryForUpdate: BookEntryForUpdate // !!! or a more generic type
+    ) {
+        const ownerDelegate = await this.getOwnerDelegate(
+            entryForUpdate
+        );
+
+        return ownerDelegate.txnGrantAuthority(
+            tcx
+        );
+    }
+
     /**
      * Updates a book entry's utxo with new details
      * @remarks
@@ -325,45 +365,62 @@ export class CMDBCapo extends DefaultCapo {
 
         const tenMinutes = 1000 * 60 * 10;
 
-        const collabInfo = await this.findUserRoleInfo("collab");
+        const ownerCollabInfo = await this.findOwnershipRoleInfo(entryForUpdate);
+        console.log("   🐞 ownership info: ", ownerCollabInfo);
+
         const editorInfo = await this.findUserRoleInfo("capoGov");
         //! identifies ownership ONLY if current user holds the correct authority token
-        const hasOwnership = !!(collabInfo.uut.name == ownerAuthority.uutName);
         const isEditor = !!(editorInfo?.uut);
 
-        if (hasOwnership) {
-            const ownerDelegate = await this.getOwnerDelegate(
-                entryForUpdate
+        if (ownerCollabInfo) {
+            const tcx = await this.txnAddUserCollabRole(
+                new StellarTxnContext<any>(),
+                ownerCollabInfo
             );
-            //!!! todo get charter-authz instead if possible, or fail if needed
-
-            const tcx = await ownerDelegate.txnGrantAuthority(
-                new StellarTxnContext<any>()
-            );
-
-            const tcx2 = tcx
-                .attachScript(this.compiledScript)
-                .addInput(currentEntryUtxo, this.activityUpdatingEntry())
-                .validFor(tenMinutes);
-            return this.txnReceiveBookEntry(tcx2, entryForUpdate);
-        }
-
-        // hasAuthority = this.findGovAuthority();
-        if (isEditor) {
-            const tcx = await this.txnAddGovAuthority(
-                new StellarTxnContext<any>()
-            );
-
+            console.log("   🐞 book entry update, with ownership")
             const tcx2 = tcx
                 .attachScript(this.compiledScript)
                 .addInput(currentEntryUtxo, this.activityUpdatingEntry())
                 .validFor(tenMinutes);
 
             return this.txnReceiveBookEntry(tcx2, entryForUpdate);
+        } else if (isEditor) {
+            const tcx1 = await this.txnAddGovAuthorityTokenRef(
+                new StellarTxnContext<any>()
+            );
+            console.log("   🐞 book entry update as editor", dumpAny(tcx1));
+
+            // const tcx1a = await this.txnAddGovAuthority(tcx1);
+            // console.log("   🐞 added govAuthority", dumpAny(tcx1a));
+            const collabInfo = await this.findUserRoleInfo("collab");
+
+            const tcx2 = await this.txnAddUserCollabRole(tcx1, collabInfo);
+            console.log("   🐞 added editor collab role", dumpAny(tcx2));
+
+            const tcx3 = tcx2
+                .attachScript(this.compiledScript)
+                .addInput(currentEntryUtxo, this.activityUpdatingEntry())
+                .validFor(tenMinutes);
+
+            return this.txnReceiveBookEntry(tcx3, entryForUpdate);
         }
         throw new Error("The connected wallet doesn't have the needed editor/collaborator authority to update an entry")
     }
-    
+
+    async txnAddUserCollabRole<
+        TCX extends StellarTxnContext<any>
+    >(
+        tcx: TCX, 
+        userCollabToken : RoleInfo
+    ) : Promise<TCX> {          
+        const t: TxInputType = userCollabToken?.utxo
+        if (!t) throw new Error(`addUserCollabRole: no collaborator token provided`)
+
+        return tcx.addInput(userCollabToken.utxo).addOutput(
+            t.output
+        )
+    }
+
     async mkTxnSuggestingUpdate(
         entryForUpdate: BookEntryForUpdate
     ): Promise<StellarTxnContext<any>> {
@@ -422,17 +479,7 @@ export class CMDBCapo extends DefaultCapo {
             for (const tokenName of tokenNames) {
                 rv.utxo = u;
                 rv.uut = new UutName(roleUutPrefix, tokenName);
-                // !!!!! early: return rv;
-                // delete below
-                const thisUutPrefix = tokenName.replace(/-.*/, "");
-                if (thisUutPrefix == roleUutPrefix) {
-                    rv.utxo = u;
-                    rv.uut = new UutName(roleUutPrefix, tokenName);
-                    return rv;
-                }
-                throw new Error(
-                    `we never get here, right?  if not -> early return is ok`
-                );
+                return rv;
             }
         }
     }
@@ -451,20 +498,24 @@ export class CMDBCapo extends DefaultCapo {
     txnReceiveBookEntry<TCX extends StellarTxnContext<any>>(
         tcx: TCX,
         entry: BookEntryForUpdate | BookEntryCreate
-    ): TCX {
+    ): TCX & hasUutContext<"eid" | "entryId"> {
         const entryMinValue = this.mkMinTv(this.mph, entry.id);
         const newDatum = this.mkDatumBookEntry(entry);
         const utxo = new TxOutput(this.address, entryMinValue, newDatum);
         const fake = 0;
         const txId = new Array(32);
         txId.fill(fake);
-        debugger;
+
         const txin = new helios.TxInput(
-            new helios.TxOutputId(txId, new helios.HInt(fake)),
+            new helios.TxOutputId([txId, fake]),
             utxo
         );
 
         tcx.state.newEntry = this.readBookEntry(txin);
+        //!!! todo: make adding UUTs more of a utility, with implicit type
+        tcx.state.uuts = tcx.state.uuts || {};
+        tcx.state.uuts.entryId = 
+        tcx.state.uuts.eid  = new UutName("eid", entry.id);
         return tcx.addOutput(utxo);
     }
     // Address.fromHash(entry.ownerAuthority.delegateValidatorHash),
@@ -574,6 +625,7 @@ export class CMDBCapo extends DefaultCapo {
     @txn
     async mkTxnMintCollaboratorToken(addr: Address) {
         const tcx: hasUutContext<"collab"> = new StellarTxnContext();
+
         const tcx2 = await this.mkTxnMintingUuts(tcx, ["collab"]);
         return tcx2.addOutput(
             new helios.TxOutput(

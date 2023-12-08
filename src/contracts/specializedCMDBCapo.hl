@@ -89,25 +89,68 @@ enum Datum {
 
                 true
             },
-            _ => error("wrong datum")//"validateEntry only works on BookEntry datum")
+            _ => error("wrong datum type")//"validateEntry only works on BookEntry datum")
         }
     }
 
-    func txnHasUpdateAuthority(self, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
-        false && 
-        self.serialize() /* never */ == ctx.serialize() &&
-        self.serialize() /* never */ == mph.serialize()
+    func txnHasUpdateAuthority(self, ownerAuthority: RelativeDelegateLink, oldListing: BookEntryStruct, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+        self.switch{
+            BookEntry{newOwnerAuthority, bookEntry} => {
+        
+                // hasCollabToken : Bool = (
+                //     ownerAuthority.uutName.starts_with("collab-") &&
+                //     requiresValidDelegateOutput(ownerAuthority, mph, ctx)
+                // );
 
+                needsEditorForActivity : Option[String] = 
+                    //! if the entryType is changing to "pg", requires editor authority.
+                    if (oldListing.entryType == "spg" && bookEntry.entryType == "pg") { 
+                        Option[String]::Some{"change from spg to pg"}
+                    } else {
+                    //! if the owner is changing, requires editor authority 
+                    if (ownerAuthority.uutName != newOwnerAuthority.uutName) { 
+                        //   !!! TODO: ... and ref-input to new owner-UUT.
+
+                            Option[String]::Some{"change ownership"}
+                        } else { Option[String]::None }
+                    };
+
+                charterData : Option[Datum::CharterToken] = self.hasCharterRefInput(ctx, mph);
+
+                availableAuthority : RelativeDelegateLink = charterData.switch{
+                    Some{Datum::CharterToken{govAuthority, _}} => {
+                        print("using editor's govAuthority for doc update");
+                        govAuthority
+                    },
+                    None => {
+                        needsEditorForActivity.switch{
+                            Some{activity} => error("update: insufficient authority for "+activity),
+                            None => {
+                                print("no charter-ref; requiring document-owner authority for doc update");
+                                ownerAuthority
+                            }
+                        }
+                    }
+                };
+                hasSufficientAuthority : Bool = requiresValidDelegateOutput(availableAuthority, mph, ctx);
+
+                hasSufficientAuthority
+            }, 
+            _ => error("wrong datum type")//"txnHasUpdateAuthority only works on BookEntry datum")
+        } || (
+            self.serialize() /* never */ == ctx.serialize() &&
+            self.serialize() /* never */ == mph.serialize()
+        )
     }
 
     func txnHasCreateAuthority(self, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
         self.switch{
-            BookEntry{bookAuthority, bookEntry} => {
+            BookEntry{entryOwnerAuthority, bookEntry} => {
 
                 //! creating any entry needs a collab- token
                 hasCollabToken : Bool = (
-                    bookAuthority.uutName.starts_with("collab-") &&
-                    requiresValidDelegateOutput(bookAuthority, mph, ctx)
+                    entryOwnerAuthority.uutName.starts_with("collab-") &&
+                    requiresValidDelegateOutput(entryOwnerAuthority, mph, ctx)
                 );
                 print("bookEntry.entryType is " + bookEntry.entryType);
 
@@ -222,24 +265,23 @@ enum Activity {
         );
         // lastExpiredAt: Int
     
-        datumCanUpdate : Bool = newDatum.txnHasUpdateAuthority(ctx, mph);
+        datumCanUpdate : Bool = newDatum.txnHasUpdateAuthority(ownerAuthority, oldListing, ctx, mph);
         assert(datumCanUpdate, "no update authority in txn");
 
-        charterData : Option[Datum::CharterToken] = hasCharterRefInput(ctx, mph);
-        availableAuthority : RelativeDelegateLink = charterData.switch{
-            Some{Datum::CharterToken{govAuthority, _}} => {
-                print("using editor's govAuthority for doc update");
-                govAuthority
-            },
-            None => {
-                print("no charter-ref; requiring document-owner authority for doc update");
-                ownerAuthority
-            }
-        };
-        hasSufficientAuthority : Bool = requiresValidDelegateOutput(availableAuthority, mph, ctx);
+        // charterData : Option[Datum::CharterToken] = hasCharterRefInput(ctx, mph);
+        // availableAuthority : RelativeDelegateLink = charterData.switch{
+        //     Some{Datum::CharterToken{govAuthority, _}} => {
+        //         print("using editor's govAuthority for doc update");
+        //         govAuthority
+        //     },
+        //     None => {
+        //         print("no charter-ref; requiring document-owner authority for doc update");
+        //         ownerAuthority
+        //     }
+        // };
+        // hasSufficientAuthority : Bool = requiresValidDelegateOutput(availableAuthority, mph, ctx);
 
         ( 
-            hasSufficientAuthority &&  //!!! todo: remove
             datumCanUpdate  &&
             newDatum.validateEntry() 
         ) ||

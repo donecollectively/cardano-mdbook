@@ -25,6 +25,7 @@ import {
     DefaultCapoTestHelper,
 } from "@donecollectively/stellar-contracts";
 import { CMDBCapoTestHelper } from "./CMDBCapoTestHelper.js";
+import { CMDBCapo, RoleInfo } from "../src/contracts/CMDBCapo.js";
 
 type localTC = StellarTestContext<CMDBCapoTestHelper>;
 
@@ -176,9 +177,10 @@ describe("Capo", async () => {
         });
 
         describe("modifying page content: ", () => {
-            it("editor can edit a suggested page and upgrade it to type=pg", async (context: localTC) => {
+            it("editor can upgrade a suggested page to type=pg", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
+                await h.editorInvitesCollaborator(actors.editor);
                 await h.editorInvitesCollaborator(actors.camilla);
                 h.currentActor = "camilla";
                 const { resourceId } = await h.collaboratorCreatesPage(
@@ -191,9 +193,32 @@ describe("Capo", async () => {
 
                 await h.editorModifiesPage(onChainEntry, {
                     ...entry,
-                    content: entry.content + "\n\nEditor updated",
                     entryType: "pg",
                 });
+                const updatedPage = await h.book.findBookEntry(resourceId);
+                expect(updatedPage.entry.entryType).toEqual("pg")
+            });
+
+            it("editor can edit a suggested page without changing its type", async (context: localTC) => {
+                // prettier-ignore
+                const {h, h:{network, actors, delay, state} } = context;
+                await h.editorInvitesCollaborator(actors.editor);
+                await h.editorInvitesCollaborator(actors.camilla);
+                h.currentActor = "camilla";
+                const { resourceId } = await h.collaboratorCreatesPage(
+                    testSuggestedPage
+                );
+                h.currentActor = "editor";
+
+                const onChainEntry = await h.book.findBookEntry(resourceId);
+                const { entry } = onChainEntry;
+
+                await h.editorModifiesPage(onChainEntry, {
+                    ...entry,
+                    content: entry.content + "\n\nEditor updated content",
+                });
+                const updatedPage = await h.book.findBookEntry(resourceId);
+                expect(updatedPage.entry.content).toMatch(/Editor updated content/)
             });
 
             it("random collaborator can't apply changes directly", async (context: localTC) => {
@@ -208,21 +233,50 @@ describe("Capo", async () => {
                 );
                 h.currentActor = "charlie";
                 const existingPage = await h.book.findBookEntry(resourceId);
-                const randoCantUpdate = h.collaboratorModifiesPage(existingPage, {
+
+                const updates = {
                     ...existingPage.entry,
                     title: testPageContent.title + " - rando can't update this"
+                };
+                const offChainFailure = h.collaboratorModifiesPage(
+                    existingPage, updates
+                );
+                await expect(offChainFailure).rejects.toThrow(/connected wallet.*authority/);
+
+                const hasFakeOwnership = vi.spyOn(
+                    h.book, "userHasOwnership"
+                ).mockImplementation(function(this: CMDBCapo, entryForUpdate, collabInfo: RoleInfo) {
+                    return true
                 });
-                await randoCantUpdate
-                await expect(randoCantUpdate).rejects.toThrow(/no way rando/)
-            
+                const randoCantUpdate = h.collaboratorModifiesPage(
+                    existingPage, updates
+                );
+                await expect(randoCantUpdate).rejects.toThrow(/missing delegation token/)
+                expect(hasFakeOwnership).toHaveBeenCalled()
             });
             
             it("page owner can directly apply updates", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 await h.bootstrap(); 
+                await h.editorInvitesCollaborator(actors.camilla);
+                h.currentActor = "camilla"
+                const { resourceId } = await h.collaboratorCreatesPage(
+                    testSuggestedPage
+                );
+                const existingPage = await h.book.findBookEntry(resourceId);
+
+                const updates = {
+                    ...existingPage.entry,
+                    title: testPageContent.title + " - owner-did-update"
+                };
+                await h.collaboratorModifiesPage(
+                    existingPage, updates
+                );
                 
-            
+                const updatedPage = await h.book.findBookEntry(resourceId);
+                console.log("     🐞 updated page", updatedPage.entry.title );
+                expect(updatedPage.entry.title).toMatch(/owner-did-update/);
             });
         });
 
@@ -239,7 +293,7 @@ describe("Capo", async () => {
                 const book = await h.bootstrap();
             });
     
-            
+
         });
 
         it.todo("a page owner can adopt a suggestion", async (context: localTC) => {
