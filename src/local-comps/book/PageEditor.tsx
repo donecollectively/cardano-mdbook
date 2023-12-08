@@ -6,6 +6,7 @@ import type {
     BookEntry,
     BookEntryOnchain,
     BookEntryForUpdate,
+    BookEntryUpdateAttrs,
 } from "../../contracts/CMDBCapo.js";
 import { Prose } from "../../components/Prose.jsx";
 import head from "next/head.js";
@@ -32,11 +33,11 @@ type stateType = {
     submitting?: boolean;
     saveAs?: "suggestion" | "update";
     problems: Record<string, string>;
-    current: BookEntry;
+    current: BookEntry | BookEntryUpdateAttrs;
 };
 
 type FieldProps = {
-    rec: BookEntry;
+    rec: BookEntryUpdateAttrs;
     fn: string;
     as?: React.ElementType;
     rows?: number;
@@ -158,7 +159,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         return this.props?.roles?.includes("editor");
     }
 
-    get hasAuthority() {
+    get hasDocOwnership() {
         const { entry, collabUut } = this.props;
         if (!entry || !collabUut) return false;
 
@@ -181,6 +182,8 @@ export class PageEditor extends React.Component<propsType, stateType> {
         e.preventDefault();
         e.stopPropagation();
 
+        if (!saveAs) throw new Error(`missing required saveAs setting - default to Suggestion?`);
+        
         //! clears "undefined" problems that may have existed temporarily
         const problems = JSON.parse(JSON.stringify(this.state.problems));
         if (Object.keys(problems).length) {
@@ -190,7 +193,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
 
         const form = e.target as HTMLFormElement;
         const updatedBookEntry = this.capture(form);
-        const { isEditor, hasAuthority } = this;
+        const { isEditor, hasDocOwnership } = this;
 
         try {
             const txnDescription = `${create ? "creation" : "update"} txn`;
@@ -201,16 +204,16 @@ export class PageEditor extends React.Component<propsType, stateType> {
             );
             const tcx = create
                 ? await bookContract.mkTxnCreatingBookEntry(updatedBookEntry)
-                : await bookContract.mkTxnUpdatingEntry({
+                : "update"== saveAs 
+                ? await bookContract.mkTxnUpdatingEntry({
                       ...entryForUpdate,
-                      updated: updatedBookEntry,
-                      options: {
-                          isEditor,
-                          hasAuthority,
-                          collabUut,
-                          saveAs,
-                      },
-                  });
+                      updated: updatedBookEntry
+                  })
+                  : await bookContract.mkTxnSuggestingUpdate({
+                    ...entryForUpdate,
+                    updated: updatedBookEntry,
+                  })
+
             console.warn(dumpAny(tcx));
             updateState(
                 `sending the ${txnDescription} to your wallet for approval`,
@@ -257,7 +260,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const showTitle = <>{create ? "Creating new" : "Edit"} page</>;
         let sidebarContent;
 
-        const { isEditor, hasAuthority } = this;
+        const { isEditor, hasDocOwnership: hasAuthority } = this;
         //! when the user has authority to apply changes, use "update" mode by default,
         //   ... but allow them to save it as a suggestion instead.
         //! if they don't have authority, they can only make a suggestion.
@@ -671,7 +674,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
     mkChangeValidator(
         fieldId: string,
         validate: Function,
-        rec: BookEntry,
+        rec: BookEntryUpdateAttrs,
         index?: number
     ): ChangeHandler {
         const v = this.validators[fieldId];
@@ -724,7 +727,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
     };
     capture(form) {
         const formData = new FormData(form);
-        const currentForm: BookEntry = Object.fromEntries(
+        const currentForm: BookEntryUpdateAttrs = Object.fromEntries(
             formData.entries()
         ) as unknown as BookEntry;
 

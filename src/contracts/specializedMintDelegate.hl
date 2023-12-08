@@ -222,6 +222,9 @@ enum MintDelegateActivity {
         newDatum : CMDBookDatum = CMDBookDatum::from_data(newTxo.datum.get_inline_data());
         CMDBookDatum::BookEntry{_, newListing} = newDatum;
 
+        canBeCreated : Bool = newDatum.txnHasCreateAuthority(ctx, mph);
+        assert(canBeCreated, "no creation authority in txn");
+
         txnTime : TimeRange = ctx.tx.time_range;        
         now : Time = txnTime.start;
         assert(/* 2a. ✅ */ 

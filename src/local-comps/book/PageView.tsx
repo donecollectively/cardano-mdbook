@@ -8,7 +8,7 @@ import React, { useState } from "react";
 // import { createPortal } from "react-dom";
 // import { Prose } from "@/components/Prose.jsx";
 // import { useLiveQuery } from "dexie-react-hooks";
-import type { BookEntryOnchain, BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
+import type { BookEntryOnchain, BookEntryForUpdate, forOnChainEntry } from "../../contracts/CMDBCapo.js";
 import { helios } from "@donecollectively/stellar-contracts";
 import { Markdoc } from "../../components/Markdoc.jsx";
 import type { BookManagementProps } from "./sharedPropTypes.js";
@@ -21,7 +21,7 @@ const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hWallet = typeof Cip30Wallet.prototype;
 
 type propsType = {
-    entry: BookEntryForUpdate;
+    entry: BookEntryOnchain | forOnChainEntry<any>;
     wallet?: hWallet;
     preview? : true
 } & BookManagementProps
@@ -75,7 +75,10 @@ export class PageView extends React.Component<propsType, stateType> {
         if (!walletUtxos) return "...loading wallet utxos..."; // undefined
 
         if (roles?.includes("collaborator")) {
-            return <Button href={`${entry.id}/edit`}>Update Listing</Button>
+            //@ts-expect-error  on entry-id
+            const eid = entry.id;
+            if (!eid) return null;
+            return <Button href={`${eid}/edit`}>Update Listing</Button>
         }
     }
 }

@@ -68,7 +68,7 @@ enum Datum {
             BookEntry{_, entry} => {
                 needsLength : (String, String, Int) -> () = (v : String, fn : String, min : Int) -> {
                     assert(v.encode_utf8().length >= min,
-                        "length error"//, fn + " needs " +min.show() + " chars or more"
+                        "field length error" // + ": " + fn + " needs " +min.show() + " chars or more"
                     )
                 };
 
@@ -92,6 +92,71 @@ enum Datum {
             _ => error("wrong datum")//"validateEntry only works on BookEntry datum")
         }
     }
+
+    func txnHasUpdateAuthority(self, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+        false && 
+        self.serialize() /* never */ == ctx.serialize() &&
+        self.serialize() /* never */ == mph.serialize()
+
+    }
+
+    func txnHasCreateAuthority(self, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+        self.switch{
+            BookEntry{bookAuthority, bookEntry} => {
+
+                //! creating any entry needs a collab- token
+                hasCollabToken : Bool = (
+                    bookAuthority.uutName.starts_with("collab-") &&
+                    requiresValidDelegateOutput(bookAuthority, mph, ctx)
+                );
+                print("bookEntry.entryType is " + bookEntry.entryType);
+
+                //! creating a Page needs Editor authority
+                hasAuthorityForEntryType : Bool = if (bookEntry.entryType == "pg") {
+                    charterData : Option[Datum::CharterToken] = self.hasCharterRefInput(ctx, mph);
+                    charterData.switch{
+                        Some{Datum::CharterToken{govAuthority, _}} => {
+                            print("using editor's govAuthority for doc update");
+                            requiresValidDelegateOutput(govAuthority, mph, ctx)
+                        },
+                        _ => error("insufficient authority to create entryType=pg")
+                    }
+                } else { hasCollabToken };
+
+                hasCollabToken && hasAuthorityForEntryType
+            },
+            _ => error("no create authority on non-book-entry")
+        } || (
+            self.serialize() /* never */ == ctx.serialize()
+        )
+    }
+
+    func hasCharterRefInput(
+        self,
+        ctx: ScriptContext, 
+        mph : MintingPolicyHash
+    ) -> Option[Datum::CharterToken] {
+        chVal : Value = tvCharter(mph);
+        hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
+
+        assert(
+            self.serialize() != ctx.serialize() &&
+            self.serialize() != mph.serialize(), "never thrown"
+        );
+
+        ctx.tx.ref_inputs.find_safe(hasCharter).switch{
+            Some{txin} => Option[Datum::CharterToken]::Some{
+                Datum::from_data( 
+                    txin.datum.get_inline_data() 
+                ).switch{
+                    c : CharterToken => c,
+                    _ => error("wrong enum")
+                }
+            },
+            None => Option[Datum::CharterToken]::None
+        }
+    }
+    
 }
 func hasCharterRefInput(
     ctx: ScriptContext, 
@@ -157,13 +222,16 @@ enum Activity {
         );
         // lastExpiredAt: Int
     
+        datumCanUpdate : Bool = newDatum.txnHasUpdateAuthority(ctx, mph);
+        assert(datumCanUpdate, "no update authority in txn");
+
         charterData : Option[Datum::CharterToken] = hasCharterRefInput(ctx, mph);
         availableAuthority : RelativeDelegateLink = charterData.switch{
             Some{Datum::CharterToken{govAuthority, _}} => {
                 print("using editor's govAuthority for doc update");
                 govAuthority
             },
-            None => {                
+            None => {
                 print("no charter-ref; requiring document-owner authority for doc update");
                 ownerAuthority
             }
@@ -171,7 +239,9 @@ enum Activity {
         hasSufficientAuthority : Bool = requiresValidDelegateOutput(availableAuthority, mph, ctx);
 
         ( 
-            hasSufficientAuthority && newDatum.validateEntry() 
+            hasSufficientAuthority &&  //!!! todo: remove
+            datumCanUpdate  &&
+            newDatum.validateEntry() 
         ) ||
         ( 
             ( self.serialize() /* never */ == oldListing.serialize() )  ||

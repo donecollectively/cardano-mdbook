@@ -33,7 +33,7 @@ const Link = link.default;
 import { useRouter } from "next/router.js";
 import React from "react";
 import type { MouseEventHandler } from "react";
-import { Prose } from "@/components/Prose.jsx";
+import { Prose } from "../../components/Prose.jsx";
 import { useLiveQuery } from "dexie-react-hooks";
 
 import type {
@@ -711,8 +711,8 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
 
         const roles = [];
         debugger;
-        const collabUtxo = await bookContract.findRoleUtxo("collab");
-        const isEditor = await bookContract.findRoleUtxo("capoGov");
+        const collabUtxo = await bookContract.findUserRoleUtxo("collab");
+        const isEditor = await bookContract.findUserRoleUtxo("capoGov");
 
         let collabToken;
         if (!!collabUtxo) {
@@ -903,26 +903,22 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
     }
 
+
+    // const allInstances = await instanceRegistry.findInstances(this.bf)
+    // const instanceIndex = instanceRegistry.mkInstanceIndex(allInstances);
+
+    // this.updateState("", {
+    //     allInstances,
+    //     instanceIndex,
+    // });
+
     //  -- step 4: Read registry entries from chain
     async fetchBookEntries() {
         const { bookContract } = this.state;
 
-        const found = await this.bf.getUtxos(bookContract.address);
-        const { mph } = bookContract;
+        const bookDetails = await bookContract.findBookEntries();
+        const bookEntryIndex = bookContract.mkEntryIndex(bookDetails);
 
-        const bookDetails: BookEntryForUpdate[] = [];
-        const bookEntryIndex = {};
-        const waiting: Promise<any>[] = [];
-        for (const utxo of found) {
-            waiting.push(
-                bookContract.readBookEntry(utxo).then((entry) => {
-                    if (!entry) return;
-                    bookDetails.push(entry);
-                    bookEntryIndex[entry.id] = entry;
-                })
-            );
-        }
-        await Promise.all(waiting);
         this.updateState(
             "",
             { bookDetails, bookEntryIndex },
