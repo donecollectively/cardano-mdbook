@@ -6,6 +6,7 @@ import {
     vi,
     assertType,
     expectTypeOf,
+    beforeAll,
 } from "vitest";
 
 import {
@@ -24,8 +25,17 @@ import {
     addTestContext,
     DefaultCapoTestHelper,
 } from "@donecollectively/stellar-contracts";
-import { CMDBCapoTestHelper } from "./CMDBCapoTestHelper.js";
-import { CMDBCapo, RoleInfo } from "../src/contracts/CMDBCapo.js";
+import {
+    CMDBCapoTestHelper,
+    ResourceUpdateResult,
+} from "./CMDBCapoTestHelper.js";
+import {
+    BookEntryCreationAttrs,
+    BookEntryForUpdate,
+    CMDBCapo,
+    RoleInfo,
+} from "../src/contracts/CMDBCapo.js";
+import { applyPatch } from "diff";
 
 type localTC = StellarTestContext<CMDBCapoTestHelper>;
 
@@ -37,12 +47,12 @@ const xit = it.skip; //!!! todo: update this when vitest can have skip<HeliosTes
 
 const describe = descrWithContext<localTC>;
 
-const testPageContent = {
+const testPageContent : BookEntryCreationAttrs = {
     entryType: "pg",
     title: "collaborator page",
-    content: "## Page Heading\n\nPage content here, minimum 40 bytes",
+    content: "## Page Heading\n\nPage content here, minimum 40 bytes\n\n",
 };
-const testSuggestedPage = {
+const testSuggestedPage : BookEntryCreationAttrs = {
     ...testPageContent,
     entryType: "spg",
 };
@@ -127,7 +137,7 @@ describe("Capo", async () => {
                 expect(onChainEntry.entry.entryType).toBe("pg");
             });
 
-            it("a collaborator can only make a suggested page", async (context: localTC) => {
+            it("a collaborator can only create a suggested page", async (context: localTC) => {
                 context.initHelper({ skipSetup: true });
                 const {
                     h,
@@ -196,7 +206,7 @@ describe("Capo", async () => {
                     entryType: "pg",
                 });
                 const updatedPage = await h.book.findBookEntry(resourceId);
-                expect(updatedPage.entry.entryType).toEqual("pg")
+                expect(updatedPage.entry.entryType).toEqual("pg");
             });
 
             it("editor can edit a suggested page without changing its type", async (context: localTC) => {
@@ -218,16 +228,18 @@ describe("Capo", async () => {
                     content: entry.content + "\n\nEditor updated content",
                 });
                 const updatedPage = await h.book.findBookEntry(resourceId);
-                expect(updatedPage.entry.content).toMatch(/Editor updated content/)
+                expect(updatedPage.entry.content).toMatch(
+                    /Editor updated content/
+                );
             });
 
             it("random collaborator can't apply changes directly", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
-                await h.bootstrap(); 
+                await h.bootstrap();
                 await h.editorInvitesCollaborator(actors.camilla);
                 await h.editorInvitesCollaborator(actors.charlie);
-                h.currentActor = "camilla"
+                h.currentActor = "camilla";
                 const { resourceId } = await h.collaboratorCreatesPage(
                     testSuggestedPage
                 );
@@ -236,31 +248,35 @@ describe("Capo", async () => {
 
                 const updates = {
                     ...existingPage.entry,
-                    title: testPageContent.title + " - rando can't update this"
+                    title: testPageContent.title + " - rando can't update this",
                 };
                 const offChainFailure = h.collaboratorModifiesPage(
-                    existingPage, updates
+                    existingPage,
+                    updates
                 );
-                await expect(offChainFailure).rejects.toThrow(/connected wallet.*authority/);
+                await expect(offChainFailure).rejects.toThrow(
+                    /connected wallet.*authority/
+                );
 
-                const hasFakeOwnership = vi.spyOn(
-                    h.book, "userHasOwnership"
-                ).mockImplementation(function(this: CMDBCapo, entryForUpdate, collabInfo: RoleInfo) {
-                    return true
-                });
+                const hasFakeOwnership = vi
+                    .spyOn(h.book, "userHasOwnership")
+                    .mockReturnValue(true);
                 const randoCantUpdate = h.collaboratorModifiesPage(
-                    existingPage, updates
+                    existingPage,
+                    updates
                 );
-                await expect(randoCantUpdate).rejects.toThrow(/missing delegation token/)
-                expect(hasFakeOwnership).toHaveBeenCalled()
+                await expect(randoCantUpdate).rejects.toThrow(
+                    /missing delegation token/
+                );
+                expect(hasFakeOwnership).toHaveBeenCalled();
             });
-            
+
             it("page owner can directly apply updates", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
-                await h.bootstrap(); 
+                await h.bootstrap();
                 await h.editorInvitesCollaborator(actors.camilla);
-                h.currentActor = "camilla"
+                h.currentActor = "camilla";
                 const { resourceId } = await h.collaboratorCreatesPage(
                     testSuggestedPage
                 );
@@ -268,38 +284,271 @@ describe("Capo", async () => {
 
                 const updates = {
                     ...existingPage.entry,
-                    title: testPageContent.title + " - owner-did-update"
+                    title: testPageContent.title + " - owner-did-update",
                 };
-                await h.collaboratorModifiesPage(
-                    existingPage, updates
-                );
-                
+                await h.collaboratorModifiesPage(existingPage, updates);
+
                 const updatedPage = await h.book.findBookEntry(resourceId);
-                console.log("     🐞 updated page", updatedPage.entry.title );
+                console.log("     🐞 updated page", updatedPage.entry.title);
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
             });
         });
 
         describe("suggesting", () => {
-            it.todo("a collaborator can make a suggestion on someone else's page", async (context: localTC) => {
+            async function setup(
+                context: localTC
+            ): Promise<
+                [ResourceUpdateResult<any>, BookEntryForUpdate]
+            > {
+                const {
+                    h,
+                    h: { network, actors, delay, state },
+                } = context;
+
+                await h.bootstrap();
+                await h.editorInvitesCollaborator(actors.camilla);
+                // await h.editorInvitesCollaborator(actors.charlie);
+                h.currentActor = "camilla";
+                const resourceUpdated = await h.collaboratorCreatesPage(
+                    testSuggestedPage
+                );
+                const { resourceId: pageId } = resourceUpdated;
+                const page = await h.book.findBookEntry(pageId);
+                return [resourceUpdated, page];
+            }
+
+            it("collaborator token is required to suggest changes", async (context: localTC) => {
+                // prettier-ignore
+                const {h, h:{network, actors, delay, state} } = context;
+                const [pageInfo, page] = await setup(context);
+
+                // await h.editorInvitesCollaborator(actors.charlie);  // no invite for you!
+                h.currentActor = "charlie";
+                const updates = {
+                    ...page.entry,
+                    title: testPageContent.title + " - collaborator suggestion",
+                };
+                const offChainFailure = h.collaboratorSuggestsChange(
+                    page,
+                    updates
+                );
+                await expect(offChainFailure).rejects.toThrow(
+                    /doesn't have a collab.*token/
+                );
+
+                const hasFakeRoleInfo = vi
+                    .spyOn(h.book, "findUserRoleInfo")
+                    .mockResolvedValue({
+                        utxo: null,
+                        uut: null,
+                    });
+                const randoCantSuggest = h.collaboratorSuggestsChange(
+                    page,
+                    updates
+                );
+                await randoCantSuggest
+                await expect(randoCantSuggest).rejects.toThrow(
+                    /missing delegation token/
+                );
+                expect(hasFakeRoleInfo).toHaveBeenCalled();
+            });
+
+            it("a collaborator can make a suggestion on someone else's page", async (context: localTC) => {
+                // prettier-ignore
+                const {h, h:{network, actors, delay, state} } = context;
+                const [pageInfo, page] = await setup(context);
+
+                await h.editorInvitesCollaborator(actors.charlie);
+                h.currentActor = "charlie";
+
+                const updates = {
+                    ...page.entry,
+                    title: testPageContent.title + " - collaborator suggestion",
+                };
+                const {
+                    resourceId: suggestionId,
+                    tcx,
+                    txid,
+                } = await h.collaboratorSuggestsChange(page, updates);
+
+                const newSuggestion = await h.book.findBookEntry(suggestionId);
+                const { uut: charlieToken } = await h.book.findUserRoleInfo(
+                    "collab"
+                );
+                expect(newSuggestion.ownerAuthority.uutName).toEqual(
+                    charlieToken.name
+                );
+            });
+
+            describe("- data format", () => {
+                it("references the parent transaction-id", async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+
+                    const [pageInfo, page] = await setup(context);
+                    const {txid: pageTxId} = pageInfo
+                    await h.editorInvitesCollaborator(actors.charlie);
+                    h.currentActor = "charlie";
+
+                    const updates = {
+                        ...page.entry,
+                        title:
+                            testPageContent.title +
+                            " - collaborator suggestion",
+                    };
+                    const {
+                        resourceId: suggestionId,
+                        tcx,
+                        txid,
+                    } = await h.collaboratorSuggestsChange(page, updates);
+                    const newSuggestion = await h.book.findBookEntry(
+                        suggestionId
+                    );
+
+                    const { title, content, changeParentTxn } =
+                        newSuggestion.entry;
+                    expect(
+                        changeParentTxn.eq(pageTxId),
+                        "mismatched txid"
+                    ).toBeTruthy();
+
+                    vi.spyOn(h.book, 
+                        "txnAddParentRefUtxo"
+                    ).mockImplementation( async (tcx, recId) => tcx );
+                    const badSuggestionTxn = h.collaboratorSuggestsChange(page, updates);
+                    await expect(badSuggestionTxn, "contract should throw when the txn is built wrong").rejects.toThrow(
+                        /no ref_input matching changeParentTxn/
+                    )
+                });
+                
+                it("formats title as direct change, leaving content empty if unchanged", async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+
+                    const [pageInfo, page] = await setup(context);
+                    const {txid: pageTxId} = pageInfo
+                    await h.editorInvitesCollaborator(actors.charlie);
+                    h.currentActor = "charlie";
+
+                    const altTitle = "alternative title";
+                    const updates = {
+                        ...page.entry,
+                        title: altTitle
+                    };
+                    const {
+                        resourceId: suggestionId,
+                        tcx,
+                        txid,
+                    } = await h.collaboratorSuggestsChange(page, updates);
+                    const newSuggestion = await h.book.findBookEntry(
+                        suggestionId
+                    );
+
+                    const { title, content } =
+                        newSuggestion.entry;
+                    expect(
+                        title
+                    ).toEqual(altTitle);
+                    expect(content.length, "expected empty content").toBeFalsy()
+                });
+
+                it("formats content diff, leaving title empty if unchanged", async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+
+                    const [pageInfo, page] = await setup(context);
+                    const {txid: pageTxId} = pageInfo
+                    await h.editorInvitesCollaborator(actors.charlie);
+                    h.currentActor = "charlie";
+
+                    const updatedContent = testPageContent.content +
+                        "\n## Plus collaborator suggestion\n";
+                    const updates = {
+                        ...page.entry,
+                        content:
+                            updatedContent,
+                    };
+                    const {
+                        resourceId: suggestionId,
+                        tcx,
+                        txid,
+                    } = await h.collaboratorSuggestsChange(page, updates);
+                    const newSuggestion = await h.book.findBookEntry(
+                        suggestionId
+                    );
+
+                    const { title, content: contentDiff } =
+                        newSuggestion.entry;
+                    expect(
+                        contentDiff.length,
+                        "expected content diff"
+                    ).toBeTruthy();
+                    expect(title.length, "expected empty title").toBeFalsy()
+
+                    const patched = applyPatch(page.entry.content, contentDiff)
+                    expect(patched, "applyPatch shouldn't fail with false").toEqual(updatedContent)
+                });
+
+            });
+
+            it.todo(
+                "suggestions are only through a collaborator role, not the editor role",
+                async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+                    const book = await h.bootstrap();
+
+                    await h.editorInvitesCollaborator(actors.camilla);
+                    await h.editorInvitesCollaborator(actors.charlie);
+                    h.currentActor = "camilla";
+                    const { resourceId } = await h.collaboratorCreatesPage(
+                        testSuggestedPage
+                    );
+                    h.currentActor = "editor";
+                    const existingPage = await h.book.findBookEntry(resourceId);
+
+                    const updates = {
+                        ...existingPage.entry,
+                        title:
+                            testPageContent.title +
+                            " - collaborator suggestion",
+                    };
+                    const offChainFailure = h.collaboratorSuggestsChange(
+                        existingPage,
+                        updates
+                    );
+                    await expect(offChainFailure).rejects.toThrow(
+                        /connected wallet.*authority/
+                    );
+
+                    const hasFakeOwnership = vi
+                        .spyOn(h.book, "userHasOwnership")
+                        .mockImplementation(function (
+                            this: CMDBCapo,
+                            entryForUpdate,
+                            collabInfo: RoleInfo
+                        ) {
+                            return true;
+                        });
+                    const editorCantSuggest = h.collaboratorSuggestsChange(
+                        existingPage,
+                        updates
+                    );
+                    await expect(editorCantSuggest).rejects.toThrow(
+                        /missing delegation token/
+                    );
+                    expect(hasFakeOwnership).toHaveBeenCalled();
+                }
+            );
+        });
+
+        it.todo(
+            "a page owner can adopt a suggestion",
+            async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 const book = await h.bootstrap();
-            });
-
-            it.todo("suggestions are only through a collaborator role, not the editor role", async (context: localTC) => {
-                // prettier-ignore
-                const {h, h:{network, actors, delay, state} } = context;
-                const book = await h.bootstrap();
-            });
-    
-
-        });
-
-        it.todo("a page owner can adopt a suggestion", async (context: localTC) => {
-            // prettier-ignore
-            const {h, h:{network, actors, delay, state} } = context;
-            const book = await h.bootstrap();
-        });
+            }
+        );
     });
 });

@@ -25,8 +25,6 @@ import {
     outputDatum
 } from StellarHeliosHelpers
 
-
-
 struct BookEntryStruct {
     entryType: String
     title: String
@@ -34,6 +32,9 @@ struct BookEntryStruct {
     createdAt: Int
     updatedAt: Int
     expiresAt: Int
+    //  suggestedBy: String // XXX collaborator-id  - see delegation-link, whose content serves the same purpose.
+    changeParentEntry: String // id of parent obj
+    changeParentTxn: Option[TxId] // -> txid
 }
 
 // struct LocalCapoConfig {
@@ -63,7 +64,7 @@ enum Datum {
         )
     } 
 
-    func validateEntry(self) -> Bool{
+    func validateEntry(self, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool{
         self.switch{
             BookEntry{_, entry} => {
                 needsLength : (String, String, Int) -> () = (v : String, fn : String, min : Int) -> {
@@ -84,10 +85,41 @@ enum Datum {
                     _ => true
                 }, ""); // already failed as invalid ^^
 
-                needsLength(entry.title, "title", 10);
-                needsLength(entry.content, "content", 40);
+                validatesOk : Bool = if ("chg" == entry.entryType) {
+                    assert(
+                        entry.title.encode_utf8().length >0 || 
+                        entry.content.encode_utf8().length > 0,
+                         "either title or content must change"
+                    );
+                    peLength: Int = entry.changeParentEntry.encode_utf8().length;
+                    assert(
+                        peLength > 15, 
+                        "changeParent entry too short: "+peLength.show()
+                    );
 
-                true
+                    // the value of the id-token:
+                    parentRec : Value = mkTv(mph, entry.changeParentEntry);
+
+                    entry.changeParentTxn.switch {
+                        Some{txid} => {
+                            ctx.tx.ref_inputs.find_safe((txin: TxInput) -> {
+                                txin.output_id.tx_id == txid &&
+                                txin.output.value >= parentRec
+                            }).switch{
+                                Some => true,
+                                None => error("no ref_input matching changeParentTxn, changeParentEntry")
+                            }
+                        },
+                        _ => error("missing required changeParentTxn")
+                    }        
+                } else {
+                    needsLength(entry.title, "title", 10);
+                    needsLength(entry.content, "content", 40);
+
+                    true    
+                };
+                
+                validatesOk
             },
             _ => error("wrong datum type")//"validateEntry only works on BookEntry datum")
         }
@@ -283,7 +315,7 @@ enum Activity {
 
         ( 
             datumCanUpdate  &&
-            newDatum.validateEntry() 
+            newDatum.validateEntry(ctx, mph) 
         ) ||
         ( 
             ( self.serialize() /* never */ == oldListing.serialize() )  ||

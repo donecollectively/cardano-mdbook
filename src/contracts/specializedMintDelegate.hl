@@ -248,7 +248,7 @@ enum MintDelegateActivity {
         // 4. ✅ 
         notModified : Bool = unmodifiedDelegation(mintDelegateData.serialize(), ctx);
         
-        (notModified && newDatum.validateEntry()  ) ||
+        (notModified && newDatum.validateEntry(ctx, mph)  ) ||
             self.serialize() /*never executed */ == ctx.serialize()
 
     }

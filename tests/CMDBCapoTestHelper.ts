@@ -16,7 +16,7 @@ import {
     type BookEntryForUpdate,
 } from "../src/contracts/CMDBCapo.js";
 
-type ResourceUpdateResult<T extends StellarTxnContext<any>> = {
+export interface ResourceUpdateResult<T extends StellarTxnContext<any>> {
     txid: helios.TxId;
     resourceId: string;
     tcx: T;
@@ -117,16 +117,48 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
                 await this.network.tick(1n);
 
                 return updatedResource({ txid, resourceId, tcx });
-            },
-            (e) => {
-                throw e;
             }
         );
     }
 
-    async collaboratorSuggestsChange() {}
+    async collaboratorSuggestsChange(
+        entry: BookEntryForUpdate,
+        updates: BookEntryUpdateAttrs
+    ) {
+        if (!this.book)
+            throw new Error(
+                `book contract not bootstrapped; no book pages can exist`
+            );
 
-    async editorAcceptsSuggestion() {}
+        console.log(
+            "--------------------------- Test helper: Suggest book page update",
+            entry.id
+        );
+        const tcx = await this.book.mkTxnSuggestingUpdate({
+            ...entry, 
+            updated: updates
+        });
+        const resourceId = tcx.state.uuts.entryId.name;
 
-    async ownerAcceptsSuggestion() {}
+        return this.book.submit(tcx).then(
+            (txid) => {
+                this.network.tick(1n);
+
+                return updatedResource({ 
+                    txid, 
+                    resourceId, 
+                    tcx 
+                });
+            }
+        )
+    }
+
+    async editorAcceptsSuggestion() {
+
+    }
+
+    async ownerAcceptsSuggestion() {
+
+    }
+
 }

@@ -1,3 +1,14 @@
+import {
+    Diff,
+    applyPatch,
+    createPatch,
+    diffChars,
+    diffLines,
+    diffSentences,
+    parsePatch,
+    structuredPatch,
+} from "diff";
+
 import type {
     SeedTxnParams,
     RelativeDelegateLink,
@@ -20,11 +31,19 @@ import {
     dumpAny,
 } from "@donecollectively/stellar-contracts";
 
-const { Value, TxOutput, Datum } = helios;
-import { 
-    TxInput, 
+const {
+    Value,
+    TxOutput,
+    Datum,
+    //@ts-expect-error
+    Option,
+    TxOutputId,
+} = helios;
+
+import {
+    TxInput,
     type TxInput as TxInputType,
-    UutName 
+    UutName,
 } from "@donecollectively/stellar-contracts";
 
 import type {
@@ -61,18 +80,20 @@ export type BookEntryUpdateOptions = {
 };
 
 export type BookEntry = {
-    entryType: string;
+    entryType: "pg" | "spg" | "chg";
     title: string;
     content: string;
-    suggestedBy?: string;
     createdAt: bigint;
     updatedAt: bigint;
     expiresAt: bigint;
+    changeParentEntry?: string;
+    changeParentTxn?: helios.TxId;
+    // suggestedBy?: string; // XXX see delegate link, whose content serves the same purpose
 };
 
 export type BookEntryCreationAttrs = Pick<
     BookEntry,
-    "title" | "content" | "entryType"
+    "title" | "content" | "entryType" | "changeParentEntry" | "changeParentTxn"
 >;
 export type RoleInfo = { utxo: TxInput; uut: UutName };
 
@@ -80,7 +101,7 @@ export type BookEntryUpdateAttrs = BookEntryCreationAttrs &
     Pick<BookEntry, "createdAt" | "expiresAt">;
 
 export type BookSuggestionAttrs = BookEntryCreationAttrs &
-    Required<Pick<BookEntry, "suggestedBy">>;
+    Required<Pick<BookEntry, "changeParentTxn" | "changeParentEntry">>;
 
 type entryId = string;
 export type BookEntryCreate = forOnChainEntry<BookEntryCreationAttrs> & {
@@ -147,7 +168,28 @@ export class CMDBCapo extends DefaultCapo {
         rec.expiresAt = BigInt(Date.now() + 364 * 24 * 60 * 60 * 1000);
         const { entryType, title, content, createdAt, updatedAt, expiresAt } =
             rec;
+        let { changeParentTxn, changeParentEntry } = rec;
 
+        if ("chg" == entryType) {
+            if (!changeParentEntry) {
+                throw new Error(
+                    `missing required changeParentEntry - a eid-* asset-name of page being changed`
+                );
+            }
+            if (!changeParentTxn) {
+                //!!! todo: ensure refUtxo to this txid is present in the resulting txn
+                throw new Error(
+                    `missing required changeParentTxn - TxId in which the change-parent was last modified`
+                );
+            }
+            console.log("changeParentTxn: ", dumpAny(changeParentTxn))
+        } else {
+            changeParentEntry = "";
+            changeParentTxn = undefined;
+        }
+        const OptTxId = Option(helios.TxId);
+
+        const chParentTxId = new OptTxId(changeParentTxn);
         const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
         const bookEntryStruct = new hlBookEntryStruct(
             entryType,
@@ -155,7 +197,9 @@ export class CMDBCapo extends DefaultCapo {
             content,
             createdAt,
             updatedAt,
-            expiresAt
+            expiresAt,
+            changeParentEntry,
+            chParentTxId
         );
         const t = new hlBookEntry(ownerAuthority, bookEntryStruct);
         return Datum.inline(t._toUplcData());
@@ -205,11 +249,10 @@ export class CMDBCapo extends DefaultCapo {
         //     - includes the mint-delegate for authorizing creation of the entry
         //  - assign the user's collaborator token as the administrative authority
 
+        // !!! mock in test
         const myCollabRoleInfo = await this.findUserRoleInfo("collab");
         if (!myCollabRoleInfo)
-            throw new Error(
-                `connected wallet doesn't have a collab-* token`
-            );
+            throw new Error(`connected wallet doesn't have a collab-* token`);
         const myEditorToken: TxInput | undefined =
             await this.findGovAuthority();
 
@@ -227,6 +270,7 @@ export class CMDBCapo extends DefaultCapo {
                 entryId: "eid",
             }
         );
+        //!!! mock in test
         const tcx1a: typeof tcx1 & hasUutContext<"ownerAuthority" | "collab"> =
             tcx1.addInput(myCollabRoleInfo.utxo);
 
@@ -235,21 +279,24 @@ export class CMDBCapo extends DefaultCapo {
             ? await this.txnAddGovAuthorityTokenRef(tcx1a)
             : tcx1a;
 
-        //!!! todo: finish adding myEditorToken support to this code path
+        const tcx1c =
+            entry.entryType == "chg"
+                ? await this.txnAddParentRefUtxo(tcx1b, entry.changeParentEntry)
+                : tcx1b;
+
         const collaborator: UutName =
-            (tcx1b.state.uuts.ownerAuthority =
-            tcx1b.state.uuts.collab =
+            (tcx1c.state.uuts.ownerAuthority =
+            tcx1c.state.uuts.collab =
                 myCollabRoleInfo.uut);
-        // this.mkUutName("collab", myCollabRoleInfo));
 
         //  - create a delegate-link connecting the entry to the collaborator
         const ownerAuthority = this.txnCreateConfiguredDelegate(
-            tcx1b,
+            tcx1c,
             "ownerAuthority",
             {
                 strategyName: "address",
+                // !!! TODO: look into why this 'config' shows up as type Partial<any>
                 config: {
-                    // !!! TODO: look into why this shows up as type Partial<any>
                     addrHint: [myCollabRoleInfo.utxo.origOutput.address],
                 },
             }
@@ -273,6 +320,16 @@ export class CMDBCapo extends DefaultCapo {
         console.warn("after receiveBookEntry", dumpAny(tcx3.tx));
         // debugger;
         return tcx3 as TCX & typeof tcx2 & typeof tcx1a;
+    }
+
+    async txnAddParentRefUtxo<TCX extends StellarTxnContext<any>>(
+        tcx: TCX,
+        parentId: string
+    ): Promise<TCX> {
+        const foundParentRec = await this.mustFindMyUtxo(`record ${parentId}`,
+            this.mkTokenPredicate(this.mph, parentId)
+        )
+        return tcx.addRefInput(foundParentRec)
     }
 
     mkEntryIndex(
@@ -305,40 +362,41 @@ export class CMDBCapo extends DefaultCapo {
 
     async findOwnershipRoleInfo(
         entryForUpdate: BookEntryForUpdate // !!! or a more generic type
-    ) : Promise<RoleInfo | undefined> {
+    ): Promise<RoleInfo | undefined> {
         const collabInfo = await this.findUserRoleInfo("collab");
 
-        if (!this.userHasOwnership(entryForUpdate, collabInfo)) return undefined
-        return collabInfo
+        if (!this.userHasOwnership(entryForUpdate, collabInfo))
+            return undefined;
+        return collabInfo;
     }
 
     userHasOwnership(
         entryForUpdate: BookEntryForUpdate, // !!! or a more generic type
-        collabInfo: RoleInfo, 
+        collabInfo: RoleInfo
     ) {
-        const {
-            ownerAuthority,
-        } = entryForUpdate
+        const { ownerAuthority } = entryForUpdate;
 
-        const {uut:{name: userCollabTokenName}} = collabInfo;
-        const {uutName: ownerUutName} = ownerAuthority;
+        const {
+            uut: { name: userCollabTokenName },
+        } = collabInfo;
+        const { uutName: ownerUutName } = ownerAuthority;
 
         const hasOwnership = !!(userCollabTokenName == ownerUutName);
-        console.log("     🐞 hasOwnership?: ", {userCollabTokenName, ownerUutName, hasOwnership});
-        return hasOwnership
+        console.log("     🐞 hasOwnership?: ", {
+            userCollabTokenName,
+            ownerUutName,
+            hasOwnership,
+        });
+        return hasOwnership;
     }
 
     async txnAddOwnershipToken<TCX extends StellarTxnContext<any>>(
         tcx: TCX,
         entryForUpdate: BookEntryForUpdate // !!! or a more generic type
     ) {
-        const ownerDelegate = await this.getOwnerDelegate(
-            entryForUpdate
-        );
+        const ownerDelegate = await this.getOwnerDelegate(entryForUpdate);
 
-        return ownerDelegate.txnGrantAuthority(
-            tcx
-        );
+        return ownerDelegate.txnGrantAuthority(tcx);
     }
 
     /**
@@ -365,19 +423,21 @@ export class CMDBCapo extends DefaultCapo {
 
         const tenMinutes = 1000 * 60 * 10;
 
-        const ownerCollabInfo = await this.findOwnershipRoleInfo(entryForUpdate);
+        const ownerCollabInfo = await this.findOwnershipRoleInfo(
+            entryForUpdate
+        );
         console.log("   🐞 ownership info: ", ownerCollabInfo);
 
         const editorInfo = await this.findUserRoleInfo("capoGov");
         //! identifies ownership ONLY if current user holds the correct authority token
-        const isEditor = !!(editorInfo?.uut);
+        const isEditor = !!editorInfo?.uut;
 
         if (ownerCollabInfo) {
             const tcx = await this.txnAddUserCollabRole(
                 new StellarTxnContext<any>(),
                 ownerCollabInfo
             );
-            console.log("   🐞 book entry update, with ownership")
+            console.log("   🐞 book entry update, with ownership");
             const tcx2 = tcx
                 .attachScript(this.compiledScript)
                 .addInput(currentEntryUtxo, this.activityUpdatingEntry())
@@ -404,33 +464,83 @@ export class CMDBCapo extends DefaultCapo {
 
             return this.txnReceiveBookEntry(tcx3, entryForUpdate);
         }
-        throw new Error("The connected wallet doesn't have the needed editor/collaborator authority to update an entry")
+        throw new Error(
+            "The connected wallet doesn't have the needed editor/collaborator authority to update an entry"
+        );
     }
 
-    async txnAddUserCollabRole<
-        TCX extends StellarTxnContext<any>
-    >(
-        tcx: TCX, 
-        userCollabToken : RoleInfo
-    ) : Promise<TCX> {          
-        const t: TxInputType = userCollabToken?.utxo
-        if (!t) throw new Error(`addUserCollabRole: no collaborator token provided`)
+    async txnAddUserCollabRole<TCX extends StellarTxnContext<any>>(
+        tcx: TCX,
+        userCollabToken: RoleInfo
+    ): Promise<TCX> {
+        const t: TxInputType = userCollabToken?.utxo;
+        if (!t)
+            throw new Error(
+                `addUserCollabRole: no collaborator token provided`
+            );
 
-        return tcx.addInput(userCollabToken.utxo).addOutput(
-            t.output
-        )
+        return tcx.addInput(userCollabToken.utxo).addOutput(t.output);
     }
 
     async mkTxnSuggestingUpdate(
         entryForUpdate: BookEntryForUpdate
     ): Promise<StellarTxnContext<any>> {
+        //! creates a new record with entryType="chg"
         const collabInfo = await this.findUserRoleInfo("collab");
         if (!collabInfo) {
-            throw new Error(`user doesn't have a collab-* token`)
+            throw new Error(`user doesn't have a collab-* token`);
         }
-        const diff = "diff placeholder" // todo: create a diff
+        //! diffs the entries
+        const { entry, updated, id } = entryForUpdate;
 
-        throw new Error(`finish implementing this`)
+        const { title: titleBefore, content: contentBefore } = entry;
+        let { title: newTitle, content: newContent } = updated;
+
+        const diffUpdate: BookEntryCreationAttrs = {
+            content: "",
+            entryType: "chg",
+            title: "",
+            changeParentEntry: id,
+            changeParentTxn: entryForUpdate.utxo.outputId.txId,
+        };
+        if (titleBefore != newTitle) {
+            //xxx diffChars(...)
+            //! not storing diff of title, as encoding even the character-diff would not clearly be a savings,
+            //  ... and it would come a need for non-trivial code to support an encoding that would save.
+            //UI can perform and present an in-memory diff.
+            diffUpdate.title = newTitle;
+        }
+        if (!newContent.endsWith("\n")) newContent = newContent + "\n";
+        if (contentBefore != newContent) {
+            // const charDiff = diffChars(contentBefore, newContent);
+            // const lineDiff = diffLines(contentBefore, newContent);
+            // const sentenceDiff = diffSentences(contentBefore, newContent);
+
+            const options = { context: 1, newlineIsToken: true };
+            const p = createPatch(
+                "",
+                contentBefore,
+                newContent,
+                "",
+                "",
+                options
+            );
+            //! trims unnecessary header content from textual patch
+            const p2 = p.split("\n").splice(4).join("\n");
+
+            // const sp = structuredPatch(id, id, contentBefore, newContent, "", "", options);
+            const [pp] = parsePatch(p2); // works fine; VERY similar to result of structuredPatch
+            const patched = applyPatch(contentBefore, p2);
+            if (patched != newContent) {
+                debugger;
+                throw new Error(`patch doesn't produce expected result`);
+            }
+
+            debugger;
+            diffUpdate.content = p2;
+        }
+
+        return this.mkTxnCreatingBookEntry(diffUpdate);
     }
 
     mkUutName(purpose: string, txin: TxInput) {
@@ -514,8 +624,10 @@ export class CMDBCapo extends DefaultCapo {
         tcx.state.newEntry = this.readBookEntry(txin);
         //!!! todo: make adding UUTs more of a utility, with implicit type
         tcx.state.uuts = tcx.state.uuts || {};
-        tcx.state.uuts.entryId = 
-        tcx.state.uuts.eid  = new UutName("eid", entry.id);
+        tcx.state.uuts.entryId = tcx.state.uuts.eid = new UutName(
+            "eid",
+            entry.id
+        );
         return tcx.addOutput(utxo);
     }
     // Address.fromHash(entry.ownerAuthority.delegateValidatorHash),
