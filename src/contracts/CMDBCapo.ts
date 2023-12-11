@@ -182,7 +182,7 @@ export class CMDBCapo extends DefaultCapo {
                     `missing required changeParentTxn - TxId in which the change-parent was last modified`
                 );
             }
-            console.log("changeParentTxn: ", dumpAny(changeParentTxn))
+            console.log("changeParentTxn: ", dumpAny(changeParentTxn));
         } else {
             changeParentEntry = "";
             changeParentTxn = undefined;
@@ -240,10 +240,10 @@ export class CMDBCapo extends DefaultCapo {
      * @public
      **/
     // @txn
-    async mkTxnCreatingBookEntry<TCX extends StellarTxnContext<any>>(
+    async mkTxnCreatingBookEntry<TCX extends StellarTxnContext>(
         entry: BookEntryCreationAttrs,
         iTcx?: TCX
-    ): Promise<TCX> {
+    ) {
         // to make a new book entry, we must:
         //  - make a UUT for the record (in-contract datum)
         //     - includes the mint-delegate for authorizing creation of the entry
@@ -263,39 +263,34 @@ export class CMDBCapo extends DefaultCapo {
         }
 
         const tcx1 = await this.mkTxnMintingUuts(
-            iTcx || new StellarTxnContext<any>(this.myActor),
+            iTcx || new StellarTxnContext(this.myActor),
             ["eid"],
             undefined,
             {
                 entryId: "eid",
             }
         );
-        //!!! mock in test
-        const tcx1a: typeof tcx1 & hasUutContext<"ownerAuthority" | "collab"> =
-            tcx1.addInput(myCollabRoleInfo.utxo);
+
+        const tcx1a = await this.txnAddUserCollabRole(tcx1, myCollabRoleInfo);
 
         console.log(tcx1a.dump());
         const tcx1b = myEditorToken
             ? await this.txnAddGovAuthorityTokenRef(tcx1a)
             : tcx1a;
 
-        const tcx1c =
+        const tcx2 =
             entry.entryType == "chg"
                 ? await this.txnAddParentRefUtxo(tcx1b, entry.changeParentEntry)
                 : tcx1b;
 
-        const collaborator: UutName =
-            (tcx1c.state.uuts.ownerAuthority =
-            tcx1c.state.uuts.collab =
-                myCollabRoleInfo.uut);
 
         //  - create a delegate-link connecting the entry to the collaborator
         const ownerAuthority = this.txnCreateConfiguredDelegate(
-            tcx1c,
+            tcx2,
             "ownerAuthority",
             {
                 strategyName: "address",
-                // !!! TODO: look into why this 'config' shows up as type Partial<any>
+                // !!! TODO: look into why this 'config' entry shows up as type Partial<any>
                 config: {
                     addrHint: [myCollabRoleInfo.utxo.origOutput.address],
                 },
@@ -303,33 +298,28 @@ export class CMDBCapo extends DefaultCapo {
         );
         const tenMinutes = 1000 * 60 * 10;
 
-        //  - send the ownerAuthz UUT to the user
-        const tcx2 = await ownerAuthority.delegate.txnReceiveAuthorityToken(
-            tcx1b,
-            this.uutsValue(collaborator)
-        );
-        tcx2.validFor(tenMinutes);
-
         //  - combine the delegate-link with the entry, to package it for on-chain storage
         //  - send the entry's UUT to the contract, with the right on-chain datum
-        const tcx3 = this.txnReceiveBookEntry(tcx2, {
+        const tcx3 = await this.txnReceiveBookEntry(tcx2, {
             ownerAuthority,
             id: tcx2.state.uuts.entryId.name,
             entry: entry,
         });
         console.warn("after receiveBookEntry", dumpAny(tcx3.tx));
+        tcx3.validFor(tenMinutes);
         // debugger;
-        return tcx3 as TCX & typeof tcx2 & typeof tcx1a;
+        return tcx3
     }
 
-    async txnAddParentRefUtxo<TCX extends StellarTxnContext<any>>(
+    async txnAddParentRefUtxo<TCX extends StellarTxnContext>(
         tcx: TCX,
         parentId: string
     ): Promise<TCX> {
-        const foundParentRec = await this.mustFindMyUtxo(`record ${parentId}`,
+        const foundParentRec = await this.mustFindMyUtxo(
+            `record ${parentId}`,
             this.mkTokenPredicate(this.mph, parentId)
-        )
-        return tcx.addRefInput(foundParentRec)
+        );
+        return tcx.addRefInput(foundParentRec);
     }
 
     mkEntryIndex(
@@ -390,7 +380,7 @@ export class CMDBCapo extends DefaultCapo {
         return hasOwnership;
     }
 
-    async txnAddOwnershipToken<TCX extends StellarTxnContext<any>>(
+    async txnAddOwnershipToken<TCX extends StellarTxnContext>(
         tcx: TCX,
         entryForUpdate: BookEntryForUpdate // !!! or a more generic type
     ) {
@@ -410,9 +400,7 @@ export class CMDBCapo extends DefaultCapo {
      * @public
      **/
     @txn
-    async mkTxnUpdatingEntry(
-        entryForUpdate: BookEntryForUpdate
-    ): Promise<StellarTxnContext<any>> {
+    async mkTxnUpdatingEntry(entryForUpdate: BookEntryForUpdate) {
         const {
             // id,
             utxo: currentEntryUtxo,
@@ -434,7 +422,7 @@ export class CMDBCapo extends DefaultCapo {
 
         if (ownerCollabInfo) {
             const tcx = await this.txnAddUserCollabRole(
-                new StellarTxnContext<any>(),
+                new StellarTxnContext(),
                 ownerCollabInfo
             );
             console.log("   🐞 book entry update, with ownership");
@@ -446,7 +434,7 @@ export class CMDBCapo extends DefaultCapo {
             return this.txnReceiveBookEntry(tcx2, entryForUpdate);
         } else if (isEditor) {
             const tcx1 = await this.txnAddGovAuthorityTokenRef(
-                new StellarTxnContext<any>()
+                new StellarTxnContext()
             );
             console.log("   🐞 book entry update as editor", dumpAny(tcx1));
 
@@ -469,22 +457,31 @@ export class CMDBCapo extends DefaultCapo {
         );
     }
 
-    async txnAddUserCollabRole<TCX extends StellarTxnContext<any>>(
+    async txnAddUserCollabRole<TCX extends StellarTxnContext>(
         tcx: TCX,
         userCollabToken: RoleInfo
-    ): Promise<TCX> {
-        const t: TxInputType = userCollabToken?.utxo;
+    ) {
+        const tcx2 = await this.txnAddUserToken(tcx, userCollabToken);
+
+        return tcx2.addUut(userCollabToken.uut, "ownerAuthority", "collab");
+    }
+
+    async txnAddUserToken<TCX extends StellarTxnContext>(
+        tcx: TCX,
+        roleToken: RoleInfo
+    ) : Promise<TCX> {
+        const t: TxInputType = roleToken?.utxo;
         if (!t)
             throw new Error(
                 `addUserCollabRole: no collaborator token provided`
             );
 
-        return tcx.addInput(userCollabToken.utxo).addOutput(t.output);
+        return tcx.addInput(roleToken.utxo).addOutput(t.output);
     }
 
     async mkTxnSuggestingUpdate(
         entryForUpdate: BookEntryForUpdate
-    ): Promise<StellarTxnContext<any>> {
+    ) {
         //! creates a new record with entryType="chg"
         const collabInfo = await this.findUserRoleInfo("collab");
         if (!collabInfo) {
@@ -605,10 +602,10 @@ export class CMDBCapo extends DefaultCapo {
      * @public
      **/
     @partialTxn
-    txnReceiveBookEntry<TCX extends StellarTxnContext<any>>(
+    async txnReceiveBookEntry<TCX extends StellarTxnContext>(
         tcx: TCX,
         entry: BookEntryForUpdate | BookEntryCreate
-    ): TCX & hasUutContext<"eid" | "entryId"> {
+    ) {
         const entryMinValue = this.mkMinTv(this.mph, entry.id);
         const newDatum = this.mkDatumBookEntry(entry);
         const utxo = new TxOutput(this.address, entryMinValue, newDatum);
@@ -621,14 +618,14 @@ export class CMDBCapo extends DefaultCapo {
             utxo
         );
 
-        tcx.state.newEntry = this.readBookEntry(txin);
-        //!!! todo: make adding UUTs more of a utility, with implicit type
-        tcx.state.uuts = tcx.state.uuts || {};
-        tcx.state.uuts.entryId = tcx.state.uuts.eid = new UutName(
-            "eid",
-            entry.id
-        );
-        return tcx.addOutput(utxo);
+        const eid = new UutName("eid", entry.id);
+
+        return tcx.addState(
+            "newEntry", 
+            await this.readBookEntry(txin)
+        ).addUut(
+            eid, "entryId", "eid"
+        ).addOutput(utxo);
     }
     // Address.fromHash(entry.ownerAuthority.delegateValidatorHash),
 

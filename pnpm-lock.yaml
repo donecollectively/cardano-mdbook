@@ -35,7 +35,7 @@ specifiers:
 
 dependencies:
   '@docsearch/react': 3.5.1_cccfvuyjnmee77bwg4wjyn6zre
-  '@donecollectively/stellar-contracts': github.com/donecollectively/stellar-contracts/fd22e14193f6019c816d07605a6354452d19f448
+  '@donecollectively/stellar-contracts': github.com/donecollectively/stellar-contracts/c47f14d76d898b0789317cb2b8594ae855ca4adc
   '@headlessui/react': 1.7.15_biqbaboplfbrettd7655fr4n2y
   '@markdoc/markdoc': 0.1.7
   '@markdoc/next.js': 0.1.6_sfilzu25rkwkmvqsscsbq2fr4e
@@ -3352,10 +3352,10 @@ packages:
     engines: {node: '>=12.20'}
     dev: true
 
-  github.com/donecollectively/stellar-contracts/fd22e14193f6019c816d07605a6354452d19f448:
-    resolution: {tarball: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/fd22e14193f6019c816d07605a6354452d19f448}
+  github.com/donecollectively/stellar-contracts/c47f14d76d898b0789317cb2b8594ae855ca4adc:
+    resolution: {tarball: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/c47f14d76d898b0789317cb2b8594ae855ca4adc}
     name: '@donecollectively/stellar-contracts'
-    version: 0.8.5-alpha46
+    version: 0.8.5-alpha49
     dependencies:
       semver: 7.5.4
     dev: false

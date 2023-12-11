@@ -47,12 +47,12 @@ const xit = it.skip; //!!! todo: update this when vitest can have skip<HeliosTes
 
 const describe = descrWithContext<localTC>;
 
-const testPageContent : BookEntryCreationAttrs = {
+const testPageContent: BookEntryCreationAttrs = {
     entryType: "pg",
     title: "collaborator page",
     content: "## Page Heading\n\nPage content here, minimum 40 bytes\n\n",
 };
-const testSuggestedPage : BookEntryCreationAttrs = {
+const testSuggestedPage: BookEntryCreationAttrs = {
     ...testPageContent,
     entryType: "spg",
 };
@@ -297,9 +297,7 @@ describe("Capo", async () => {
         describe("suggesting", () => {
             async function setup(
                 context: localTC
-            ): Promise<
-                [ResourceUpdateResult<any>, BookEntryForUpdate]
-            > {
+            ): Promise<[ResourceUpdateResult<any>, BookEntryForUpdate]> {
                 const {
                     h,
                     h: { network, actors, delay, state },
@@ -322,6 +320,12 @@ describe("Capo", async () => {
                 const {h, h:{network, actors, delay, state} } = context;
                 const [pageInfo, page] = await setup(context);
 
+                await h.editorInvitesCollaborator(actors.camilla);
+                h.currentActor = "camilla";
+                const camillaCollabToken = await h.book.findUserRoleInfo(
+                    "collab"
+                );
+
                 // await h.editorInvitesCollaborator(actors.charlie);  // no invite for you!
                 h.currentActor = "charlie";
                 const updates = {
@@ -338,19 +342,22 @@ describe("Capo", async () => {
 
                 const hasFakeRoleInfo = vi
                     .spyOn(h.book, "findUserRoleInfo")
-                    .mockResolvedValue({
-                        utxo: null,
-                        uut: null,
-                    });
+                    .mockResolvedValue(camillaCollabToken);
+
+                const mockedUserToken = vi
+                    .spyOn(h.book, "txnAddUserToken")
+                    .mockImplementation(async (tcx, x) => tcx);
+
                 const randoCantSuggest = h.collaboratorSuggestsChange(
                     page,
                     updates
                 );
-                await randoCantSuggest
+                // await randoCantSuggest;
                 await expect(randoCantSuggest).rejects.toThrow(
                     /missing delegation token/
                 );
                 expect(hasFakeRoleInfo).toHaveBeenCalled();
+                expect(mockedUserToken).toHaveBeenCalled();
             });
 
             it("a collaborator can make a suggestion on someone else's page", async (context: localTC) => {
@@ -386,7 +393,7 @@ describe("Capo", async () => {
                     const {h, h:{network, actors, delay, state} } = context;
 
                     const [pageInfo, page] = await setup(context);
-                    const {txid: pageTxId} = pageInfo
+                    const { txid: pageTxId } = pageInfo;
                     await h.editorInvitesCollaborator(actors.charlie);
                     h.currentActor = "charlie";
 
@@ -412,28 +419,32 @@ describe("Capo", async () => {
                         "mismatched txid"
                     ).toBeTruthy();
 
-                    vi.spyOn(h.book, 
-                        "txnAddParentRefUtxo"
-                    ).mockImplementation( async (tcx, recId) => tcx );
-                    const badSuggestionTxn = h.collaboratorSuggestsChange(page, updates);
-                    await expect(badSuggestionTxn, "contract should throw when the txn is built wrong").rejects.toThrow(
-                        /no ref_input matching changeParentTxn/
-                    )
+                    vi.spyOn(h.book, "txnAddParentRefUtxo").mockImplementation(
+                        async (tcx, recId) => tcx
+                    );
+                    const badSuggestionTxn = h.collaboratorSuggestsChange(
+                        page,
+                        updates
+                    );
+                    await expect(
+                        badSuggestionTxn,
+                        "contract should throw when the txn is built wrong"
+                    ).rejects.toThrow(/no ref_input matching changeParentTxn/);
                 });
-                
+
                 it("formats title as direct change, leaving content empty if unchanged", async (context: localTC) => {
                     // prettier-ignore
                     const {h, h:{network, actors, delay, state} } = context;
 
                     const [pageInfo, page] = await setup(context);
-                    const {txid: pageTxId} = pageInfo
+                    const { txid: pageTxId } = pageInfo;
                     await h.editorInvitesCollaborator(actors.charlie);
                     h.currentActor = "charlie";
 
                     const altTitle = "alternative title";
                     const updates = {
                         ...page.entry,
-                        title: altTitle
+                        title: altTitle,
                     };
                     const {
                         resourceId: suggestionId,
@@ -444,12 +455,12 @@ describe("Capo", async () => {
                         suggestionId
                     );
 
-                    const { title, content } =
-                        newSuggestion.entry;
+                    const { title, content } = newSuggestion.entry;
+                    expect(title).toEqual(altTitle);
                     expect(
-                        title
-                    ).toEqual(altTitle);
-                    expect(content.length, "expected empty content").toBeFalsy()
+                        content.length,
+                        "expected empty content"
+                    ).toBeFalsy();
                 });
 
                 it("formats content diff, leaving title empty if unchanged", async (context: localTC) => {
@@ -457,16 +468,16 @@ describe("Capo", async () => {
                     const {h, h:{network, actors, delay, state} } = context;
 
                     const [pageInfo, page] = await setup(context);
-                    const {txid: pageTxId} = pageInfo
+                    const { txid: pageTxId } = pageInfo;
                     await h.editorInvitesCollaborator(actors.charlie);
                     h.currentActor = "charlie";
 
-                    const updatedContent = testPageContent.content +
+                    const updatedContent =
+                        testPageContent.content +
                         "\n## Plus collaborator suggestion\n";
                     const updates = {
                         ...page.entry,
-                        content:
-                            updatedContent,
+                        content: updatedContent,
                     };
                     const {
                         resourceId: suggestionId,
@@ -477,18 +488,19 @@ describe("Capo", async () => {
                         suggestionId
                     );
 
-                    const { title, content: contentDiff } =
-                        newSuggestion.entry;
+                    const { title, content: contentDiff } = newSuggestion.entry;
                     expect(
                         contentDiff.length,
                         "expected content diff"
                     ).toBeTruthy();
-                    expect(title.length, "expected empty title").toBeFalsy()
+                    expect(title.length, "expected empty title").toBeFalsy();
 
-                    const patched = applyPatch(page.entry.content, contentDiff)
-                    expect(patched, "applyPatch shouldn't fail with false").toEqual(updatedContent)
+                    const patched = applyPatch(page.entry.content, contentDiff);
+                    expect(
+                        patched,
+                        "applyPatch shouldn't fail with false"
+                    ).toEqual(updatedContent);
                 });
-
             });
 
             it.todo(
