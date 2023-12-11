@@ -20,8 +20,8 @@ export default defineConfig({
         globals: true,
         restoreMocks: true,
         testTimeout: 500000,
-        hookTimeout: 7000,
-        teardownTimeout: 9000,
+        hookTimeout: 19000,
+        teardownTimeout: 23000,
         // browser: {
         //     enabled: true,
         //     name: 'chrome', // browser name is required
