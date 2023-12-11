@@ -35,6 +35,7 @@ struct BookEntryStruct {
     //  suggestedBy: String // XXX collaborator-id  - see delegation-link, whose content serves the same purpose.
     changeParentEntry: String // id of parent obj
     changeParentTxn: Option[TxId] // -> txid
+    changeParentOidx: Option[Int]
 }
 
 // struct LocalCapoConfig {
@@ -106,7 +107,13 @@ enum Datum {
                                 txin.output_id.tx_id == txid &&
                                 txin.output.value >= parentRec
                             }).switch{
-                                Some => true,
+                                Some => {
+                                    entry.changeParentOidx.switch{
+                                        Some => true,
+                                        None => error("missing required output-index for changeParentOidx")
+                                    } &&
+                                    true
+                                },
                                 None => error("no ref_input matching changeParentTxn, changeParentEntry")
                             }
                         },

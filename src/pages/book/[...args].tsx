@@ -11,15 +11,15 @@
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
     mph: {
-        bytes: "3e00baa9165a93c29a48035a0b4f3356ecf542cfa150fffd4024f5a6",
+        bytes: "561eb0667d4a150480a7326badceea132768abaf5f8c21cd6d895ef5",
     },
     rev: "1",
     seedTxn: {
-        bytes: "9bff5c779b0393d555b2450ef2b2f6c19be06d019746c3e479ad96b4342b7fe1",
+        bytes: "8fcea29037d6d2698f5e7e5677c5e0e96bce9aef715b79d81c379a226733e6e6",
     },
     seedIndex: "2",
     rootCapoScriptHash: {
-        bytes: "624fa40c10ddd904af9facde7ad4348d152104f77e2d883b8e92d657",
+        bytes: "2df5b6b7a00386563c04ab08cc49fc01752d726dfa21b828100edeb8",
     },
 };
 
@@ -50,7 +50,7 @@ import {
     helios,
 } from "@donecollectively/stellar-contracts";
 
-import type { BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
+import type { BookEntryForUpdate, BookIndex } from "../../contracts/CMDBCapo.js";
 import { CMDBCapo } from "../../contracts/CMDBCapo.js";
 import { PageEditor } from "../../local-comps/book/PageEditor.jsx";
 import { BookPages } from "../../local-comps/book/BookPages.jsx";
@@ -94,7 +94,7 @@ export type BookPageState = PageStatus & {
     tcx?: StellarTxnContext<any>;
 
     bookDetails?: BookEntryForUpdate[];
-    bookEntryIndex?: { [k: string]: BookEntryForUpdate };
+    bookEntryIndex?: BookIndex;
 
     nextAction?: keyof typeof actionLabels;
     moreInstructions?: string;
@@ -903,7 +903,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
     }
 
-
     // const allInstances = await instanceRegistry.findInstances(this.bf)
     // const instanceIndex = instanceRegistry.mkInstanceIndex(allInstances);
 
@@ -917,7 +916,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         const { bookContract } = this.state;
 
         const bookDetails = await bookContract.findBookEntries();
-        const bookEntryIndex = bookContract.mkEntryIndex(bookDetails);
+        const bookEntryIndex = await bookContract.mkEntryIndex(bookDetails);
 
         this.updateState(
             "",

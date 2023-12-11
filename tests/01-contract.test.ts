@@ -294,7 +294,7 @@ describe("Capo", async () => {
             });
         });
 
-        describe("suggesting", () => {
+        describe("changes", () => {
             async function setup(
                 context: localTC
             ): Promise<[ResourceUpdateResult<any>, BookEntryForUpdate]> {

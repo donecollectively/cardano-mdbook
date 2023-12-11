@@ -88,12 +88,28 @@ export type BookEntry = {
     expiresAt: bigint;
     changeParentEntry?: string;
     changeParentTxn?: helios.TxId;
+    changeParentOidx?: number;
     // suggestedBy?: string; // XXX see delegate link, whose content serves the same purpose
 };
 
+export type BookIndexEntry = {
+    pageEntry: BookEntryForUpdate
+    changes: ChangeDetails[]
+}
+
+export type ChangeDetails = {
+    change: BookEntryForUpdate
+} & ( {
+    isCurrent: true
+} | {
+    isCurrent: false,
+    baseEntry: BookEntryForUpdate
+});
+
 export type BookEntryCreationAttrs = Pick<
     BookEntry,
-    "title" | "content" | "entryType" | "changeParentEntry" | "changeParentTxn"
+    "title" | "content" | "entryType" | 
+    "changeParentEntry" | "changeParentTxn" | "changeParentOidx"
 >;
 export type RoleInfo = { utxo: TxInput; uut: UutName };
 
@@ -121,6 +137,8 @@ export type BookEntryForUpdate = BookEntryOnchain & {
 export type BookEntryUpdated = {
     updated: BookEntry;
 } & BookEntryForUpdate;
+
+export type BookIndex = Record<string, BookIndexEntry>;
 
 export class CMDBCapo extends DefaultCapo {
     get specializedCapo() {
@@ -168,7 +186,7 @@ export class CMDBCapo extends DefaultCapo {
         rec.expiresAt = BigInt(Date.now() + 364 * 24 * 60 * 60 * 1000);
         const { entryType, title, content, createdAt, updatedAt, expiresAt } =
             rec;
-        let { changeParentTxn, changeParentEntry } = rec;
+        let { changeParentTxn, changeParentEntry, changeParentOidx } = rec;
 
         if ("chg" == entryType) {
             if (!changeParentEntry) {
@@ -182,14 +200,21 @@ export class CMDBCapo extends DefaultCapo {
                     `missing required changeParentTxn - TxId in which the change-parent was last modified`
                 );
             }
+            if ("undefined" == typeof changeParentOidx) {
+                throw new Error(
+                    `missing required changeParentOidx`
+                );
+            }
             console.log("changeParentTxn: ", dumpAny(changeParentTxn));
         } else {
             changeParentEntry = "";
             changeParentTxn = undefined;
+            changeParentOidx = undefined;
         }
         const OptTxId = Option(helios.TxId);
-
+        const OptIndex = Option(helios.HInt)
         const chParentTxId = new OptTxId(changeParentTxn);
+        const chParentOidx = new OptIndex(changeParentOidx);
         const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
         const bookEntryStruct = new hlBookEntryStruct(
             entryType,
@@ -199,7 +224,8 @@ export class CMDBCapo extends DefaultCapo {
             updatedAt,
             expiresAt,
             changeParentEntry,
-            chParentTxId
+            chParentTxId,
+            chParentOidx
         );
         const t = new hlBookEntry(ownerAuthority, bookEntryStruct);
         return Datum.inline(t._toUplcData());
@@ -322,12 +348,49 @@ export class CMDBCapo extends DefaultCapo {
         return tcx.addRefInput(foundParentRec);
     }
 
-    mkEntryIndex(
+    async mkEntryIndex(
         entries: BookEntryForUpdate[]
-    ): Record<string, BookEntryForUpdate> {
-        const entryIndex: Record<string, BookEntryForUpdate> = {};
+    ): Promise<BookIndex> {
+        const entryIndex: Record<string, BookIndexEntry> = {};
+        const changesById : Record<string, BookEntryForUpdate[]>= {};
         for (const e of entries) {
-            entryIndex[e.id] = e;
+            if (e.entry.entryType == "chg") {
+                const changes = changesById[e.id] = changesById[e.id] || [];
+                changes.push(e)
+            } else {
+                entryIndex[e.id] = {
+                    pageEntry: e,
+                    changes: []
+                };
+            }
+        }
+        type txidString = string
+        const previousEntries : Record<txidString, BookEntryForUpdate> = {}
+        for (const [eid, {pageEntry: entry,changes}] of Object.entries(entryIndex)) {
+            for (const change of changesById[eid]) {
+                if (change.entry.changeParentTxn.eq(entry.utxo.outputId.txId)) {
+                    changes.push({
+                        change,
+                        isCurrent: true
+                    })
+                } else {
+                    const prevTx = change.entry.changeParentTxn
+                    const utxo = await this.network.getUtxo(
+                        new helios.TxOutputId(prevTx, change.entry.changeParentOidx)
+                    );
+                    let prevEntry = previousEntries[prevTx.hex];
+                    if (!prevEntry) {
+                        const prevDatum = await this.readBookEntry(utxo);
+                        prevEntry = previousEntries[prevTx.hex] = prevDatum
+                    }
+
+                    changes.push({
+                        change,
+                        isCurrent: false,
+                        baseEntry: prevEntry
+                    })
+                }
+            }
         }
         return entryIndex;
     }
@@ -490,15 +553,17 @@ export class CMDBCapo extends DefaultCapo {
         //! diffs the entries
         const { entry, updated, id } = entryForUpdate;
 
-        const { title: titleBefore, content: contentBefore } = entry;
+        let { title: titleBefore, content: contentBefore } = entry;
         let { title: newTitle, content: newContent } = updated;
 
+        const outputId = entryForUpdate.utxo.outputId;
         const diffUpdate: BookEntryCreationAttrs = {
             content: "",
             entryType: "chg",
             title: "",
             changeParentEntry: id,
-            changeParentTxn: entryForUpdate.utxo.outputId.txId,
+            changeParentTxn: outputId.txId,
+            changeParentOidx: outputId.utxoIdx,
         };
         if (titleBefore != newTitle) {
             //xxx diffChars(...)
@@ -508,6 +573,7 @@ export class CMDBCapo extends DefaultCapo {
             diffUpdate.title = newTitle;
         }
         if (!newContent.endsWith("\n")) newContent = newContent + "\n";
+        if (!contentBefore.endsWith("\n")) contentBefore = contentBefore + "\n";
         if (contentBefore != newContent) {
             // const charDiff = diffChars(contentBefore, newContent);
             // const lineDiff = diffLines(contentBefore, newContent);
@@ -558,7 +624,6 @@ export class CMDBCapo extends DefaultCapo {
     async findUserRoleUtxo(
         roleUutPrefix: string
     ): Promise<TxInput | undefined> {
-        throw new Error("obsolete?");
         return (await this.findUserRoleInfo(roleUutPrefix))?.utxo;
     }
 
@@ -651,7 +716,7 @@ export class CMDBCapo extends DefaultCapo {
      *
      * Asynchronously reads the UTxO for the given id and returns its underlying datum via {@link CMDBCapo.readBookEntry}
      *
-     * @param entryId - the UUT identifier regCred-xxxxxxxxxx
+     * @param entryId - the UUT identifier eid-xxxxxxxxxx
      * @public
      **/
     async findBookEntry(entryId: string) {
@@ -733,7 +798,7 @@ export class CMDBCapo extends DefaultCapo {
      **/
     @txn
     async mkTxnMintCollaboratorToken(addr: Address) {
-        const tcx: hasUutContext<"collab"> = new StellarTxnContext();
+        const tcx= new StellarTxnContext();
 
         const tcx2 = await this.mkTxnMintingUuts(tcx, ["collab"]);
         return tcx2.addOutput(
