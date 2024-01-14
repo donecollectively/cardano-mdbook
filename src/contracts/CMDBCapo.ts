@@ -926,11 +926,12 @@ export class CMDBCapo extends DefaultCapo {
                     "Each book is operated by people who can exercise oversight authority over their books",
                 ],
                 mech: [
-                    "x a collaborator token is required to suggest changes",
-                    "x a collaborator can suggest page changes, with entryType='chg' for Change",
-                    "x the suggestor's collaborator token is referenced as the Change record's ownerAuthority",
-                    "x an editor's suggestions are owned by their collaborator role",
+                    "a collaborator token is required to suggest changes",
+                    "a collaborator can suggest page changes, with entryType='chg' for Change",
+                    "the suggestor's collaborator token is referenced as the Change record's ownerAuthority",
+                    "an editor's suggestions are owned by their collaborator role",
                     "TODO: the suggestor can adjust the Change record before it is accepted",
+                    "TODO: other collaborators can suggest alternatives to a change suggestion",
                 ],
                 requires: [
                     "collaborator tokens can be minted by the book's editor",
@@ -979,6 +980,22 @@ export class CMDBCapo extends DefaultCapo {
                 ],
             },
 
+            "well specified data format for change suggestions": {
+                purpose: "enables interoperability of change suggestions either with our dAPI or without",
+                details: [
+                    "Each change suggestion references the utxo of the page being changed. ",                    
+                    "When the parent utxo is still most current, then the change can always be applied, ",
+                    "  .... otherwise, patch conflict resolution may be needed.",
+                    "Content changes are formatted as a diff.",
+                    "Title changes are reflected without a diff format."
+                ],
+                mech: [
+                    "references the parent transaction-id",
+                    "formats title as direct change, leaving content empty if unchanged",
+                    "formats content changes as a diff, leaving title empty if unchanged",
+                ]
+            },
+
             "editors and page-owners can reject changes": {
                 purpose: "to clean up after changes that are not accepted",
                 details: [
@@ -993,22 +1010,6 @@ export class CMDBCapo extends DefaultCapo {
                     "TODO: editor can reject a suggested change",
                     "TODO: page owner can reject a suggested change",
                     "TODO: when a change is rejected, its eid-* UUT is burned.",
-                ]
-            },
-
-            "well specified data format for change suggestions": {
-                purpose: "enables interoperability of change suggestions either with our dAPI or without",
-                details: [
-                    "Each change suggestion references the utxo of the page being changed. ",                    
-                    "When the parent utxo is still most current, then the change can always be applied, ",
-                    "  .... otherwise, patch conflict resolution may be needed.",
-                    "Content changes are formatted as a diff.",
-                    "Title changes are reflected without a diff format."
-                ],
-                mech: [
-                    "x references the parent transaction-id",
-                    "x formats title as direct change, leaving content empty if unchanged",
-                    "x formats content diff, leaving title empty if unchanged",
                 ]
             },
 
@@ -1036,7 +1037,9 @@ export class CMDBCapo extends DefaultCapo {
                     "A revoked listing MUST NOT be considered an active page in the book.",
                 ],
                 mech: [
-                    "A deletion is allowed for the holder of govAuthority token",
+                    "TODO: editor can delete a page",
+                    "TODO: page owner can delete a page",
+                    "TODO: collaborator can't delete a page",
                 ],
                 requires: [
                     // "FUT: A virtual deletion can be developed by momentum of collaborators"

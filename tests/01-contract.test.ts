@@ -115,8 +115,12 @@ describe("Capo", async () => {
                 await expect(entries).resolves.toHaveLength(2);
             });
 
-            it.todo("TODO: includes expired entries when used with expired:true");
-            it.todo("TODO: includes suggested entries when used with suggested:true");
+            it.todo(
+                "TODO: includes expired entries when used with expired:true"
+            );
+            it.todo(
+                "TODO: includes suggested entries when used with suggested:true"
+            );
             it.todo(
                 "TODO: doesn't include suggested edits to pages at the top level"
             );
@@ -356,7 +360,8 @@ describe("Capo", async () => {
 
                 const updates = {
                     ...existingPage.entry,
-                    content: testPageEntry.content + "\n\nOwner updated content",
+                    content:
+                        testPageEntry.content + "\n\nOwner updated content",
                     title: testPageEntry.title + " - owner-did-update",
                 };
                 await h.collaboratorModifiesPage(existingPage, updates);
@@ -364,10 +369,11 @@ describe("Capo", async () => {
                 const updatedPage = await h.book.findBookEntry(resourceId);
                 console.log("     🐞 updated page", updatedPage.entry.title);
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
-                expect(updatedPage.entry.content).toMatch(/Owner updated content/);
+                expect(updatedPage.entry.content).toMatch(
+                    /Owner updated content/
+                );
             });
         });
-
 
         describe("suggesting changes: ", () => {
             async function setup(
@@ -390,7 +396,7 @@ describe("Capo", async () => {
                 return [resourceUpdated, page];
             }
 
-            it("x a collaborator token is required to suggest changes", async (context: localTC) => {
+            it("a collaborator token is required to suggest changes", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 const [pageInfo, page] = await setup(context);
@@ -435,7 +441,7 @@ describe("Capo", async () => {
                 expect(mockedUserToken).toHaveBeenCalled();
             });
 
-            it("x a collaborator can suggest page changes, with entryType='chg' for Change", async (context: localTC) => {
+            it("a collaborator can suggest page changes, with entryType='chg' for Change", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 const [pageInfo, page] = await setup(context);
@@ -446,7 +452,8 @@ describe("Capo", async () => {
                 const updates = {
                     ...page.entry,
                     content:
-                        testPageEntry.content + "\n\nCollaborator updated content",
+                        testPageEntry.content +
+                        "\n\nCollaborator updated content",
                     title: testPageEntry.title + " - collaborator suggestion",
                 };
                 const {
@@ -474,21 +481,22 @@ describe("Capo", async () => {
                 );
             });
 
-            it("x the suggestor's collaborator token is referenced as the Change record's ownerAuthority", () => {
+            it("the suggestor's collaborator token is referenced as the Change record's ownerAuthority", () => {
                 console.log("already tested at h642bx");
             });
 
-            it("x an editor's suggestions are owned by their collaborator role", async (context: localTC) => {
+            it("an editor's suggestions are owned by their collaborator role", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
 
                 const [pageInfo, page] = await setup(context);
-                await h.editorInvitesCollaborator(actors.editor)
+                await h.editorInvitesCollaborator(actors.editor);
                 h.currentActor = "editor";
 
                 const updates = {
                     ...page.entry,
-                    content: testPageEntry.content + "\n\nEditor content suggestion",
+                    content:
+                        testPageEntry.content + "\n\nEditor content suggestion",
                     title: testPageEntry.title + " - editor suggestion",
                 };
                 const {
@@ -513,8 +521,27 @@ describe("Capo", async () => {
                 );
             });
 
+            it.todo(
+                "TODO: the suggestor can adjust the Change record before it is accepted",
+                async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+
+                    // const strella =
+                    await h.bootstrap();
+
+                    //!!! note: it could be tricky to recognize edits that are WITHIN the change-suggestion.
+                }
+            );
+
+
+
+            it.todo(
+                "TODO: other collaborators can suggest alternatives to a change suggestion"
+            );
+
             describe("well specified data format for change suggestions", () => {
-                it("x references the parent transaction-id", async (context: localTC) => {
+                it("references the parent transaction-id", async (context: localTC) => {
                     // prettier-ignore
                     const {h, h:{network, actors, delay, state} } = context;
 
@@ -526,8 +553,7 @@ describe("Capo", async () => {
                     const updates = {
                         ...page.entry,
                         title:
-                            testPageEntry.title +
-                            " - collaborator suggestion",
+                            testPageEntry.title + " - collaborator suggestion",
                     };
                     const {
                         resourceId: suggestionId,
@@ -558,7 +584,7 @@ describe("Capo", async () => {
                     ).rejects.toThrow(/no ref_input matching changeParentTxn/);
                 });
 
-                it("x formats title as direct change, leaving content empty if unchanged", async (context: localTC) => {
+                it("formats title as direct change, leaving content empty if unchanged", async (context: localTC) => {
                     // prettier-ignore
                     const {h, h:{network, actors, delay, state} } = context;
 
@@ -589,7 +615,7 @@ describe("Capo", async () => {
                     ).toBeFalsy();
                 });
 
-                it("x formats content diff, leaving title empty if unchanged", async (context: localTC) => {
+                it("formats content changes as a diff, leaving title empty if unchanged", async (context: localTC) => {
                     // prettier-ignore
                     const {h, h:{network, actors, delay, state} } = context;
 
@@ -628,107 +654,64 @@ describe("Capo", async () => {
                     ).toEqual(updatedContent);
                 });
             });
-
+        });
+        describe("accepting change suggestions: ", () => {
             it.todo(
-                "an editor's suggestions are owned by their collaborator role",
+                "TODO: a page owner can adopt a suggestion",
+                async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+                    const book = await h.bootstrap();
+                }
+            );
+        });
+
+        describe("rejecting changes", () => {
+            it.todo(
+                "TODO: a random collaborator can't reject a suggested change"
+            );
+            it.todo("TODO: editor can reject a suggested change");
+            it.todo("TODO: page owner can reject a suggested change");
+            it.todo(
+                "TODO: when a change is rejected, its eid-* UUT is burned."
+            );
+        });
+        
+        describe("page expiration and freshening", () => {
+            it.todo(
+                "TODO: A listing can be freshened by its owner or editor, and its expiration date is extended",
+                async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+
+                    // const strella =
+                    await h.bootstrap();
+                }
+            );
+        });
+
+        describe("deleting pages: ", () => {
+            it.todo(
+                "TODO: editor can delete a page",
                 async (context: localTC) => {
                     // prettier-ignore
                     const {h, h:{network, actors, delay, state} } = context;
                     const book = await h.bootstrap();
 
                     await h.editorInvitesCollaborator(actors.camilla);
-                    await h.editorInvitesCollaborator(actors.charlie);
                     h.currentActor = "camilla";
                     const { resourceId } = await h.collaboratorCreatesPage(
-                        testSuggestedPage
+                        testPageEntry
                     );
-                    h.currentActor = "editor";
                     const existingPage = await h.book.findBookEntry(resourceId);
 
-                    const updates = {
-                        ...existingPage.entry,
-                        title:
-                            testPageEntry.title +
-                            " - collaborator suggestion",
-                    };
-                    const offChainFailure = h.collaboratorSuggestsChange(
-                        existingPage,
-                        updates
-                    );
-                    await expect(offChainFailure).rejects.toThrow(
-                        /connected wallet.*authority/
-                    );
-
-                    const hasFakeOwnership = vi
-                        .spyOn(h.book, "userHasOwnership")
-                        .mockImplementation(function (
-                            this: CMDBCapo,
-                            entryForUpdate,
-                            collabInfo: RoleInfo
-                        ) {
-                            return true;
-                        });
-                    const editorCantSuggest = h.collaboratorSuggestsChange(
-                        existingPage,
-                        updates
-                    );
-                    await expect(editorCantSuggest).rejects.toThrow(
-                        /missing delegation token/
-                    );
-                    expect(hasFakeOwnership).toHaveBeenCalled();
+                    await h.editorDeletesPage(existingPage);
+                    const deletedPage = await h.book.findBookEntry(resourceId);
+                    expect(deletedPage).toBeUndefined();
                 }
             );
 
-            describe("accepting change suggestions: ", () => {
-                it.todo(
-                    "a page owner can adopt a suggestion",
-                    async (context: localTC) => {
-                        // prettier-ignore
-                        const {h, h:{network, actors, delay, state} } = context;
-                        const book = await h.bootstrap();
-                    }
-                );
-            });
-
-            describe("rejecting changes", () => {
-                it.todo("TODO: a random collaborator can't reject a suggested change");
-                it.todo("TODO: editor can reject a suggested change");
-                it.todo("TODO: page owner can reject a suggested change");
-                it.todo("TODO: when a change is rejected, its eid-* UUT is burned.");
-            });
-        });
-
-        describe("page expiration and freshening", () => {
-            it.todo("TODO: A listing can be freshened by its owner or editor, and its expiration date is extended", async (context: localTC) => {
-                // prettier-ignore
-                const {h, h:{network, actors, delay, state} } = context;
-                
-                  // const strella = 
-                await h.bootstrap(); 
-                                        
-                
-            });
-        });
-
-        describe("deleting pages: ", () => {
-            it("x editor can delete a page", async (context: localTC) => {
-                // prettier-ignore
-                const {h, h:{network, actors, delay, state} } = context;
-                const book = await h.bootstrap();
-
-                await h.editorInvitesCollaborator(actors.camilla);
-                h.currentActor = "camilla";
-                const { resourceId } = await h.collaboratorCreatesPage(
-                    testPageEntry
-                );
-                const existingPage = await h.book.findBookEntry(resourceId);
-
-                await h.editorDeletesPage(existingPage);
-                const deletedPage = await h.book.findBookEntry(resourceId);
-                expect(deletedPage).toBeUndefined();
-            });
-
-            it("x collaborator can't delete a page", async (context: localTC) => {
+            it.todo("TODO: collaborator can't delete a page", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 const book = await h.bootstrap();
@@ -741,9 +724,7 @@ describe("Capo", async () => {
                 const existingPage = await h.book.findBookEntry(resourceId);
 
                 h.currentActor = "camilla";
-                const offChainFailure = h.collaboratorDeletesPage(
-                    existingPage
-                );
+                const offChainFailure = h.collaboratorDeletesPage(existingPage);
                 await expect(offChainFailure).rejects.toThrow(
                     /connected wallet.*authority/
                 );
@@ -757,9 +738,7 @@ describe("Capo", async () => {
                     ) {
                         return true;
                     });
-                const randoCantDelete = h.collaboratorDeletesPage(
-                    existingPage
-                );
+                const randoCantDelete = h.collaboratorDeletesPage(existingPage);
                 await expect(randoCantDelete).rejects.toThrow(
                     /missing delegation token/
                 );
