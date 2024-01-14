@@ -35,7 +35,7 @@ const {
     Value,
     TxOutput,
     Datum,
-    //@ts-expect-error
+    //xx @ts-expect-error
     Option,
     TxOutputId,
 } = helios;
@@ -459,7 +459,7 @@ export class CMDBCapo extends DefaultCapo {
      * detailed remarks
      * @param entryForUpdate - update details
      * @reqt updates all the details found in the `entryForUpdate`
-     * @reqt fails if the owner's contributor-token (or charter authz) is not found in the user's wallet
+     * @reqt fails if the owner's collaborator-token (or charter authz) is not found in the user's wallet
      * @public
      **/
     @txn
@@ -810,18 +810,58 @@ export class CMDBCapo extends DefaultCapo {
     }
 
     requirements() {
+        // note that these requirements augment the essential capabilities
+        // ... and requirements of the base Capo class.  In particular, 
+        // ... the governance token 'capoGov-XXXXX' is held by the book's editor
         return hasReqts({
-            "the book's operator can create pages in the book": {
+            "creates a registry of pages": {
+                purpose: "enables finding and presenting lists of the book's content",
+                details: [
+                    "Provides API endpoints for listing current pages in the book.",
+                    "Normally, only pages that are up-to-date are included, but expired pages can also be found.",
+                    "Provides endpoints for finding Suggested pages.",
+                    "Provides endpoints for finding changes being proposed to any page or suggested page."
+                ],
+                mech: [],
+                requires: [
+                    "the book's editor can create pages in the book",
+                    "lists pages that are in the book",
+                    "page expiration",
+                    "collaborator tokens can be minted by the book's editor",
+                    "collaborators can suggest pages to be added in the book",
+                    "editor and page-owners can apply changes directly",
+                    "collaborators can suggest changes to an existing book page",
+                ],
+            },
+
+            "the book's editor can create pages in the book": {
                 purpose: "clear authority for now, extensibility for later",
                 details: [
                     "The book's authority token is issued to a wallet for now,",
                     "  ... and later, can be decentralized further",
+                    "The holder of that capoGov-XXX authority token is called the editor here."
                 ],
                 mech: [
-                    "The holder of the contract's charter-authority token can directly create book pages",
-                    "Pages are created with type='pg' for Page",
+                    "x The editor can directly create book pages, with entryType=pg",
+                    "TODO: an editor's created pages are owned by their collaborator role, not the capoGov- token",
                 ],
-                requires: ["page expiration"],
+            },
+
+            "lists pages that are in the book": {
+                purpose: "to access book contents for presentation",
+                details: [
+                    "Listed pages may be already created or suggested, and may be active or expired",
+                    "Expired pages are hidden by default, but can be listed explicitly",
+                    "Suggested pages are listed separately from active pages",
+                    "findBookEntries() is used for all of these",
+                ],
+                mech: [
+                    "x finds active entries when used with no arguments",
+                    "todo: includes expired entries when used with expired:true",
+                    "todo: includes suggested entries when used with suggested:true",
+                    "todo: doesn't include suggested edits to pages at the top level",
+                    "todo: each record includes any suggested changes that are pending",
+                ]
             },
 
             "collaborators can suggest pages to be added in the book": {
@@ -831,92 +871,156 @@ export class CMDBCapo extends DefaultCapo {
                     "Each book is operated by people who can exercise oversight authority over their books",
                 ],
                 mech: [
-                    "creates page records with type='spg' for Suggested Page",
-                    "the suggestor's collaborator token is referenced as the page's ownerAuthority",
-                    "the suggestor can make changes to the page before it is accepted",
+                    "x a collaborator can only create a suggested page, with entryType='spg'",
+                    "x the suggestor's collaborator token is referenced as the page's ownerAuthority",
                 ],
                 requires: [
-                    "contributor tokens can be minted by the book's operator",
-                    "page expiration",
+                    "collaborator tokens can be minted by the book's editor",
+                ],
+            },
+
+            "editor and page-owners can apply changes directly": {
+                purpose: "spreads responsibility for page maintenance",
+                details: [
+                    "Each page can have an owner, who can apply changes to that page. ",
+                    "This allows a responsible party to skip unnecessary beaurocracy",                    
+                ],
+                mech: [
+                    "x editor can upgrade a suggested page to type=pg",
+                    "todo: TEST editor can make changes to any page",
+                    "x editor can make changes to a suggested page without changing its type",
+                    "x a page owner can directly apply changes to their owned page",
+                    "x the owner of a suggested page can directly apply updates",
+                    "x a random collaborator can't apply changes directly to a page",
                 ],
             },
 
             "collaborators can suggest changes to an existing book page": {
-                purpose: "testnet: enable collaboration for invitees",
+                purpose: "enable collaboration for invitees",
                 details: [
                     "People can post page suggestions into the book once they have a collaborator token",
                     "Each book is operated by people who can exercise oversight authority over their books",
                 ],
                 mech: [
-                    "creates page records with type='spg' for Suggested Page",
-                    "the suggestor's collaborator token is referenced as the page's ownerAuthority",
-                    "the suggestor can make changes to the page before it is accepted",
+                    "x a collaborator token is required to suggest changes",
+                    "x a collaborator can suggest page changes, with entryType='chg' for Change",
+                    "x the suggestor's collaborator token is referenced as the Change record's ownerAuthority",
+                    "x an editor's suggestions are owned by their collaborator role",
+                    "TODO: the suggestor can adjust the Change record before it is accepted",
                 ],
                 requires: [
-                    "contributor tokens can be minted by the book's operator",
-                    "page expiration",
+                    "collaborator tokens can be minted by the book's editor",
+                    "editors and page-owners can accept changes",
+                    "editors and page-owners can reject changes",
+                    "well specified data format for change suggestions",
                 ],
             },
 
-            "contributor tokens can be minted by the book's operator": {
+            "editors and page-owners can accept changes": {
+                purpose: "enables multiple parties to collaborate on a book",
+                details: [
+                    "Page owners and editors can apply suggested changes.",
+                    "When a change is in conflict, the person applying the change ",
+                    "  ... can  resolve the conflict manually and through visual inspection. ",
+                    "When a change is accepted, the change record is removed, ",
+                    "  ... its eid-* UUT is burned, ",
+                    "  ... and is referenced in the page record's appliedChanges field",                    
+                ],
+                requires: [
+                    "application-layer conflict management"
+                ],
+                mech: [
+                    "TODO: editor can accept a suggested change",
+                    "TODO: page owner can accept a suggested change",
+                    "TODO: a random collaborator can't accept a suggested change",
+                    "TODO: the change originator receives the suggestion's minUtxo",
+                    "TODO: the suggestion's eid-* UUT is burned."
+                ]
+            },
+
+            "application-layer conflict management": {
                 purpose:
-                    "creates positive control for who can be a contributor",
+                    "So that people can easily avoid merging suggestions that have become obsolete",
+                details: [
+                    "On-chain logic can't be expected to validate diffs. ",
+                    "However, the application layer can validate that diffs can be applied cleanly. ",
+                    "The dAPI provides simple conflict signals to the application layer",
+                    "The application layer requires the person who merges a conflicting change to review the results.",
+                ],
+                mech: [
+                    "TODO: A diff that conflicts is clearly marked as conflicting in the dAPI's findBookEntries() result",
+                    "TODO: A diff that applies cleanly can be merged using only the details in findBookEntries()",
+                    "TODO: A diff that conflicts can only be applied with a mergeResolution field providing a non-conflicting diff",
+                    "TODO: Two diffs, applied in a different areas of a page, can both be merged without extra confirmation",
+                ],
+            },
+
+            "editors and page-owners can reject changes": {
+                purpose: "to clean up after changes that are not accepted",
+                details: [
+                    "A change record contains a eid- UUT, which is burned when the change is rejected.",
+                    "This prevents the rejected change from being applied later.",
+                    "The chain record can be queried to see rejected changes (not currently in scope).",
+                    "Any minUtxo connected to the rejected change has to be paid out, and ",
+                    "  ... we are not paying it to the originator of the bad suggestion, to incentivize good suggestions.",
+                ],
+                mech: [
+                    "TODO: a random collaborator can't reject a suggested change",
+                    "TODO: editor can reject a suggested change",
+                    "TODO: page owner can reject a suggested change",
+                    "TODO: when a change is rejected, its eid-* UUT is burned.",
+                ]
+            },
+
+            "well specified data format for change suggestions": {
+                purpose: "enables interoperability of change suggestions either with our dAPI or without",
+                details: [
+                    "Each change suggestion references the utxo of the page being changed. ",                    
+                    "When the parent utxo is still most current, then the change can always be applied, ",
+                    "  .... otherwise, patch conflict resolution may be needed.",
+                    "Content changes are formatted as a diff.",
+                    "Title changes are reflected without a diff format."
+                ],
+                mech: [
+                    "x references the parent transaction-id",
+                    "x formats title as direct change, leaving content empty if unchanged",
+                    "x formats content diff, leaving title empty if unchanged",
+                ]
+            },
+
+            "collaborator tokens can be minted by the book's editor": {
+                purpose:
+                    "creates positive control for who can be a collaborator",
                 details: [
                     "The book's operations staff can approve the minting of collaborator tokens.",
                     "These tokens give the holder permission to suggest new pages or changes to existing pages",
                 ],
                 mech: [
-                    "the charter-authority token is required for minting collaborator tokens",
-                    "the collaborator token can be sent directly to the collaborator",
+                    "x issues collab to any address on authority of the editor",
                 ],
-            },
-            "the book's operator can adopt proposed changes to the book": {
-                purpose: "",
-                details: [
-                    "When suggestions have been made, the book's operator retains authority for adopting the suggestions.",
-                ],
-                mech: [
-                    "When a suggestion is accepted, its uut is burned, with its minUtxo sent to its originator",
-                ],
-                requires: ["The workflow guards against change conflict"],
             },
 
-            "page expiration": {
+            "page expiration and freshening": {
                 purpose:
                     "for proactive freshness even in the face of immutable content",
                 details: [
                     "Book pages expire by default, and can be freshened as long as they remain relevant.",
                     "This way, obsolete content is naturally hidden, ",
                     "  ... while remaining available for review/update/freshening",
+                    "listBookEntries() includes these requirements",
+                    "When a listing is freshened, its expiration date is extended.",
                 ],
                 mech: [
-                    "expired pages are hidden by default",
-                    "expired pages can be freshened by the book's operator, with or without content changes",
-                    "FUT: expired pages can be freshened implicitly by a collaborator suggesting a fresh change that resolves any obsolescense",
+                    "TODO: A listing can be freshened by its owner or editor, and its expiration date is extended",
+                    "FUT: expired pages can be freshened implicitly by a collaborator suggesting a fresh change that resolves any obsolescence",
                 ],
-            },
-
-            "The workflow guards against change conflict": {
-                purpose:
-                    "So that people can easily avoid merging suggestions that have become obsolete",
-                details: [
-                    "On-chain logic can't be expected to validate diffs.  ",
-                    "However, the application layer can validate that diffs can be applied cleanly.",
-                    "And, it can require the person who merges a conflicting change to review the results.",
-                ],
-                mech: [
-                    "A diff that conflicts can't be merged until it is updated to apply cleanly",
-                    "A diff that applies cleanly can be merged with no extra confirmation",
-                    "Two diffs, applied in a different areas of a page, can both be merged without extra confirmation",
-                ],
-                requires: [],
             },
 
             "page deletion": {
                 purpose:
                     "for proactive assurance of freshness and quality of each page and the book overall",
                 details: [
-                    "The book's operator can revoke a listing.",
+                    "The book's editor can revoke a listing.",
                     "A revoked listing MUST NOT be considered an active page in the book.",
                 ],
                 mech: [
@@ -927,14 +1031,6 @@ export class CMDBCapo extends DefaultCapo {
                 ],
             },
 
-            "a listing can be freshened by the holder of the linked authority token":
-                {
-                    purpose:
-                        "allowing update and preventing the expiration of a listing",
-                    details: [],
-                    mech: [],
-                    requires: [],
-                },
         });
     }
 }
