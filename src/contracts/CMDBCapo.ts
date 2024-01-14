@@ -572,6 +572,7 @@ export class CMDBCapo extends DefaultCapo {
             //UI can perform and present an in-memory diff.
             diffUpdate.title = newTitle;
         }
+        
         if (!newContent.endsWith("\n")) newContent = newContent + "\n";
         if (!contentBefore.endsWith("\n")) contentBefore = contentBefore + "\n";
         if (contentBefore != newContent) {
@@ -594,10 +595,21 @@ export class CMDBCapo extends DefaultCapo {
             // const sp = structuredPatch(id, id, contentBefore, newContent, "", "", options);
             const [pp] = parsePatch(p2); // works fine; VERY similar to result of structuredPatch
             const patched = applyPatch(contentBefore, p2);
+            if (!patched) {
+                console.error({contentBefore});
+                console.error({patch: p2})
+                console.error({pp});
+                console.error({newContent});
+                throw new Error(`patch reported a conflict`);
+            }
+
             if (patched != newContent) {
                 debugger;
+                console.error("patched: ", patched);
+                console.error("newContent: ", newContent);
                 throw new Error(`patch doesn't produce expected result`);
             }
+
 
             debugger;
             diffUpdate.content = p2;
@@ -826,7 +838,7 @@ export class CMDBCapo extends DefaultCapo {
                 requires: [
                     "the book's editor can create pages in the book",
                     "lists pages that are in the book",
-                    "page expiration",
+                    "page expiration and freshening",
                     "collaborator tokens can be minted by the book's editor",
                     "collaborators can suggest pages to be added in the book",
                     "editor and page-owners can apply changes directly",
@@ -842,8 +854,20 @@ export class CMDBCapo extends DefaultCapo {
                     "The holder of that capoGov-XXX authority token is called the editor here."
                 ],
                 mech: [
-                    "x The editor can directly create book pages, with entryType=pg",
-                    "TODO: an editor's created pages are owned by their collaborator role, not the capoGov- token",
+                    "the editor can directly create book pages, with entryType=pg",
+                    "an editor's created pages are owned by their collaborator role, not the capoGov- token",
+                ],
+            },
+
+            "collaborator tokens can be minted by the book's editor": {
+                purpose:
+                    "creates positive control for who can be a collaborator",
+                details: [
+                    "The book's operations staff can approve the minting of collaborator tokens.",
+                    "These tokens give the holder permission to suggest new pages or changes to existing pages",
+                ],
+                mech: [
+                    "issues collab-* UUTs to any address on authority of the editor",
                 ],
             },
 
@@ -856,27 +880,12 @@ export class CMDBCapo extends DefaultCapo {
                     "findBookEntries() is used for all of these",
                 ],
                 mech: [
-                    "x finds active entries when used with no arguments",
+                    "finds active entries when used with no arguments",
                     "todo: includes expired entries when used with expired:true",
                     "todo: includes suggested entries when used with suggested:true",
                     "todo: doesn't include suggested edits to pages at the top level",
                     "todo: each record includes any suggested changes that are pending",
                 ]
-            },
-
-            "collaborators can suggest pages to be added in the book": {
-                purpose: "testnet: enable collaboration for invitees",
-                details: [
-                    "People can post page suggestions into the book once they have a collaborator token",
-                    "Each book is operated by people who can exercise oversight authority over their books",
-                ],
-                mech: [
-                    "x a collaborator can only create a suggested page, with entryType='spg'",
-                    "x the suggestor's collaborator token is referenced as the page's ownerAuthority",
-                ],
-                requires: [
-                    "collaborator tokens can be minted by the book's editor",
-                ],
             },
 
             "editor and page-owners can apply changes directly": {
@@ -886,12 +895,27 @@ export class CMDBCapo extends DefaultCapo {
                     "This allows a responsible party to skip unnecessary beaurocracy",                    
                 ],
                 mech: [
-                    "x editor can upgrade a suggested page to type=pg",
-                    "todo: TEST editor can make changes to any page",
-                    "x editor can make changes to a suggested page without changing its type",
-                    "x a page owner can directly apply changes to their owned page",
-                    "x the owner of a suggested page can directly apply updates",
-                    "x a random collaborator can't apply changes directly to a page",
+                    "editor can upgrade a suggested page to type=pg",
+                    "TODO: TEST editor can make changes to another collaborator's page",
+                    "editor can make changes to a suggested page without changing its type",
+                    "a random collaborator can't apply changes directly to a page",
+                    "a page owner can directly apply changes to their owned page",
+                    "the owner of a SUGGESTED page can directly apply updates",
+                ],
+            },
+
+            "collaborators can suggest pages to be added in the book": {
+                purpose: "testnet: enable collaboration for invitees",
+                details: [
+                    "People can post page suggestions into the book once they have a collaborator token",
+                    "Each book is operated by people who can exercise oversight authority over their books",
+                ],
+                mech: [
+                    "a collaborator can only create a SUGGESTED  page, with entryType='spg'",
+                    "the suggestor's collaborator token is referenced as the SUGGESTED page's ownerAuthority",
+                ],
+                requires: [
+                    "collaborator tokens can be minted by the book's editor",
                 ],
             },
 
@@ -986,18 +1010,6 @@ export class CMDBCapo extends DefaultCapo {
                     "x formats title as direct change, leaving content empty if unchanged",
                     "x formats content diff, leaving title empty if unchanged",
                 ]
-            },
-
-            "collaborator tokens can be minted by the book's editor": {
-                purpose:
-                    "creates positive control for who can be a collaborator",
-                details: [
-                    "The book's operations staff can approve the minting of collaborator tokens.",
-                    "These tokens give the holder permission to suggest new pages or changes to existing pages",
-                ],
-                mech: [
-                    "x issues collab to any address on authority of the editor",
-                ],
             },
 
             "page expiration and freshening": {

@@ -47,13 +47,13 @@ const xit = it.skip; //!!! todo: update this when vitest can have skip<HeliosTes
 
 const describe = descrWithContext<localTC>;
 
-const testPageContent: BookEntryCreationAttrs = {
+const testPageEntry: BookEntryCreationAttrs = {
     entryType: "pg",
     title: "collaborator page",
     content: "## Page Heading\n\nPage content here, minimum 40 bytes\n\n",
 };
 const testSuggestedPage: BookEntryCreationAttrs = {
-    ...testPageContent,
+    ...testPageEntry,
     entryType: "spg",
 };
 
@@ -85,7 +85,7 @@ describe("Capo", async () => {
     });
 
     describe("issues collab tokens for contributors", () => {
-        it("x issues collab to any address on authority of the editor", async (context: localTC) => {
+        it("issues collab-* UUTs to any address on authority of the editor", async (context: localTC) => {
             // prettier-ignore
             const {h, h:{network, actors, delay, state} } = context;
             let book = await h.bootstrap();
@@ -99,36 +99,36 @@ describe("Capo", async () => {
     });
 
     describe("creates a registry of pages", () => {
-        describe("findBookEntry()", () => {
-            it("x finds active entries when used with no arguments", async (context: localTC) => {
+        describe("findBookEntry(): ", () => {
+            it("finds active entries when used with no arguments", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 const book = await h.bootstrap();
 
                 await h.editorInvitesCollaborator(actors.editor);
-                await h.collaboratorCreatesPage(testPageContent);
+                await h.collaboratorCreatesPage(testPageEntry);
                 await h.collaboratorCreatesPage({
-                    ...testPageContent,
+                    ...testPageEntry,
                     title: "test title 2",
                 });
                 const entries = h.book.findBookEntries();
                 await expect(entries).resolves.toHaveLength(2);
             });
 
-            it.todo("includes expired entries when used with expired:true");
-            it.todo("includes suggested entries when used with suggested:true");
+            it.todo("TODO: includes expired entries when used with expired:true");
+            it.todo("TODO: includes suggested entries when used with suggested:true");
             it.todo(
-                "doesn't include suggested edits to pages at the top level"
+                "TODO: doesn't include suggested edits to pages at the top level"
             );
             it.todo(
-                "each record includes any suggested changes that are pending"
+                "TODO: each record includes any suggested changes that are pending"
             );
         });
     });
 
     describe("roles and activities", () => {
         describe("page creation: ", () => {
-            it("x the editor can directly create book pages, with entryType='pg'", async (context: localTC) => {
+            it("the editor can directly create book pages, with entryType='pg'", async (context: localTC) => {
                 context.initHelper({ skipSetup: true });
                 const {
                     h,
@@ -137,17 +137,28 @@ describe("Capo", async () => {
                 const book = await h.bootstrap();
 
                 await h.editorInvitesCollaborator(actors.editor);
-                const { content: expectedContent } = testPageContent;
+                const { content: expectedContent } = testPageEntry;
                 const { resourceId } = await h.collaboratorCreatesPage(
-                    testPageContent
+                    testPageEntry
                 );
 
                 const onChainEntry = await book.findBookEntry(resourceId);
                 expect(onChainEntry.entry.content).toBe(expectedContent);
                 expect(onChainEntry.entry.entryType).toBe("pg");
+
+                // c8br02x
+                const foundCollabToken = await book.findUserRoleInfo("collab");
+                expect(foundCollabToken.uut.purpose).toBe("collab");
+                expect(onChainEntry.ownerAuthority.uutName).toEqual(
+                    foundCollabToken.uut.name
+                );
             });
 
-            it("x a collaborator can only create a suggested page, with entryType='spg'", async (context: localTC) => {
+            it("an editor's created pages are owned by tgheir collaborator role, not the capoGov- token", async (context: localTC) => {
+                console.log("tested at c8br02x");
+            });
+
+            it("a collaborator can only create a SUGGESTED page, with entryType='spg'", async (context: localTC) => {
                 context.initHelper({ skipSetup: true });
                 const {
                     h,
@@ -180,7 +191,7 @@ describe("Capo", async () => {
                 // expect(camillaTokenNames.length).toBe(1);
                 // expect(camillaTokenNames[0]).toMatch(/^collab-/);
 
-                const pageCreation = h.collaboratorCreatesPage(testPageContent);
+                const pageCreation = h.collaboratorCreatesPage(testPageEntry);
                 await expect(pageCreation).rejects.toThrow(
                     /missing delegation token.*capoGov/
                 );
@@ -201,7 +212,7 @@ describe("Capo", async () => {
                     foundCollabToken.uut.name
                 );
             });
-            it("x the suggestor's collaborator token is referenced as the page's ownerAuthority", async (context: localTC) => {
+            it("the suggestor's collaborator token is referenced as the SUGGESTED page's ownerAuthority", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
 
@@ -210,7 +221,7 @@ describe("Capo", async () => {
         });
 
         describe("modifying page content: ", () => {
-            it("x editor can upgrade a suggested page to type=pg", async (context: localTC) => {
+            it("editor can upgrade a suggested page to type=pg", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 await h.editorInvitesCollaborator(actors.editor);
@@ -232,7 +243,18 @@ describe("Capo", async () => {
                 expect(updatedPage.entry.entryType).toEqual("pg");
             });
 
-            it("x editor can edit a suggested page without changing its type", async (context: localTC) => {
+            it.todo(
+                "TODO: editor can make changes to another collaborator's page",
+                async (context: localTC) => {
+                    // prettier-ignore
+                    const {h, h:{network, actors, delay, state} } = context;
+
+                    // const strella =
+                    await h.bootstrap();
+                }
+            );
+
+            it("editor can make changes to a suggested page without changing its type", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 await h.editorInvitesCollaborator(actors.editor);
@@ -256,18 +278,7 @@ describe("Capo", async () => {
                 );
             });
 
-            it.todo(
-                "editor can make changes to another collaborator's page",
-                async (context: localTC) => {
-                    // prettier-ignore
-                    const {h, h:{network, actors, delay, state} } = context;
-
-                    // const strella =
-                    await h.bootstrap();
-                }
-            );
-
-            it("x random collaborator can't apply changes directly to a page", async (context: localTC) => {
+            it("random collaborator can't apply changes directly to a page", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 await h.bootstrap();
@@ -282,7 +293,7 @@ describe("Capo", async () => {
 
                 const updates = {
                     ...existingPage.entry,
-                    title: testPageContent.title + " - rando can't update this",
+                    title: testPageEntry.title + " - rando can't update this",
                 };
                 const offChainFailure = h.collaboratorModifiesPage(
                     existingPage,
@@ -307,7 +318,7 @@ describe("Capo", async () => {
                 expect(hasFakeOwnership).toHaveBeenCalled();
             });
 
-            it("x page owner can directly apply changes to their owned page", async (context: localTC) => {
+            it("page owner can directly apply changes to their owned page", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 await h.bootstrap();
@@ -321,8 +332,8 @@ describe("Capo", async () => {
                 const updates = {
                     ...existingPage.entry,
                     content:
-                        testPageContent.content + "\n\nOwner updated content",
-                    title: testPageContent.title + " - owner-did-update",
+                        testPageEntry.content + "\n\nOwner updated content",
+                    title: testPageEntry.title + " - owner-did-update",
                 };
                 await h.collaboratorModifiesPage(existingPage, updates);
 
@@ -332,7 +343,7 @@ describe("Capo", async () => {
                 expect(updatedPage.entry.content).toMatch(/updated content/);
             });
 
-            it("x the owner of a suggested page can directly apply updates", async (context: localTC) => {
+            it("the owner of a SUGGESTED page can directly apply updates", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 await h.bootstrap();
@@ -345,15 +356,18 @@ describe("Capo", async () => {
 
                 const updates = {
                     ...existingPage.entry,
-                    title: testPageContent.title + " - owner-did-update",
+                    content: testPageEntry.content + "\n\nOwner updated content",
+                    title: testPageEntry.title + " - owner-did-update",
                 };
                 await h.collaboratorModifiesPage(existingPage, updates);
 
                 const updatedPage = await h.book.findBookEntry(resourceId);
                 console.log("     🐞 updated page", updatedPage.entry.title);
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
+                expect(updatedPage.entry.content).toMatch(/Owner updated content/);
             });
         });
+
 
         describe("suggesting changes: ", () => {
             async function setup(
@@ -391,7 +405,7 @@ describe("Capo", async () => {
                 h.currentActor = "charlie";
                 const updates = {
                     ...page.entry,
-                    title: testPageContent.title + " - collaborator suggestion",
+                    title: testPageEntry.title + " - collaborator suggestion",
                 };
                 const offChainFailure = h.collaboratorSuggestsChange(
                     page,
@@ -421,7 +435,7 @@ describe("Capo", async () => {
                 expect(mockedUserToken).toHaveBeenCalled();
             });
 
-            fit("x a collaborator can suggest page changes, with entryType='chg' for Change", async (context: localTC) => {
+            it("x a collaborator can suggest page changes, with entryType='chg' for Change", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 const [pageInfo, page] = await setup(context);
@@ -432,8 +446,8 @@ describe("Capo", async () => {
                 const updates = {
                     ...page.entry,
                     content:
-                        testPageContent + "\n\nCollaborator updated content",
-                    title: testPageContent.title + " - collaborator suggestion",
+                        testPageEntry.content + "\n\nCollaborator updated content",
+                    title: testPageEntry.title + " - collaborator suggestion",
                 };
                 const {
                     resourceId: suggestionId,
@@ -469,13 +483,13 @@ describe("Capo", async () => {
                 const {h, h:{network, actors, delay, state} } = context;
 
                 const [pageInfo, page] = await setup(context);
-
+                await h.editorInvitesCollaborator(actors.editor)
                 h.currentActor = "editor";
 
                 const updates = {
                     ...page.entry,
-                    content: testPageContent + "\n\nEditor content suggestion",
-                    title: testPageContent.title + " - editor suggestion",
+                    content: testPageEntry.content + "\n\nEditor content suggestion",
+                    title: testPageEntry.title + " - editor suggestion",
                 };
                 const {
                     resourceId: suggestionId,
@@ -512,7 +526,7 @@ describe("Capo", async () => {
                     const updates = {
                         ...page.entry,
                         title:
-                            testPageContent.title +
+                            testPageEntry.title +
                             " - collaborator suggestion",
                     };
                     const {
@@ -585,7 +599,7 @@ describe("Capo", async () => {
                     h.currentActor = "charlie";
 
                     const updatedContent =
-                        testPageContent.content +
+                        testPageEntry.content +
                         "\n## Plus collaborator suggestion\n";
                     const updates = {
                         ...page.entry,
@@ -634,7 +648,7 @@ describe("Capo", async () => {
                     const updates = {
                         ...existingPage.entry,
                         title:
-                            testPageContent.title +
+                            testPageEntry.title +
                             " - collaborator suggestion",
                     };
                     const offChainFailure = h.collaboratorSuggestsChange(
@@ -705,7 +719,7 @@ describe("Capo", async () => {
                 await h.editorInvitesCollaborator(actors.camilla);
                 h.currentActor = "camilla";
                 const { resourceId } = await h.collaboratorCreatesPage(
-                    testPageContent
+                    testPageEntry
                 );
                 const existingPage = await h.book.findBookEntry(resourceId);
 
@@ -722,7 +736,7 @@ describe("Capo", async () => {
                 await h.editorInvitesCollaborator(actors.camilla);
                 h.currentActor = "camilla";
                 const { resourceId } = await h.collaboratorCreatesPage(
-                    testPageContent
+                    testPageEntry
                 );
                 const existingPage = await h.book.findBookEntry(resourceId);
 
