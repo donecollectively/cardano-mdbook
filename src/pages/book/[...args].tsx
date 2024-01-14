@@ -127,6 +127,10 @@ let mountCount = 0;
 
 //   _x_   ?.  add actor collateral to TCX, on-demand and/or during addScript (when??)
 
+type moreStatusOptions = {
+    clearAfter?: number;
+}
+
 export class BookHomePage extends React.Component<paramsType, BookPageState> {
     bf: hBlockfrost;
     bfFast: hTxChain;
@@ -940,7 +944,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
      **/
     updateState(
         status: string | undefined,
-        stateProps: Omit<BookPageState, "status"> = {},
+        stateProps: Omit<BookPageState, "status"> & moreStatusOptions = {},
         extraComment: string
     ): Promise<any> {
         const {
@@ -949,6 +953,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             progressBar = undefined,
             error = undefined,
             actionLabel = undefined,
+            clearAfter = 0,
         } = stateProps;
 
         // if (this._unmounted) {
@@ -982,6 +987,17 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         });
         return new Promise<void>((resolve) => {
             this.setState(newState, resolve);
+            if (clearAfter) {
+                setTimeout(() => {
+                    if (this.state.status == status)
+                        this.updateState(
+                            "",
+                            {},
+                            "//clear previous message"
+                        );
+                }, clearAfter);
+            }
+
         });
     }
     static nextPrev = false;

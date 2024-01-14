@@ -89,7 +89,7 @@ export class Invitation extends React.Component<propsType, stateType> {
         await updateState("loading collaborator-mint txn to wallet", {}, "//collab-mint -> wallet");
         
         return bookContract.submit(tcx).then(
-            () => updateState("submitted", {}, "//submit collab-creation"),
+            () => updateState("submitted", { clearAfter: 8000 }, "//submit collab-creation"),
             (e) => reportError(e, "submitting collaborator-mint txn", {
                 // nextAction: "initializeBookContract",
                 // actionLabel: "Create New Book",
