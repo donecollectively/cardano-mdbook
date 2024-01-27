@@ -22,14 +22,20 @@ func requiresPageInput(
     (pageUutVal, pageTxIn)
 }
 
-func isAcceptingChangesOnPage(ctx: ScriptContext, pageUtxo : TxInput ) -> Bool {
+func requiresAcceptingChangesActivity(ctx: ScriptContext, pageUtxo : TxInput ) -> Bool {
+    print("seeking acceptingChanges redeemer:" );
+    print(" - expected "+ pageUtxo.output_id.serialize().show());
     ctx.tx.redeemers.any( 
         (purpose : ScriptPurpose, redeemer: Data) -> { purpose.switch{ 
             sp: Spending => {
+                print (" - redeemer " + sp.output_id.serialize().show());
                 sp.output_id == pageUtxo.output_id &&
                 redeemer.switch {
                     (index: Int, fields: []Data) => {
-                        index == 3 && // acceptingChanges to a page
+                        isExpected: Bool = (index == 3);
+                        assert(isExpected, "unexpected redeemer: want index 3, got "+ index.show());
+                        // print ("right redeemer with index "+ index.show()+" hasExpectedIndex=" + isExpected.show());
+                        isExpected && // acceptingChanges to a page
                         fields == fields
                     },
                     _ => error("incontheevable")

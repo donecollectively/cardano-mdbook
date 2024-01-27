@@ -146,12 +146,14 @@ describe("Capo", async () => {
                     testPageEntry
                 );
 
-                const onChainEntry = await book.findBookEntry(resourceId);
+                const onChainEntry = (await book.findBookEntry(resourceId))!
+
                 expect(onChainEntry.entry.content).toBe(expectedContent);
                 expect(onChainEntry.entry.entryType).toBe("pg");
 
                 // c8br02x
                 const foundCollabToken = await book.findUserRoleInfo("collab");
+                if (!foundCollabToken) throw new Error("no collab token");
                 expect(foundCollabToken.uut.purpose).toBe("collab");
                 expect(onChainEntry.ownerAuthority.uutName).toEqual(
                     foundCollabToken.uut.name
@@ -197,6 +199,9 @@ describe("Capo", async () => {
 
                 const pageCreation = h.collaboratorCreatesPage(testPageEntry);
                 await expect(pageCreation).rejects.toThrow(
+                    /trace: 8rf2o3j4/
+                );
+                await expect(pageCreation).rejects.toThrow(
                     /missing.*delegat.*capoGov/
                 );
 
@@ -204,14 +209,14 @@ describe("Capo", async () => {
                 const { resourceId } = await h.collaboratorCreatesPage(
                     testSuggestedPage
                 );
-                const onChainEntry = await book.findBookEntry(resourceId);
+                const onChainEntry = (await book.findBookEntry(resourceId))!;
 
                 expect(onChainEntry.entry.content).toBe(expectedContent);
                 expect(onChainEntry.entry.entryType).toBe("spg");
 
                 // 2jo8c7b
                 const foundCollabToken = await book.findUserRoleInfo("collab");
-                expect(foundCollabToken).toBeTruthy();
+                if (!foundCollabToken) throw new Error("no collab token");
                 expect(onChainEntry.ownerAuthority.uutName).toEqual(
                     foundCollabToken.uut.name
                 );
@@ -237,9 +242,12 @@ describe("Capo", async () => {
                 const camillaCollabToken = await h.book.findUserRoleInfo(
                     "collab"
                 );
-                h.currentActor = "editor";
+                if (!camillaCollabToken) throw new Error("no camillaCollabToken");
 
+                h.currentActor = "editor";
+                const editorUut = ( await h.book.findUserRoleInfo("collab") )!.uut;
                 const onChainEntry = await h.book.findBookEntry(resourceId);
+                if (!onChainEntry) throw new Error("no onChainEntry");
                 const { entry } = onChainEntry;
 
                 await h.editorModifiesPage(onChainEntry, {
@@ -247,6 +255,7 @@ describe("Capo", async () => {
                     entryType: "pg",
                 });
                 const updatedPage = await h.book.findBookEntry(resourceId);
+                if (!updatedPage) throw new Error("no updatedPage");
                 expect(updatedPage.entry.entryType).toEqual("pg");
                 expect(updatedPage.ownerAuthority.uutName).toEqual(
                     camillaCollabToken.uut.name
@@ -254,19 +263,21 @@ describe("Capo", async () => {
 
                 {
                     // d9msju4
-                    const onChainEntry = await h.book.findBookEntry(resourceId);
-                    const { entry } = onChainEntry;
+                    const fresherOnChainEntry = await h.book.findBookEntry(resourceId);
+                    if (!fresherOnChainEntry) throw new Error("no onChainEntry");
+                    const { entry } = fresherOnChainEntry;
 
-                    await h.editorModifiesPage(onChainEntry, {
+                    await h.editorModifiesPage(fresherOnChainEntry, {
                         ...entry,
                         content: entry.content + "\n\nEditor updated content",
                     });
-                    const updatedPage = await h.book.findBookEntry(resourceId);
-                    expect(updatedPage.entry.entryType).toEqual("pg");
-                    expect(updatedPage.ownerAuthority.uutName).toEqual(
+                    const freshestPage = await h.book.findBookEntry(resourceId);
+                    if (!freshestPage) throw new Error("no updatedPage");
+                    expect(freshestPage.entry.entryType).toEqual("pg");
+                    expect(freshestPage.ownerAuthority.uutName).toEqual(
                         camillaCollabToken.uut.name
                     );
-                    expect(updatedPage.entry.content).toMatch(
+                    expect(freshestPage.entry.content).toMatch(
                         /Editor updated content/
                     );
                 }
@@ -286,8 +297,10 @@ describe("Capo", async () => {
                     testSuggestedPage
                 );
                 h.currentActor = "editor";
+                const editorUut = ( await h.book.findUserRoleInfo("collab") )!.uut;
 
                 const onChainEntry = await h.book.findBookEntry(resourceId);
+                if (!onChainEntry) throw new Error("no onChainEntry");
                 const { entry } = onChainEntry;
 
                 await h.editorModifiesPage(onChainEntry, {
@@ -295,7 +308,9 @@ describe("Capo", async () => {
                     content: entry.content + "\n\nEditor updated content",
                 });
                 const updatedPage = await h.book.findBookEntry(resourceId);
-                expect(updatedPage.entry.content).toMatch(
+                expect(updatedPage).toBeTruthy();
+
+                expect(updatedPage!.entry.content).toMatch(
                     /Editor updated content/
                 );
             });
@@ -312,7 +327,8 @@ describe("Capo", async () => {
                 );
                 h.currentActor = "charlie";
                 const existingPage = await h.book.findBookEntry(resourceId);
-
+                if (!existingPage) throw new Error("no existingPage");
+                
                 const updates = {
                     ...existingPage.entry,
                     title: testPageEntry.title + " - rando can't update this",
@@ -350,6 +366,7 @@ describe("Capo", async () => {
                     testSuggestedPage
                 );
                 const existingPage = await h.book.findBookEntry(resourceId);
+                if (!existingPage) throw new Error("no existingPage");
 
                 const updates = {
                     ...existingPage.entry,
@@ -360,6 +377,7 @@ describe("Capo", async () => {
                 await h.collaboratorModifiesPage(existingPage, updates);
 
                 const updatedPage = await h.book.findBookEntry(resourceId);
+                if (!updatedPage) throw new Error("no updatedPage");
                 console.log("     🐞 updated page", updatedPage.entry.title);
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
                 expect(updatedPage.entry.content).toMatch(/updated content/);
@@ -375,7 +393,7 @@ describe("Capo", async () => {
                     testSuggestedPage
                 );
                 const existingPage = await h.book.findBookEntry(resourceId);
-
+                if (!existingPage) throw new Error("no existingPage");
                 const updates = {
                     ...existingPage.entry,
                     content:
@@ -385,6 +403,7 @@ describe("Capo", async () => {
                 await h.collaboratorModifiesPage(existingPage, updates);
 
                 const updatedPage = await h.book.findBookEntry(resourceId);
+                if (!updatedPage) throw new Error("no updatedPage");
                 console.log("     🐞 updated page", updatedPage.entry.title);
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
                 expect(updatedPage.entry.content).toMatch(
@@ -410,8 +429,9 @@ describe("Capo", async () => {
                     testSuggestedPage
                 );
                 const { resourceId: pageId } = resourceUpdated;
-                const page = await h.book.findBookEntry(pageId);
-                return [resourceUpdated, page];
+                const newPage = await h.book.findBookEntry(pageId);
+                if (!newPage) throw new Error("no newPage");
+                return [resourceUpdated,  newPage];
             }
 
             it("a collaborator token is required to suggest changes", async (context: localTC) => {
@@ -481,6 +501,7 @@ describe("Capo", async () => {
                 } = await h.collaboratorSuggestsChange(page, updates);
 
                 const newSuggestion = await h.book.findBookEntry(suggestionId);
+                if (!newSuggestion) throw new Error("no newSuggestion");
                 expect(newSuggestion.entry.content).toMatch(
                     /Collaborator updated content/
                 );
@@ -489,9 +510,9 @@ describe("Capo", async () => {
                     /collaborator suggestion/
                 );
 
-                const { uut: charlieToken } = await h.book.findUserRoleInfo(
+                const { uut: charlieToken } = (await h.book.findUserRoleInfo(
                     "collab"
-                );
+                ))!
 
                 // h642bx
                 expect(newSuggestion.ownerAuthority.uutName).toEqual(
@@ -524,15 +545,16 @@ describe("Capo", async () => {
                 } = await h.collaboratorSuggestsChange(page, updates);
 
                 const newSuggestion = await h.book.findBookEntry(suggestionId);
+                if (!newSuggestion) throw new Error("no newSuggestion");
                 expect(newSuggestion.entry.content).toMatch(
                     /Editor content suggestion/
                 );
                 expect(newSuggestion.entry.entryType).toEqual("sug");
                 expect(newSuggestion.entry.title).toMatch(/editor suggestion/);
 
-                const { uut: editorCollab } = await h.book.findUserRoleInfo(
+                const { uut: editorCollab } = (await h.book.findUserRoleInfo(
                     "collab"
-                );
+                ))!;
 
                 expect(newSuggestion.ownerAuthority.uutName).toEqual(
                     editorCollab.name
@@ -576,14 +598,14 @@ describe("Capo", async () => {
                         tcx,
                         txid,
                     } = await h.collaboratorSuggestsChange(page, updates);
-                    const newSuggestion = await h.book.findBookEntry(
+                    const newSuggestion = (await h.book.findBookEntry(
                         suggestionId
-                    );
+                    ))!;
 
                     const { title, content, changeParentTxId } =
                         newSuggestion.entry;
                     expect(
-                        changeParentTxId.eq(pageTxId),
+                        changeParentTxId!.eq(pageTxId),
                         "mismatched txid"
                     ).toBeTruthy();
 
@@ -623,7 +645,7 @@ describe("Capo", async () => {
                         suggestionId
                     );
 
-                    const { title, content } = newSuggestion.entry;
+                    const { title, content } = newSuggestion!.entry;
                     expect(title).toEqual(altTitle);
                     expect(
                         content.length,
@@ -656,7 +678,7 @@ describe("Capo", async () => {
                         suggestionId
                     );
 
-                    const { title, content: contentDiff } = newSuggestion.entry;
+                    const { title, content: contentDiff } = newSuggestion!.entry;
                     expect(
                         contentDiff.length,
                         "expected content diff"
@@ -701,6 +723,7 @@ describe("Capo", async () => {
                 );
                 const { resourceId: pageId } = pageCreated;
                 const page = await h.book.findBookEntry(pageId);
+                if (!page) throw new Error("no page created");
 
                 await h.editorInvitesCollaborator(actors.charlie);
                 h.currentActor = "charlie";
@@ -719,7 +742,7 @@ describe("Capo", async () => {
                 const { resourceId: suggestionId, tcx, txid } = suggestedUpdate;
                 const suggestion = await h.book.findBookEntry(suggestionId);
 
-                return [pageCreated, page, suggestedUpdate, suggestion];
+                return [pageCreated, page, suggestedUpdate, suggestion!];
             }
 
             it("a page owner can adopt a suggestion", async (context: localTC) => {
@@ -736,7 +759,11 @@ describe("Capo", async () => {
                 const { resourceId: suggestionId } = suggestedUpdate;
 
                 h.currentActor = "camilla";
-                await h.ownerAcceptsSuggestions(page, [suggestion]);
+                await h.acceptSuggestions(page, [suggestion]);
+                const updated = await h.book.findBookEntry(pageId);
+                expect(updated).toBeTruthy();
+                expect (updated!.entry.content).toMatch(/Page content here/);
+                expect (updated!.entry.content).toMatch(/Collaborator suggested update/);
             });
 
             it.todo("TODO: can adopt multiple suggestions that don't conflict", async (context: localTC) => {
@@ -757,10 +784,66 @@ describe("Capo", async () => {
                             
             })
 
-            it.todo("TODO: editor can accept suggestiongs");
-            it.todo(
-                "TODO: a random collaborator can't accept a suggested change"
-            );
+            it("editor can accept suggestions", async (context: localTC ) => { 
+                // prettier-ignore
+                const {h, h:{network, actors, delay, state} } = context;
+                const book = await h.bootstrap();
+                //prettier-ignore
+                const [
+                    pageCreated, page, 
+                    suggestedUpdate, suggestion
+                ] = await setup(context);
+
+                const { resourceId: pageId } = pageCreated;
+                const { resourceId: suggestionId } = suggestedUpdate;
+
+                await h.editorInvitesCollaborator(actors.editor);
+                h.currentActor = "editor";
+                const editorUut = ( await h.book.findUserRoleInfo("collab") )!.uut;
+                await h.acceptSuggestions(page, [suggestion]);
+
+                const updated = await h.book.findBookEntry(pageId);
+                expect(updated).toBeTruthy();
+                expect (updated!.entry.content).toMatch(/Page content here/);
+                expect (updated!.entry.content).toMatch(/Collaborator suggested update/);
+            });
+
+            it("a random collaborator can't accept a suggested change", async (context: localTC) => {
+                // prettier-ignore
+                const {h, h:{network, actors, delay, state} } = context;
+                
+                  // const strella = 
+                await h.bootstrap(); 
+                //prettier-ignore
+                const [
+                    pageCreated, page, 
+                    suggestedUpdate, suggestion
+                ] = await setup(context);
+
+                const { resourceId: pageId } = pageCreated;
+                const {
+                    ownerAuthority: {
+                        uutName: ownerTokenName
+                    }
+                } = page;
+                const { resourceId: suggestionId } = suggestedUpdate;
+
+                await h.editorInvitesCollaborator(actors.ralph);
+                h.currentActor = "ralph";
+                const offChain = h.acceptSuggestions(page, [suggestion]);
+                await expect(offChain).rejects.toThrow(
+                    /wallet doesn't have.*authority/
+                );
+
+                vi.spyOn(h.book, "userHasOwnership").mockReturnValue(true);
+                const onChain = h.acceptSuggestions(page, [suggestion])
+                await expect(onChain).rejects.toThrow(
+                    new RegExp(`owner ${ownerTokenName} missing`)
+                );
+                await expect(onChain).rejects.toThrow(
+                    /missing.*delegation token/
+                );
+            });
             it.todo(
                 "TODO: when accepted, the change originator receives the suggestion's minUtxo"
             );

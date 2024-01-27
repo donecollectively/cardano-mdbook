@@ -22,7 +22,7 @@ import {
     getOutputWithValue,
     mkTv,
     outputDatum,
-    returnsValue
+    spendsAndReturns
 } from StellarHeliosHelpers
 
 import {
@@ -37,7 +37,7 @@ import {
 
 import {
     requiresPageInput,
-    isAcceptingChangesOnPage
+    requiresAcceptingChangesActivity
 } from CMDBController
 
 // struct DredRegistrationSettings {
@@ -323,9 +323,10 @@ enum MintDelegateActivity {
                 (pageUut: Value, pageUtxo : TxInput) = requiresPageInput(ctx, 
                     priorMddd.dd.mph, toPageEid
                 );
-                // 
-                delegatedEnforcement : Bool = returnsValue(pageUut, ctx, pageUtxo);
-                isAcceptingChangesOnPage(ctx, pageUtxo) &&
+                print("pageInput ok");
+                delegatedEnforcement : Bool = spendsAndReturns(pageUut, ctx, pageUtxo);
+                print("delegatedEnforcement is " + delegatedEnforcement.show());
+                requiresAcceptingChangesActivity(ctx, pageUtxo) &&
                 delegatedEnforcement 
             },
             _ => {
@@ -394,6 +395,7 @@ enum MintDelegateActivity {
 
         newDatum : CMDBookDatum = CMDBookDatum::from_data(newTxo.datum.get_inline_data());
         CMDBookDatum::BookEntry{_, newListing} = newDatum;
+        print("trace: 8rf2o3j4 ");
         canBeCreated : Bool = newDatum.txnHasCreateAuthority(ctx, mph);
         assert(canBeCreated, "no creation authority in txn");
 

@@ -28,7 +28,7 @@ import {
 import {
     BookEntryStruct,
     requiresPageInput,
-    isAcceptingChangesOnPage
+    requiresAcceptingChangesActivity
 } from CMDBController
 
 // struct LocalCapoConfig {
@@ -85,11 +85,11 @@ enum Datum {
                     if (oldListing.entryType == "spg" && bookEntry.entryType == "pg") { 
                         Option[String]::Some{"change from spg to pg"}
                     } else {
-                    //! if the owner is changing, requires editor authority 
-                    if (ownerAuthority.uutName != newOwnerAuthority.uutName) { 
-                        //   !!! TODO: ... and ref-input to new owner-UUT.
-
-                            Option[String]::Some{"change ownership"}
+                        //! if the owner is changing, requires editor authority 
+                        if (ownerAuthority.uutName != newOwnerAuthority.uutName) { 
+                            error("todo: fixme")
+                            //!!! TODO: ... and ref-input to new owner-UUT.
+                            // Option[String]::Some{"change ownership"}
                         } else { Option[String]::None }
                     };
 
@@ -99,10 +99,10 @@ enum Datum {
                 wantsEditor : Bool = editorRequired.switch{
                     Some => true, // editor required
                     None => if (hasCollabToken) {
-                        print("editorRequired = None. We have a collabToken");
+                        print("editor not required; we have a good collab-* authority");
                         false 
                     } else {
-                        print( "no collaborator token for doc owner; requiring editor authority for update" );
+                        print( "doc owner "+ ownerAuthority.uutName +" missing; requiring editor authority for update" );
                         true // editor is needed if the document owner isn't involved.
                     }
                 };
@@ -351,7 +351,7 @@ enum Activity {
                             ctx, mph, peid
                         );
                         // enforces that the parent-page is currently updating with acceptingChanges activity
-                        isAcceptingChangesOnPage(ctx, pageUtxo) &&
+                        requiresAcceptingChangesActivity(ctx, pageUtxo) &&
                         // main record's acceptingChanges() activity checks that the change record UUT is burned (
                         // todo: the page must include this change suggestion's eid-* token in its acceptingChanges field
                         true

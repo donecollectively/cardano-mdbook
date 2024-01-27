@@ -32,9 +32,14 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
     CMDBCapo
 ) {
     setupActors() {
-        this.addActor("editor", 1100n * ADA);
+        this.addActor("editor", 1100n * ADA, ... Array(7).fill( 7n * ADA));
+        // collaborators
         this.addActor("charlie", 13n * ADA);
         this.addActor("camilla", 120n * ADA);
+
+        // a random person
+        this.addActor("ralph", 13n * ADA);
+
         this.currentActor = "editor";
     }
     get book() {
@@ -64,7 +69,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
             `--------------------------- Test helper: Create book page '${pageContent.title}'`
         );
         const tcx = await this.book.mkTxnCreatingBookEntry({
-            entryType: "spg",
+            // entryType: "spg", // default, can be overridden
             ...pageContent,
         });
         const resourceId = tcx.state.uuts.entryId.name;
@@ -166,7 +171,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
 
     }
 
-    async ownerAcceptsSuggestions(
+    async acceptSuggestions(
         page: BookEntryForUpdate, 
         suggestions: BookEntryForUpdate[]
     ) {
@@ -176,7 +181,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
             );
 
         console.log(
-            "--------------------------- Test helper: Owner accepts suggestion",
+            "--------------------------- Test helper: suggestion being accepted",
             page.id
         );
         const tcx = await this.book.mkTxnAcceptingPageChanges(

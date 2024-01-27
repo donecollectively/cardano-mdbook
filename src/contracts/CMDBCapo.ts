@@ -357,7 +357,7 @@ export class CMDBCapo extends DefaultCapo {
 
         const tcx2 =
             entry.entryType == "sug"
-                ? await this.txnAddParentRefUtxo(tcx1c, entry.changeParentEid)
+                ? await this.txnAddParentRefUtxo(tcx1c, entry.changeParentEid!)
                 : tcx1c;
 
         //  - create a delegate-link connecting the entry to the collaborator
@@ -407,7 +407,6 @@ export class CMDBCapo extends DefaultCapo {
      * Organizes the book pages found in on-chain storage for use in the dApp
      * @remarks
      *
-     * 
      * Indexes all of the pages or Suggested pages found in the contract script
      * Includes a list of changes for each page.  Each change record is marked
      * with isCurrent=true if the change is the most recent change to the page,
@@ -511,7 +510,7 @@ export class CMDBCapo extends DefaultCapo {
         entryForUpdate: BookEntryForUpdate // !!! or a more generic type
     ): Promise<RoleInfo | undefined> {
         const collabInfo = await this.findUserRoleInfo("collab");
-
+        if (!collabInfo) return undefined
         if (!this.userHasOwnership(entryForUpdate, collabInfo))
             return undefined;
         return collabInfo;
@@ -520,8 +519,9 @@ export class CMDBCapo extends DefaultCapo {
     userHasOwnership(
         entryForUpdate: BookEntryForUpdate, // !!! or a more generic type
         collabInfo: RoleInfo
-    ) {
+    ): boolean {
         const { ownerAuthority } = entryForUpdate;
+        if (!collabInfo) return false;
 
         const {
             uut: { name: userCollabTokenName },
@@ -601,7 +601,9 @@ export class CMDBCapo extends DefaultCapo {
             // const tcx1a = await this.txnAddGovAuthority(tcx1);
             // console.log("   🐞 added govAuthority", dumpAny(tcx1a));
             const collabInfo = await this.findUserRoleInfo("collab");
-
+            if (!collabInfo) {
+                throw new Error(`Editor credential found, but missing their required collab-* token`);
+            }
             const tcx2 = await this.txnAddUserCollabRole(tcx1, collabInfo);
             console.log(
                 "   🐞 added editor collab role",
@@ -610,7 +612,7 @@ export class CMDBCapo extends DefaultCapo {
 
             const tcx3 = tcx2
                 .attachScript(this.compiledScript)
-                .addInput(currentEntryUtxo, this.activityUpdatingEntry())
+                .addInput(currentEntryUtxo, activity)
                 .validFor(tenMinutes);
 
             return this.txnReceiveBookEntry(tcx3, entryForUpdate);
@@ -642,7 +644,7 @@ export class CMDBCapo extends DefaultCapo {
         return tcx.addInput(roleToken.utxo).addOutput(t.output);
     }
 
-    async mkTxnSuggestingUpdate(entryForUpdate: BookEntryForUpdate) {
+    async mkTxnSuggestingUpdate(entryForUpdate: Required<BookEntryForUpdate>) {
         //! creates a new record with entryType="sug"
         const collabInfo = await this.findUserRoleInfo("collab");
         if (!collabInfo) {
@@ -720,10 +722,7 @@ export class CMDBCapo extends DefaultCapo {
         suggestions: BookEntryForUpdate[],
         merged: { content?: string; title?: string } = {}
     ) {
-        const { 
-            entry: pageEntry,
-            id: pageEid,
-         } = page;
+        const { entry: pageEntry, id: pageEid } = page;
         const { title: pageTitle, content: pageContent } = pageEntry;
 
         const mergedContent = merged?.content;
@@ -788,9 +787,13 @@ export class CMDBCapo extends DefaultCapo {
             tcx2 = await this.txnAcceptingOneSuggestion(tcx2, suggestionId);
         }
 
-        return this.txnBurnAcceptedSuggestions(tcx, pageEid, burningSuggestions);
+        return this.txnBurnAcceptedSuggestions(
+            tcx,
+            pageEid,
+            burningSuggestions
+        );
     }
-    
+
     @partialTxn
     async txnAcceptingOneSuggestion<
         TCX extends StellarTxnContext & isBurningSuggestions
@@ -802,7 +805,7 @@ export class CMDBCapo extends DefaultCapo {
         // tcx.attachScript(this.compiledScript).
         tcx.addInput(utxo, this.activitySuggestionBeingAccepted());
         tcx.state.burningSuggestions.push(new UutName("eid", suggestionId));
-        return tcx
+        return tcx;
     }
 
     async txnBurnAcceptedSuggestions<TCX extends StellarTxnContext>(
@@ -844,18 +847,14 @@ export class CMDBCapo extends DefaultCapo {
 
     async findUserRoleInfo(
         roleUutPrefix: string
-    ): Promise<undefined | RoleInfo> {
+    ): Promise<RoleInfo | undefined> {
         const utxos: TxInput[] = await this.wallet.utxos;
         console.info(
             `found ${utxos.length} wallet utxos, in pursuit of ${roleUutPrefix}-* token from ${this.mph.hex}`
         );
 
-        const rv: RoleInfo = {
-            utxo: undefined,
-            uut: undefined,
-        };
-        for (const u of utxos) {
-            const tokenNamesExisting = u.value.assets
+        for (const utxo of utxos) {
+            const tokenNamesExisting = utxo.value.assets
                 .getTokenNames(this.mph)
                 .map((x) => helios.bytesToText(x.bytes));
             // if (tokenNamesExisting.length) debugger
@@ -863,12 +862,15 @@ export class CMDBCapo extends DefaultCapo {
                 // console.info("   - found token name: "+x);
                 return !!x.startsWith(`${roleUutPrefix}-`);
             });
+            // if any token names match, return the first one
             for (const tokenName of tokenNames) {
-                rv.utxo = u;
-                rv.uut = new UutName(roleUutPrefix, tokenName);
-                return rv;
+                return {
+                    utxo,
+                    uut: new UutName(roleUutPrefix, tokenName),
+                };
             }
         }
+        return undefined;
     }
 
     /**
@@ -959,6 +961,7 @@ export class CMDBCapo extends DefaultCapo {
         const entryId = a
             .map((x) => helios.bytesToText(x.bytes))
             .find((x) => x.startsWith("eid-"));
+        if (!entryId) return undefined;
 
         const result = await this.readDatum<BookEntryOnchain>(
             "BookEntry",
@@ -989,10 +992,11 @@ export class CMDBCapo extends DefaultCapo {
     async getOwnerDelegate(
         entryOrId: string | BookEntryOnchain
     ): Promise<AuthorityPolicy> {
-        const entry: forOnChainEntry<any> =
+        const entry =
             "string" == typeof entryOrId
                 ? await this.findBookEntry(entryOrId)
                 : entryOrId;
+        if (!entry) throw new Error(`no entry `);
 
         const delegate = await this.connectDelegateWithLink(
             "ownerAuthority",
