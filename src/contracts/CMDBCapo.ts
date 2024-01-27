@@ -403,56 +403,90 @@ export class CMDBCapo extends DefaultCapo {
         return tcx.addRefInput(foundParentRec);
     }
 
+    /**
+     * Organizes the book pages found in on-chain storage for use in the dApp
+     * @remarks
+     *
+     * 
+     * Indexes all of the pages or Suggested pages found in the contract script
+     * Includes a list of changes for each page.  Each change record is marked
+     * with isCurrent=true if the change is the most recent change to the page,
+     * or with a baseEntry containing the previous (patched) version of the page,
+     * for comparison with the current version
+     * @param entries - the full list of book entries (type=pg, spg, or sug) to index
+     * @public
+     **/
     async mkEntryIndex(entries: BookEntryForUpdate[]): Promise<BookIndex> {
-        const entryIndex: Record<string, BookIndexEntry> = {};
-        const changesById: Record<string, BookEntryForUpdate[]> = {};
+        const pageIndex: Record<string, BookIndexEntry> = {};
+        const changesByPageId: Record<string, BookEntryForUpdate[]> = {};
         for (const e of entries) {
             if (e.entry.entryType == "sug") {
-                const changes = (changesById[e.id] = changesById[e.id] || []);
+                const { changeParentEid: peid } = e.entry;
+                if (!peid) {
+                    console.error(
+                        "ignoring INVALID SUGGESTION entry without changeParentEid: ",
+                        e
+                    );
+                    continue;
+                }
+
+                // populate a list of changes for each page
+                const changes = (changesByPageId[peid] =
+                    changesByPageId[peid] || []);
                 changes.push(e);
             } else {
-                entryIndex[e.id] = {
+                pageIndex[e.id] = {
                     pageEntry: e,
                     changes: [],
                 };
             }
         }
         type txidString = string;
-        const previousEntries: Record<txidString, BookEntryForUpdate> = {};
-        for (const [eid, { pageEntry: entry, changes }] of Object.entries(
-            entryIndex
-        )) {
-            for (const change of changesById[eid]) {
-                if (
-                    change.entry.changeParentTxId.eq(entry.utxo.outputId.txId)
-                ) {
+        const staleEntriesByTxId: Record<txidString, BookEntryForUpdate> = {};
+
+        // with a list of changes for each page-id, we can make a change-list for each page.
+        for (const [eid, { pageEntry, changes }] of Object.entries(pageIndex)) {
+            for (const change of changesByPageId[eid]) {
+                const { changeParentTxId: pTxId, changeParentOidx: pTxIdx } =
+                    change.entry;
+                if (!pTxId) throw new Error(`unreachable`);
+                if (!pTxIdx) throw new Error(`missing changeParentOidx : (`);
+
+                const changeIsFresh = pTxId.eq(pageEntry.utxo.outputId.txId);
+                if (changeIsFresh) {
                     changes.push({
                         change,
                         isCurrent: true,
                     });
                 } else {
-                    const prevTx = change.entry.changeParentTxId;
                     const utxo = await this.network.getUtxo(
-                        new helios.TxOutputId(
-                            prevTx,
-                            change.entry.changeParentOidx
-                        )
+                        new helios.TxOutputId([pTxId, pTxIdx])
                     );
-                    let prevEntry = previousEntries[prevTx.hex];
-                    if (!prevEntry) {
+                    const staleEntryKey = utxo.outputId.toString();
+                    console.log(
+                        "------------------------------- staleEntryKey: ",
+                        staleEntryKey
+                    );
+                    let changeBaseEntry = staleEntriesByTxId[staleEntryKey];
+                    if (!changeBaseEntry) {
                         const prevDatum = await this.readBookEntry(utxo);
-                        prevEntry = previousEntries[prevTx.hex] = prevDatum;
+                        if (!prevDatum)
+                            throw new Error(
+                                `bad book entry without inline datum`
+                            );
+                        changeBaseEntry = staleEntriesByTxId[staleEntryKey] =
+                            prevDatum;
                     }
 
                     changes.push({
                         change,
                         isCurrent: false,
-                        baseEntry: prevEntry,
+                        baseEntry: changeBaseEntry,
                     });
                 }
             }
         }
-        return entryIndex;
+        return pageIndex;
     }
 
     async findBookEntries() {
