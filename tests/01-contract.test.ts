@@ -159,6 +159,22 @@ describe("Capo", async () => {
                     foundCollabToken.uut.name
                 );
             });
+            it("can't have updatedBy during creation", async (context: localTC) => {
+                // prettier-ignore
+                const {h, h:{network, actors, delay, state} } = context;
+                
+                  // const strella = 
+                await h.bootstrap(); 
+                
+                await h.editorInvitesCollaborator(actors.editor);
+                const { content: expectedContent } = testPageEntry;
+                await expect(h.collaboratorCreatesPage(
+                    {...testPageEntry,
+                        //@ts-expect-error
+                        updatedBy: "bad",
+                    }
+                )).rejects.toThrow("updatedBy must be empty");
+            });
 
             it("an editor's created pages are owned by their collaborator role, not the capoGov- token", async (context: localTC) => {
                 console.log("tested at c8br02x");
@@ -274,6 +290,7 @@ describe("Capo", async () => {
                     const freshestPage = await h.book.findBookEntry(resourceId);
                     if (!freshestPage) throw new Error("no updatedPage");
                     expect(freshestPage.entry.entryType).toEqual("pg");
+                    expect(freshestPage.entry.updatedBy).toEqual(editorUut.name);
                     expect(freshestPage.ownerAuthority.uutName).toEqual(
                         camillaCollabToken.uut.name
                     );
@@ -309,6 +326,7 @@ describe("Capo", async () => {
                 });
                 const updatedPage = await h.book.findBookEntry(resourceId);
                 expect(updatedPage).toBeTruthy();
+                expect(updatedPage!.entry.updatedBy).toEqual(editorUut.name);
 
                 expect(updatedPage!.entry.content).toMatch(
                     /Editor updated content/
@@ -362,7 +380,7 @@ describe("Capo", async () => {
                 await h.bootstrap();
                 await h.editorInvitesCollaborator(actors.camilla);
                 h.currentActor = "camilla";
-                const { resourceId } = await h.collaboratorCreatesPage(
+                const { resourceId, tcx } = await h.collaboratorCreatesPage(
                     testSuggestedPage
                 );
                 const existingPage = await h.book.findBookEntry(resourceId);
@@ -376,9 +394,13 @@ describe("Capo", async () => {
                 };
                 await h.collaboratorModifiesPage(existingPage, updates);
 
+                const ownerUut = tcx.state.uuts.collab;
+
                 const updatedPage = await h.book.findBookEntry(resourceId);
                 if (!updatedPage) throw new Error("no updatedPage");
                 console.log("     🐞 updated page", updatedPage.entry.title);
+
+                expect(updatedPage!.entry.updatedBy).toEqual(ownerUut.name);
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
                 expect(updatedPage.entry.content).toMatch(/updated content/);
             });
@@ -389,7 +411,7 @@ describe("Capo", async () => {
                 await h.bootstrap();
                 await h.editorInvitesCollaborator(actors.camilla);
                 h.currentActor = "camilla";
-                const { resourceId } = await h.collaboratorCreatesPage(
+                const { resourceId, tcx } = await h.collaboratorCreatesPage(
                     testSuggestedPage
                 );
                 const existingPage = await h.book.findBookEntry(resourceId);
@@ -405,6 +427,8 @@ describe("Capo", async () => {
                 const updatedPage = await h.book.findBookEntry(resourceId);
                 if (!updatedPage) throw new Error("no updatedPage");
                 console.log("     🐞 updated page", updatedPage.entry.title);
+
+                expect(updatedPage!.entry.updatedBy).toEqual(tcx.state.uuts.collab.name);
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
                 expect(updatedPage.entry.content).toMatch(
                     /Owner updated content/
@@ -571,6 +595,7 @@ describe("Capo", async () => {
                     await h.bootstrap();
 
                     //!!! note: it could be tricky to recognize edits that are WITHIN the change-suggestion.
+                    // expect(updatedPage!.entry.updatedBy).toEqual(tcx.state.uuts.collab.name);
                 }
             );
 
@@ -804,6 +829,7 @@ describe("Capo", async () => {
 
                 const updated = await h.book.findBookEntry(pageId);
                 expect(updated).toBeTruthy();
+                expect(updated.entry.updatedBy).toEqual(editorUut.name);
                 expect (updated!.entry.content).toMatch(/Page content here/);
                 expect (updated!.entry.content).toMatch(/Collaborator suggested update/);
             });

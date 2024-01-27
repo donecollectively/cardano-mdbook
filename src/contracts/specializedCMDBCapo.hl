@@ -260,6 +260,14 @@ enum Activity {
         );
         // lastExpiredAt: Int
     
+        assert(newListing.updatedBy.starts_with("collab-"), "updatedBy must be a collab-* token");
+        // check that the transaction has the collab-* token as an input
+        correctUpdatedBy: Bool = requiresValidDelegateOutput(
+            RelativeDelegateLink{newListing.updatedBy, "address", Option[ValidatorHash]::None}, 
+            mph, ctx, false
+        );
+
+        
         datumCanUpdate : Bool = newDatum.txnHasUpdateAuthority(ownerAuthority, oldListing, ctx, mph);
         assert(datumCanUpdate, "no update authority in txn");
 
@@ -278,6 +286,7 @@ enum Activity {
 
         ( 
             datumCanUpdate  &&
+            correctUpdatedBy &&
             newDatum.validateEntry(ctx, mph) 
         ) ||
         ( 

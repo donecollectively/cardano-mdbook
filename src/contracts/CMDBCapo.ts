@@ -88,6 +88,7 @@ export type BookEntry = {
     content: string;
     createdAt: bigint;
     updatedAt: bigint;
+    updatedBy: string;
     expiresAt: bigint;
     changeParentEid?: string;
     changeParentTxId?: helios.TxId;
@@ -126,7 +127,7 @@ export type BookEntryCreationAttrs = Pick<
 export type RoleInfo = { utxo: TxInput; uut: UutName };
 
 export type BookEntryUpdateAttrs = BookEntryCreationAttrs &
-    Pick<BookEntry, "appliedChanges" | "createdAt" | "expiresAt">;
+    Pick<BookEntry, "appliedChanges" | "createdAt" | "updatedBy" | "expiresAt">;
 
 export type BookSuggestionAttrs = BookEntryCreationAttrs &
     Required<Pick<BookEntry, "changeParentTxId" | "changeParentEid">>;
@@ -223,6 +224,7 @@ export class CMDBCapo extends DefaultCapo {
             content,
             createdAt,
             updatedAt,
+            updatedBy,
             expiresAt,
             appliedChanges = [],
         } = rec;
@@ -261,6 +263,7 @@ export class CMDBCapo extends DefaultCapo {
             content,
             createdAt,
             updatedAt,
+            updatedBy || "",
             expiresAt,
             appliedChanges,
             new OptString(changeParentEid),
@@ -590,6 +593,7 @@ export class CMDBCapo extends DefaultCapo {
                 .addInput(currentEntryUtxo, activity)
                 .validFor(tenMinutes);
 
+            entryForUpdate.updated.updatedBy = ownerCollabInfo.uut.name;
             return this.txnReceiveBookEntry(tcx2, entryForUpdate);
         } else if (isEditor) {
             const tcx1 = await this.txnAddGovAuthorityTokenRef(tcx);
@@ -615,7 +619,8 @@ export class CMDBCapo extends DefaultCapo {
                 .addInput(currentEntryUtxo, activity)
                 .validFor(tenMinutes);
 
-            return this.txnReceiveBookEntry(tcx3, entryForUpdate);
+                entryForUpdate.updated.updatedBy = collabInfo.uut.name;
+                return this.txnReceiveBookEntry(tcx3, entryForUpdate);
         }
         throw new Error(
             "The connected wallet doesn't have the needed editor/collaborator authority to update an entry"
@@ -794,7 +799,7 @@ export class CMDBCapo extends DefaultCapo {
         );
     }
 
-    @partialTxn
+    @partialTxn  // used by accepting-multiple-suggestions code path
     async txnAcceptingOneSuggestion<
         TCX extends StellarTxnContext & isBurningSuggestions
     >(tcx: TCX, suggestionId: string) {

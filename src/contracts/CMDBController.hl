@@ -52,6 +52,7 @@ struct BookEntryStruct {
     content: String
     createdAt: Int
     updatedAt: Int
+    updatedBy: String
     expiresAt: Int
     //  suggestedBy: String // XXX collaborator-id  - see delegation-link, whose content serves the same purpose.
     appliedChanges: []String
@@ -74,6 +75,12 @@ struct BookEntryStruct {
             assert(v.encode_utf8().length >= min,
                 "field length error" // + ": " + fn + " needs " +min.show() + " chars or more"
             )
+        };
+
+        if(self.updatedAt > 0) {
+            assert(self.updatedBy.starts_with("collab-"), "missing required updatedBy")
+        } else {
+            assert(self.updatedBy.encode_utf8().length == 0, "updatedBy must be empty")
         };
 
         assert(goodTypes.get_safe(self.entryType).switch{
