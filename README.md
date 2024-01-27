@@ -18,7 +18,7 @@ Please use `pnpm`, not `npm`.
   - ✅ allow editor to promote a suggested-page to a page
   - ✅ enable direct editing by editor
   - ✅ non-owner can't update
-  - enable change-suggestion by non-owner; post 'chg' entry
+  - enable change-suggestion by non-owner; post 'sug' entry
   - gather topic index and include in site menu
   - enable markdown editor for page-creation
   - optionally integrate suggested changes to page View

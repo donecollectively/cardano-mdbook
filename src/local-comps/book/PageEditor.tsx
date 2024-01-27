@@ -7,6 +7,7 @@ import type {
     BookEntryOnchain,
     BookEntryForUpdate,
     BookEntryUpdateAttrs,
+    BookIndexEntry,
 } from "../../contracts/CMDBCapo.js";
 import { Prose } from "../../components/Prose.jsx";
 import head from "next/head.js";
@@ -18,7 +19,7 @@ import type { NextRouter } from "next/router.js";
 import { PageView } from "./PageView.jsx";
 
 type propsType = {
-    entry?: BookEntryForUpdate;
+    entry?: BookIndexEntry;
     create?: boolean;
     refresh: Function;
     router: NextRouter;
@@ -111,7 +112,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const { entry, bookContract } = this.props;
         // console.error(`MOUNTED CredForm ${this.i}`)
         const current =
-            entry?.entry ||
+            entry?.pageEntry ||
             ({
                 ...testBookPage,
             } as BookEntry);
@@ -214,7 +215,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                     updated: updatedBookEntry,
                   })
 
-            console.warn(dumpAny(tcx));
+            console.warn(dumpAny(tcx, bookContract.networkParams));
             updateState(
                 `sending the ${txnDescription} to your wallet for approval`,
                 {
@@ -542,7 +543,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                             <hr className="not-prose mb-2" />
                             <PageView
                                 {...{
-                                    entry: { ...entry, entry: rec },
+                                    entry: { ...entry, pageEntry: rec },
                                     bookContract,
                                     collabUut: this.props.collabUut,
                                     connectingWallet:

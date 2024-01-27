@@ -1,0 +1,125 @@
+module CMDBController
+
+import {
+    mkTv,
+    tvCharter
+} from StellarHeliosHelpers
+
+func requiresPageInput(
+    ctx: ScriptContext,
+    mph: MintingPolicyHash,
+    pageEid: String
+) -> (Value, TxInput) {
+    pageUutVal : Value = mkTv(mph, pageEid);
+    pageTxIn : TxInput = ctx.tx.inputs.find_safe((txin: TxInput) -> {
+        txin.value >= pageUutVal
+    }).switch{
+        Some{txin} => txin,
+        None => error("missing required input with "+ pageEid + 
+            "\n expected: "+pageUutVal.show()
+        )
+    };
+    (pageUutVal, pageTxIn)
+}
+
+func isAcceptingChangesOnPage(ctx: ScriptContext, pageUtxo : TxInput ) -> Bool {
+    ctx.tx.redeemers.any( 
+        (purpose : ScriptPurpose, redeemer: Data) -> { purpose.switch{ 
+            sp: Spending => {
+                sp.output_id == pageUtxo.output_id &&
+                redeemer.switch {
+                    (index: Int, fields: []Data) => {
+                        index == 3 && // acceptingChanges to a page
+                        fields == fields
+                    },
+                    _ => error("incontheevable")
+                }
+            },
+            _ => false 
+        } }
+    )    
+}
+
+struct BookEntryStruct {
+    entryType: String
+    title: String
+    content: String
+    createdAt: Int
+    updatedAt: Int
+    expiresAt: Int
+    //  suggestedBy: String // XXX collaborator-id  - see delegation-link, whose content serves the same purpose.
+    appliedChanges: []String
+    //! TODO: rejectedChanges: []String 
+    changeParentEid: Option[String]
+    changeParentTxId: Option[TxId] // -> txid
+    changeParentOidx: Option[Int]
+
+    func validate(self, 
+        ctx: ScriptContext, 
+        mph: MintingPolicyHash
+    ) -> Bool {
+        goodTypes = Map[String]Bool{
+            "pg":true, //page
+            "spg": true,  // suggested page
+            "sug": true  // suggested change
+        };
+
+        needsLength : (String, String, Int) -> () = (v : String, fn : String, min : Int) -> {
+            assert(v.encode_utf8().length >= min,
+                "field length error" // + ": " + fn + " needs " +min.show() + " chars or more"
+            )
+        };
+
+        assert(goodTypes.get_safe(self.entryType).switch{
+            None => {
+                error("invalid entryType: '"+ self.entryType + "'")
+            },
+            _ => true
+        }, ""); // already failed as invalid ^^
+
+        validatesOk : Bool = if ("sug" == self.entryType) {
+            assert(
+                self.title.encode_utf8().length >0 || 
+                self.content.encode_utf8().length > 0,
+                 "either title or content must change"
+            );
+            peLength: Int = self.changeParentEid.switch{
+                None => error("missing required changeParentEid"),
+                Some{peid} => peid.encode_utf8().length
+            };
+            assert(
+                peLength > 15, 
+                "changeParent entry too short: "+peLength.show()
+            );
+
+            // the value of the id-token:
+            parentRec : Value = mkTv(mph, self.changeParentEid.unwrap());
+
+            self.changeParentTxId.switch {
+                Some{txid} => {
+                    ctx.tx.ref_inputs.find_safe((txin: TxInput) -> {
+                        txin.output_id.tx_id == txid &&
+                        txin.output.value >= parentRec
+                    }).switch{
+                        Some => {
+                            self.changeParentOidx.switch{
+                                Some => true,
+                                None => error("missing required output-index in changeParentOidx")
+                            } &&
+                            true
+                        },
+                        None => error("no ref_input matching changeParentTxId, changeParentEid")
+                    }
+                },
+                _ => error("missing required changeParentTxId")
+            }        
+        } else {
+            needsLength(self.title, "title", 10);
+            needsLength(self.content, "content", 40);
+
+            true    
+        };
+        
+        validatesOk
+    }
+}

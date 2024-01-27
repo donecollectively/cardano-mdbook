@@ -1,6 +1,7 @@
 import {
     ADA,
     DefaultCapoTestHelper,
+    dumpAny,
     helios,
     StellarTxnContext,
     type Wallet,
@@ -154,10 +155,46 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
     }
 
     async editorAcceptsSuggestion() {
+        
+
+
+
+
+
+
+
 
     }
 
-    async ownerAcceptsSuggestion() {
+    async ownerAcceptsSuggestions(
+        page: BookEntryForUpdate, 
+        suggestions: BookEntryForUpdate[]
+    ) {
+        if (!this.book)
+            throw new Error(
+                `book contract not bootstrapped; no book pages can exist`
+            );
+
+        console.log(
+            "--------------------------- Test helper: Owner accepts suggestion",
+            page.id
+        );
+        const tcx = await this.book.mkTxnAcceptingPageChanges(
+            page, suggestions
+        );
+        const resourceId = tcx.state.uuts.entryId.name;
+        console.log("               -------------------------------------\nbefore submitting suggestion-merge", dumpAny(tcx))
+        return this.book.submit(tcx).then(
+            (txid) => {
+                this.network.tick(1n);
+
+                return updatedResource({ 
+                    txid, 
+                    resourceId, 
+                    tcx 
+                });
+            }
+        )
 
     }
 

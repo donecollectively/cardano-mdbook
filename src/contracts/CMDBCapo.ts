@@ -13,6 +13,7 @@ import type {
     SeedTxnParams,
     RelativeDelegateLink,
     hasUutContext,
+    hasSeedUtxo,
 } from "@donecollectively/stellar-contracts";
 
 import {
@@ -29,13 +30,14 @@ import {
     helios,
     txn,
     dumpAny,
+    mkValuesEntry,
 } from "@donecollectively/stellar-contracts";
 
 const {
     Value,
     TxOutput,
     Datum,
-    //xx @ts-expect-error
+    //@ts-expect-error
     Option,
     TxOutputId,
 } = helios;
@@ -55,6 +57,7 @@ import type {
 import specializedCapo from "./specializedCMDBCapo.hl"; // assert { type: 'text' };
 
 import { CMDBMintDelegate } from "./CMDBMintDelegate.js";
+import { CMDBController } from "./CMDBController.js";
 
 export type BookEntryOnchain = {
     ownerAuthority: RelativeDelegateLink<AuthorityPolicy>;
@@ -80,44 +83,53 @@ export type BookEntryUpdateOptions = {
 };
 
 export type BookEntry = {
-    entryType: "pg" | "spg" | "chg";
+    entryType: "pg" | "spg" | "sug";
     title: string;
     content: string;
     createdAt: bigint;
     updatedAt: bigint;
     expiresAt: bigint;
-    changeParentEntry?: string;
-    changeParentTxn?: helios.TxId;
+    changeParentEid?: string;
+    changeParentTxId?: helios.TxId;
     changeParentOidx?: number;
+    appliedChanges?: string[];
+    //! TODO:  rejectedChanges?: string[];
     // suggestedBy?: string; // XXX see delegate link, whose content serves the same purpose
 };
 
 export type BookIndexEntry = {
-    pageEntry: BookEntryForUpdate
-    changes: ChangeDetails[]
-}
+    pageEntry: BookEntryForUpdate;
+    changes: ChangeDetails[];
+};
 
 export type ChangeDetails = {
-    change: BookEntryForUpdate
-} & ( {
-    isCurrent: true
-} | {
-    isCurrent: false,
-    baseEntry: BookEntryForUpdate
-});
+    change: BookEntryForUpdate;
+} & (
+    | {
+          isCurrent: true;
+      }
+    | {
+          isCurrent: false;
+          baseEntry: BookEntryForUpdate;
+      }
+);
 
 export type BookEntryCreationAttrs = Pick<
     BookEntry,
-    "title" | "content" | "entryType" | 
-    "changeParentEntry" | "changeParentTxn" | "changeParentOidx"
+    | "title"
+    | "content"
+    | "entryType"
+    | "changeParentEid"
+    | "changeParentTxId"
+    | "changeParentOidx"
 >;
 export type RoleInfo = { utxo: TxInput; uut: UutName };
 
 export type BookEntryUpdateAttrs = BookEntryCreationAttrs &
-    Pick<BookEntry, "createdAt" | "expiresAt">;
+    Pick<BookEntry, "appliedChanges" | "createdAt" | "expiresAt">;
 
 export type BookSuggestionAttrs = BookEntryCreationAttrs &
-    Required<Pick<BookEntry, "changeParentTxn" | "changeParentEntry">>;
+    Required<Pick<BookEntry, "changeParentTxId" | "changeParentEid">>;
 
 type entryId = string;
 export type BookEntryCreate = forOnChainEntry<BookEntryCreationAttrs> & {
@@ -140,12 +152,19 @@ export type BookEntryUpdated = {
 
 export type BookIndex = Record<string, BookIndexEntry>;
 
+type isBurningSuggestions = { state: { burningSuggestions: UutName[] } };
+
 export class CMDBCapo extends DefaultCapo {
     get specializedCapo() {
         return mkHeliosModule(
             specializedCapo,
             "src/contracts/specializedCMDBCapo.hl"
         );
+    }
+    importModules() {
+        const modules = [...super.importModules(), CMDBController];
+        // console.error(modules.map(x => x.moduleName));
+        return modules;
     }
 
     static get defaultParams() {
@@ -154,9 +173,23 @@ export class CMDBCapo extends DefaultCapo {
 
     @Activity.redeemer
     protected activityUpdatingEntry(): isActivity {
-        const { updatingEntry } = this.onChainActivitiesType;
-        const t = new updatingEntry();
+        const Updating = this.mustGetActivity("updatingEntry");
+        const t = new Updating();
 
+        return { redeemer: t._toUplcData() };
+    }
+
+    @Activity.redeemer
+    activityAcceptingChanges() {
+        const Accepting = this.mustGetActivity("acceptingChanges");
+        const t = new Accepting();
+        return { redeemer: t._toUplcData() };
+    }
+
+    @Activity.redeemer
+    activitySuggestionBeingAccepted() {
+        const AcceptingOne = this.mustGetActivity("suggestionBeingAccepted");
+        const t = new AcceptingOne();
         return { redeemer: t._toUplcData() };
     }
 
@@ -184,37 +217,43 @@ export class CMDBCapo extends DefaultCapo {
             rec.updatedAt = 0n;
         }
         rec.expiresAt = BigInt(Date.now() + 364 * 24 * 60 * 60 * 1000);
-        const { entryType, title, content, createdAt, updatedAt, expiresAt } =
-            rec;
-        let { changeParentTxn, changeParentEntry, changeParentOidx } = rec;
+        const {
+            entryType,
+            title,
+            content,
+            createdAt,
+            updatedAt,
+            expiresAt,
+            appliedChanges = [],
+        } = rec;
+        let { changeParentTxId, changeParentEid, changeParentOidx } = rec;
 
-        if ("chg" == entryType) {
-            if (!changeParentEntry) {
+        if ("sug" == entryType) {
+            if (!changeParentEid) {
                 throw new Error(
-                    `missing required changeParentEntry - a eid-* asset-name of page being changed`
+                    `missing required changeParentEid - a eid-* asset-name of page being changed`
                 );
             }
-            if (!changeParentTxn) {
+            if (!changeParentTxId || !changeParentOidx) {
                 //!!! todo: ensure refUtxo to this txid is present in the resulting txn
                 throw new Error(
-                    `missing required changeParentTxn - TxId in which the change-parent was last modified`
+                    `missing required changeParentTxId / changeParentOidx - TxId/index in which the change-parent was last modified`
                 );
             }
             if ("undefined" == typeof changeParentOidx) {
-                throw new Error(
-                    `missing required changeParentOidx`
-                );
+                throw new Error(`missing required changeParentOidx`);
             }
-            console.log("changeParentTxn: ", dumpAny(changeParentTxn));
+            console.log("changeParentTxId: ", dumpAny(changeParentTxId));
         } else {
-            changeParentEntry = "";
-            changeParentTxn = undefined;
+            changeParentEid = "";
+            changeParentTxId = undefined;
             changeParentOidx = undefined;
         }
         const OptTxId = Option(helios.TxId);
-        const OptIndex = Option(helios.HInt)
-        const chParentTxId = new OptTxId(changeParentTxn);
-        const chParentOidx = new OptIndex(changeParentOidx);
+        const OptIndex = Option(helios.HInt);
+        //@ts-expect-error
+        const OptString = Option(helios.HString);
+        debugger;
         const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
         const bookEntryStruct = new hlBookEntryStruct(
             entryType,
@@ -223,9 +262,10 @@ export class CMDBCapo extends DefaultCapo {
             createdAt,
             updatedAt,
             expiresAt,
-            changeParentEntry,
-            chParentTxId,
-            chParentOidx
+            appliedChanges,
+            new OptString(changeParentEid),
+            new OptTxId(changeParentTxId),
+            new OptIndex(changeParentOidx)
         );
         const t = new hlBookEntry(ownerAuthority, bookEntryStruct);
         return Datum.inline(t._toUplcData());
@@ -266,7 +306,7 @@ export class CMDBCapo extends DefaultCapo {
      * @public
      **/
     // @txn
-    async mkTxnCreatingBookEntry<TCX extends StellarTxnContext>(
+    async mkTxnCreatingBookEntry<TCX extends StellarTxnContext & hasSeedUtxo>(
         entry: BookEntryCreationAttrs,
         iTcx?: TCX
     ) {
@@ -287,28 +327,38 @@ export class CMDBCapo extends DefaultCapo {
 
             throw new Error(message);
         }
+        const tcx =
+            iTcx ||
+            (await this.addSeedUtxo(new StellarTxnContext(this.myActor)));
 
-        const tcx1 = await this.mkTxnMintingUuts(
-            iTcx || new StellarTxnContext(this.myActor),
+        const mintDelegate = await this.getMintDelegate();
+        const tcx1a = await this.txnMintingUuts(
+            tcx,
             ["eid"],
-            undefined,
+            {
+                mintDelegateActivity: mintDelegate.activityCreatingBookPage(
+                    tcx.getSeedAttrs()
+                ),
+            },
             {
                 entryId: "eid",
             }
         );
 
-        const tcx1a = await this.txnAddUserCollabRole(tcx1, myCollabRoleInfo);
+        const tcx1b = await this.txnAddUserCollabRole(tcx1a, myCollabRoleInfo);
 
-        console.log(tcx1a.dump());
-        const tcx1b = myEditorToken
-            ? await this.txnAddGovAuthorityTokenRef(tcx1a)
-            : tcx1a;
+        // console.log(tcx1b.dump());
+        console.log("################# myEditorToken", { myEditorToken });
+        const tcx1c = myEditorToken
+            ? await this.txnAddGovAuthorityTokenRef(tcx1b)
+            : tcx1b;
+
+        // await this.txnMustUseCharterUtxo(tcx, "refInput")
 
         const tcx2 =
-            entry.entryType == "chg"
-                ? await this.txnAddParentRefUtxo(tcx1b, entry.changeParentEntry)
-                : tcx1b;
-
+            entry.entryType == "sug"
+                ? await this.txnAddParentRefUtxo(tcx1c, entry.changeParentEid)
+                : tcx1c;
 
         //  - create a delegate-link connecting the entry to the collaborator
         const ownerAuthority = this.txnCreateConfiguredDelegate(
@@ -322,19 +372,24 @@ export class CMDBCapo extends DefaultCapo {
                 },
             }
         );
-        const tenMinutes = 1000 * 60 * 10;
-
+        const createEntry: BookEntryCreate = {
+            id: tcx2.state.uuts.entryId.name,
+            ownerAuthority,
+            entry: entry,
+        };
         //  - combine the delegate-link with the entry, to package it for on-chain storage
         //  - send the entry's UUT to the contract, with the right on-chain datum
-        const tcx3 = await this.txnReceiveBookEntry(tcx2, {
-            ownerAuthority,
-            id: tcx2.state.uuts.entryId.name,
-            entry: entry,
-        });
-        console.warn("after receiveBookEntry", dumpAny(tcx3.tx));
+        const tcx3 = await this.txnReceiveBookEntry(tcx2, createEntry);
+        console.log(
+            "   -- after receiveBookEntry:",
+            dumpAny(tcx3.tx, this.networkParams)
+        );
+
+        const tenMinutes = 1000 * 60 * 10;
         tcx3.validFor(tenMinutes);
+
         // debugger;
-        return tcx3
+        return tcx3;
     }
 
     async txnAddParentRefUtxo<TCX extends StellarTxnContext>(
@@ -348,47 +403,52 @@ export class CMDBCapo extends DefaultCapo {
         return tcx.addRefInput(foundParentRec);
     }
 
-    async mkEntryIndex(
-        entries: BookEntryForUpdate[]
-    ): Promise<BookIndex> {
+    async mkEntryIndex(entries: BookEntryForUpdate[]): Promise<BookIndex> {
         const entryIndex: Record<string, BookIndexEntry> = {};
-        const changesById : Record<string, BookEntryForUpdate[]>= {};
+        const changesById: Record<string, BookEntryForUpdate[]> = {};
         for (const e of entries) {
-            if (e.entry.entryType == "chg") {
-                const changes = changesById[e.id] = changesById[e.id] || [];
-                changes.push(e)
+            if (e.entry.entryType == "sug") {
+                const changes = (changesById[e.id] = changesById[e.id] || []);
+                changes.push(e);
             } else {
                 entryIndex[e.id] = {
                     pageEntry: e,
-                    changes: []
+                    changes: [],
                 };
             }
         }
-        type txidString = string
-        const previousEntries : Record<txidString, BookEntryForUpdate> = {}
-        for (const [eid, {pageEntry: entry,changes}] of Object.entries(entryIndex)) {
+        type txidString = string;
+        const previousEntries: Record<txidString, BookEntryForUpdate> = {};
+        for (const [eid, { pageEntry: entry, changes }] of Object.entries(
+            entryIndex
+        )) {
             for (const change of changesById[eid]) {
-                if (change.entry.changeParentTxn.eq(entry.utxo.outputId.txId)) {
+                if (
+                    change.entry.changeParentTxId.eq(entry.utxo.outputId.txId)
+                ) {
                     changes.push({
                         change,
-                        isCurrent: true
-                    })
+                        isCurrent: true,
+                    });
                 } else {
-                    const prevTx = change.entry.changeParentTxn
+                    const prevTx = change.entry.changeParentTxId;
                     const utxo = await this.network.getUtxo(
-                        new helios.TxOutputId(prevTx, change.entry.changeParentOidx)
+                        new helios.TxOutputId(
+                            prevTx,
+                            change.entry.changeParentOidx
+                        )
                     );
                     let prevEntry = previousEntries[prevTx.hex];
                     if (!prevEntry) {
                         const prevDatum = await this.readBookEntry(utxo);
-                        prevEntry = previousEntries[prevTx.hex] = prevDatum
+                        prevEntry = previousEntries[prevTx.hex] = prevDatum;
                     }
 
                     changes.push({
                         change,
                         isCurrent: false,
-                        baseEntry: prevEntry
-                    })
+                        baseEntry: prevEntry,
+                    });
                 }
             }
         }
@@ -463,7 +523,11 @@ export class CMDBCapo extends DefaultCapo {
      * @public
      **/
     @txn
-    async mkTxnUpdatingEntry(entryForUpdate: BookEntryForUpdate) {
+    async mkTxnUpdatingEntry(
+        entryForUpdate: BookEntryForUpdate,
+        activity = this.activityUpdatingEntry(),
+        tcx = new StellarTxnContext(this.myActor)
+    ) {
         const {
             // id,
             utxo: currentEntryUtxo,
@@ -474,6 +538,7 @@ export class CMDBCapo extends DefaultCapo {
 
         const tenMinutes = 1000 * 60 * 10;
 
+        // get the user's ownership role for the page, if found
         const ownerCollabInfo = await this.findOwnershipRoleInfo(
             entryForUpdate
         );
@@ -484,29 +549,30 @@ export class CMDBCapo extends DefaultCapo {
         const isEditor = !!editorInfo?.uut;
 
         if (ownerCollabInfo) {
-            const tcx = await this.txnAddUserCollabRole(
-                new StellarTxnContext(),
-                ownerCollabInfo
-            );
+            const tcx1 = await this.txnAddUserCollabRole(tcx, ownerCollabInfo);
             console.log("   🐞 book entry update, with ownership");
-            const tcx2 = tcx
+            const tcx2 = tcx1
                 .attachScript(this.compiledScript)
-                .addInput(currentEntryUtxo, this.activityUpdatingEntry())
+                .addInput(currentEntryUtxo, activity)
                 .validFor(tenMinutes);
 
             return this.txnReceiveBookEntry(tcx2, entryForUpdate);
         } else if (isEditor) {
-            const tcx1 = await this.txnAddGovAuthorityTokenRef(
-                new StellarTxnContext()
+            const tcx1 = await this.txnAddGovAuthorityTokenRef(tcx);
+            console.log(
+                "   🐞 book entry update as editor",
+                dumpAny(tcx1, this.networkParams)
             );
-            console.log("   🐞 book entry update as editor", dumpAny(tcx1));
 
             // const tcx1a = await this.txnAddGovAuthority(tcx1);
             // console.log("   🐞 added govAuthority", dumpAny(tcx1a));
             const collabInfo = await this.findUserRoleInfo("collab");
 
             const tcx2 = await this.txnAddUserCollabRole(tcx1, collabInfo);
-            console.log("   🐞 added editor collab role", dumpAny(tcx2));
+            console.log(
+                "   🐞 added editor collab role",
+                dumpAny(tcx2, this.networkParams)
+            );
 
             const tcx3 = tcx2
                 .attachScript(this.compiledScript)
@@ -532,7 +598,7 @@ export class CMDBCapo extends DefaultCapo {
     async txnAddUserToken<TCX extends StellarTxnContext>(
         tcx: TCX,
         roleToken: RoleInfo
-    ) : Promise<TCX> {
+    ): Promise<TCX> {
         const t: TxInputType = roleToken?.utxo;
         if (!t)
             throw new Error(
@@ -542,10 +608,8 @@ export class CMDBCapo extends DefaultCapo {
         return tcx.addInput(roleToken.utxo).addOutput(t.output);
     }
 
-    async mkTxnSuggestingUpdate(
-        entryForUpdate: BookEntryForUpdate
-    ) {
-        //! creates a new record with entryType="chg"
+    async mkTxnSuggestingUpdate(entryForUpdate: BookEntryForUpdate) {
+        //! creates a new record with entryType="sug"
         const collabInfo = await this.findUserRoleInfo("collab");
         if (!collabInfo) {
             throw new Error(`user doesn't have a collab-* token`);
@@ -559,10 +623,10 @@ export class CMDBCapo extends DefaultCapo {
         const outputId = entryForUpdate.utxo.outputId;
         const diffUpdate: BookEntryCreationAttrs = {
             content: "",
-            entryType: "chg",
+            entryType: "sug",
             title: "",
-            changeParentEntry: id,
-            changeParentTxn: outputId.txId,
+            changeParentEid: id,
+            changeParentTxId: outputId.txId,
             changeParentOidx: outputId.utxoIdx,
         };
         if (titleBefore != newTitle) {
@@ -572,7 +636,7 @@ export class CMDBCapo extends DefaultCapo {
             //UI can perform and present an in-memory diff.
             diffUpdate.title = newTitle;
         }
-        
+
         if (!newContent.endsWith("\n")) newContent = newContent + "\n";
         if (!contentBefore.endsWith("\n")) contentBefore = contentBefore + "\n";
         if (contentBefore != newContent) {
@@ -596,10 +660,10 @@ export class CMDBCapo extends DefaultCapo {
             const [pp] = parsePatch(p2); // works fine; VERY similar to result of structuredPatch
             const patched = applyPatch(contentBefore, p2);
             if (!patched) {
-                console.error({contentBefore});
-                console.error({patch: p2})
-                console.error({pp});
-                console.error({newContent});
+                console.error({ contentBefore });
+                console.error({ patch: p2 });
+                console.error({ pp });
+                console.error({ newContent });
                 throw new Error(`patch reported a conflict`);
             }
 
@@ -610,12 +674,117 @@ export class CMDBCapo extends DefaultCapo {
                 throw new Error(`patch doesn't produce expected result`);
             }
 
-
             debugger;
             diffUpdate.content = p2;
         }
 
         return this.mkTxnCreatingBookEntry(diffUpdate);
+    }
+
+    async mkTxnAcceptingPageChanges(
+        page: BookEntryForUpdate,
+        suggestions: BookEntryForUpdate[],
+        merged: { content?: string; title?: string } = {}
+    ) {
+        const { 
+            entry: pageEntry,
+            id: pageEid,
+         } = page;
+        const { title: pageTitle, content: pageContent } = pageEntry;
+
+        const mergedContent = merged?.content;
+        const mergedTitle = merged?.title;
+
+        let autoMergedContent = pageContent;
+        let autoMergedTitle = "";
+
+        let suggestionIds: string[] = [];
+        for (const suggestion of suggestions) {
+            const { entry: suggestionEntry } = suggestion;
+            const { changeParentEid, changeParentOidx, changeParentTxId } =
+                suggestionEntry;
+            const { title: patchTitle, content: patchContent } =
+                suggestionEntry;
+
+            suggestionIds.push(suggestion.id);
+
+            if (page.id != changeParentEid) {
+                throw new Error(
+                    `suggestion ${suggestion.id} (for page ${changeParentEid}) doesn't apply to this page ${page.id}`
+                );
+            }
+
+            // tries to apply all the patches, unless pre-merged content is provided
+            if (!mergedContent) {
+                // throws exception if patch doesn't apply cleanly
+                const patched = applyPatch(autoMergedContent, patchContent);
+                if (!patched)
+                    throw new Error(
+                        `suggestion ${suggestion.id} doesn't apply cleanly to page ${page.id}`
+                    );
+                autoMergedContent = patched;
+            }
+
+            if (patchTitle && !merged.title) {
+                if (autoMergedTitle)
+                    throw new Error(
+                        `multiple patches modify title; multi-merge must provide merged.title to mkTxnAcceptingSuggestions`
+                    );
+                autoMergedTitle = patchTitle;
+            }
+        }
+
+        const tcx = await this.mkTxnUpdatingEntry(
+            {
+                ...page,
+                updated: {
+                    ...pageEntry,
+                    title: merged.title || autoMergedTitle || pageTitle,
+                    content: merged.content || autoMergedContent || pageContent,
+                    appliedChanges: suggestionIds,
+                },
+            },
+            this.activityAcceptingChanges()
+        );
+        const burningSuggestions: UutName[] = [];
+        let tcx2 = tcx as typeof tcx & isBurningSuggestions;
+        tcx2.state.burningSuggestions = burningSuggestions;
+
+        for (const suggestionId of suggestionIds) {
+            tcx2 = await this.txnAcceptingOneSuggestion(tcx2, suggestionId);
+        }
+
+        return this.txnBurnAcceptedSuggestions(tcx, pageEid, burningSuggestions);
+    }
+    
+    @partialTxn
+    async txnAcceptingOneSuggestion<
+        TCX extends StellarTxnContext & isBurningSuggestions
+    >(tcx: TCX, suggestionId: string) {
+        const utxo = await this.mustFindMyUtxo(
+            `suggestion ${suggestionId}`,
+            this.mkTokenPredicate(this.mph, suggestionId)
+        );
+        // tcx.attachScript(this.compiledScript).
+        tcx.addInput(utxo, this.activitySuggestionBeingAccepted());
+        tcx.state.burningSuggestions.push(new UutName("eid", suggestionId));
+        return tcx
+    }
+
+    async txnBurnAcceptedSuggestions<TCX extends StellarTxnContext>(
+        tcx: TCX,
+        pageEid: string,
+        uuts: UutName[]
+    ): Promise<TCX> {
+        const minter = this.connectMinter();
+        const vEntries = uuts.map((uut) => mkValuesEntry(uut.name, -1n));
+        const mintDgt = await this.getMintDelegate();
+        return minter.txnMintWithDelegateAuthorizing(
+            tcx,
+            vEntries,
+            mintDgt,
+            mintDgt.burnSuggestionsBeingAccepted(pageEid)
+        );
     }
 
     mkUutName(purpose: string, txin: TxInput) {
@@ -697,12 +866,10 @@ export class CMDBCapo extends DefaultCapo {
 
         const eid = new UutName("eid", entry.id);
 
-        return tcx.addState(
-            "newEntry", 
-            await this.readBookEntry(txin)
-        ).addUut(
-            eid, "entryId", "eid"
-        ).addOutput(utxo);
+        return tcx
+            .addState("newEntry", await this.readBookEntry(txin))
+            .addUut(eid, "entryId", "eid")
+            .addOutput(utxo);
     }
     // Address.fromHash(entry.ownerAuthority.delegateValidatorHash),
 
@@ -800,6 +967,10 @@ export class CMDBCapo extends DefaultCapo {
         return delegate;
     }
 
+    async getMintDelegate() {
+        return (await super.getMintDelegate()) as CMDBMintDelegate;
+    }
+
     /**
      * Creates a transaction minting a collaborator token
      * @remarks
@@ -810,9 +981,15 @@ export class CMDBCapo extends DefaultCapo {
      **/
     @txn
     async mkTxnMintCollaboratorToken(addr: Address) {
-        const tcx= new StellarTxnContext();
+        const tcx = await this.addSeedUtxo(new StellarTxnContext(this.myActor));
 
-        const tcx2 = await this.mkTxnMintingUuts(tcx, ["collab"]);
+        const mintDelegate = await this.getMintDelegate();
+        debugger;
+        const tcx2 = await this.txnMintingUuts(tcx, ["collab"], {
+            mintDelegateActivity: mintDelegate.activityMintingCollaboratorToken(
+                tcx.getSeedAttrs()
+            ),
+        });
         return tcx2.addOutput(
             new helios.TxOutput(
                 addr,
@@ -823,16 +1000,17 @@ export class CMDBCapo extends DefaultCapo {
 
     requirements() {
         // note that these requirements augment the essential capabilities
-        // ... and requirements of the base Capo class.  In particular, 
+        // ... and requirements of the base Capo class.  In particular,
         // ... the governance token 'capoGov-XXXXX' is held by the book's editor
         return hasReqts({
             "creates a registry of pages": {
-                purpose: "enables finding and presenting lists of the book's content",
+                purpose:
+                    "enables finding and presenting lists of the book's content",
                 details: [
                     "Provides API endpoints for listing current pages in the book.",
                     "Normally, only pages that are up-to-date are included, but expired pages can also be found.",
                     "Provides endpoints for finding Suggested pages.",
-                    "Provides endpoints for finding changes being proposed to any page or suggested page."
+                    "Provides endpoints for finding changes being proposed to any page or suggested page.",
                 ],
                 mech: [],
                 requires: [
@@ -851,7 +1029,7 @@ export class CMDBCapo extends DefaultCapo {
                 details: [
                     "The book's authority token is issued to a wallet for now,",
                     "  ... and later, can be decentralized further",
-                    "The holder of that capoGov-XXX authority token is called the editor here."
+                    "The holder of that capoGov-XXX authority token is called the editor here.",
                 ],
                 mech: [
                     "the editor can directly create book pages, with entryType=pg",
@@ -885,22 +1063,23 @@ export class CMDBCapo extends DefaultCapo {
                     "todo: includes suggested entries when used with suggested:true",
                     "todo: doesn't include suggested edits to pages at the top level",
                     "todo: each record includes any suggested changes that are pending",
-                ]
+                ],
             },
 
             "editor and page-owners can apply changes directly": {
                 purpose: "spreads responsibility for page maintenance",
                 details: [
                     "Each page can have an owner, who can apply changes to that page. ",
-                    "This allows a responsible party to skip unnecessary beaurocracy",                    
+                    "This allows a responsible party to skip unnecessary beaurocracy",
                 ],
                 mech: [
                     "editor can upgrade a suggested page to type=pg",
-                    "TODO: TEST editor can make changes to another collaborator's page",
+                    "editor can make changes to another collaborator's page",
                     "editor can make changes to a suggested page without changing its type",
                     "a random collaborator can't apply changes directly to a page",
                     "a page owner can directly apply changes to their owned page",
                     "the owner of a SUGGESTED page can directly apply updates",
+                    "TODO: the appliedChanges field should be emptied",
                 ],
             },
 
@@ -927,7 +1106,7 @@ export class CMDBCapo extends DefaultCapo {
                 ],
                 mech: [
                     "a collaborator token is required to suggest changes",
-                    "a collaborator can suggest page changes, with entryType='chg' for Change",
+                    "a collaborator can suggest page changes, with entryType='sug' for Suggestion",
                     "the suggestor's collaborator token is referenced as the Change record's ownerAuthority",
                     "an editor's suggestions are owned by their collaborator role",
                     "TODO: the suggestor can adjust the Change record before it is accepted",
@@ -949,18 +1128,16 @@ export class CMDBCapo extends DefaultCapo {
                     "  ... can  resolve the conflict manually and through visual inspection. ",
                     "When a change is accepted, the change record is removed, ",
                     "  ... its eid-* UUT is burned, ",
-                    "  ... and is referenced in the page record's appliedChanges field",                    
+                    "  ... and is referenced in the page record's appliedChanges field",
                 ],
-                requires: [
-                    "application-layer conflict management"
-                ],
+                requires: ["application-layer conflict management"],
                 mech: [
                     "TODO: editor can accept a suggested change",
                     "TODO: page owner can accept a suggested change",
                     "TODO: a random collaborator can't accept a suggested change",
-                    "TODO: the change originator receives the suggestion's minUtxo",
-                    "TODO: the suggestion's eid-* UUT is burned."
-                ]
+                    "TODO: when accepted, the change originator receives the suggestion's minUtxo",
+                    "TODO: when accepted, the suggestion's eid-* UUT is burned.",
+                ],
             },
 
             "application-layer conflict management": {
@@ -981,19 +1158,20 @@ export class CMDBCapo extends DefaultCapo {
             },
 
             "well specified data format for change suggestions": {
-                purpose: "enables interoperability of change suggestions either with our dAPI or without",
+                purpose:
+                    "enables interoperability of change suggestions either with our dAPI or without",
                 details: [
-                    "Each change suggestion references the utxo of the page being changed. ",                    
+                    "Each change suggestion references the utxo of the page being changed. ",
                     "When the parent utxo is still most current, then the change can always be applied, ",
-                    "  .... otherwise, patch conflict resolution may be needed.",
+                    "  ... otherwise, patch conflict resolution may be needed.",
                     "Content changes are formatted as a diff.",
-                    "Title changes are reflected without a diff format."
+                    "Title changes are reflected without a diff format.",
                 ],
                 mech: [
                     "references the parent transaction-id",
                     "formats title as direct change, leaving content empty if unchanged",
                     "formats content changes as a diff, leaving title empty if unchanged",
-                ]
+                ],
             },
 
             "editors and page-owners can reject changes": {
@@ -1010,7 +1188,7 @@ export class CMDBCapo extends DefaultCapo {
                     "TODO: editor can reject a suggested change",
                     "TODO: page owner can reject a suggested change",
                     "TODO: when a change is rejected, its eid-* UUT is burned.",
-                ]
+                ],
             },
 
             "page expiration and freshening": {
@@ -1045,7 +1223,6 @@ export class CMDBCapo extends DefaultCapo {
                     // "FUT: A virtual deletion can be developed by momentum of collaborators"
                 ],
             },
-
         });
     }
 }

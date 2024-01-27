@@ -25,18 +25,11 @@ import {
     outputDatum
 } from StellarHeliosHelpers
 
-struct BookEntryStruct {
-    entryType: String
-    title: String
-    content: String
-    createdAt: Int
-    updatedAt: Int
-    expiresAt: Int
-    //  suggestedBy: String // XXX collaborator-id  - see delegation-link, whose content serves the same purpose.
-    changeParentEntry: String // id of parent obj
-    changeParentTxn: Option[TxId] // -> txid
-    changeParentOidx: Option[Int]
-}
+import {
+    BookEntryStruct,
+    requiresPageInput,
+    isAcceptingChangesOnPage
+} from CMDBController
 
 // struct LocalCapoConfig {
 //     openCreate: Bool "@opn"
@@ -67,81 +60,27 @@ enum Datum {
 
     func validateEntry(self, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool{
         self.switch{
-            BookEntry{_, entry} => {
-                needsLength : (String, String, Int) -> () = (v : String, fn : String, min : Int) -> {
-                    assert(v.encode_utf8().length >= min,
-                        "field length error" // + ": " + fn + " needs " +min.show() + " chars or more"
-                    )
-                };
-
-                goodTypes = Map[String]Bool{
-                    "pg":true, //page
-                    "spg": true,  // suggested page
-                    "chg": true  // suggested change
-                };
-                assert(goodTypes.get_safe(entry.entryType).switch{
-                    None => {
-                        error("invalid entryType: '"+ entry.entryType + "'")
-                    },
-                    _ => true
-                }, ""); // already failed as invalid ^^
-
-                validatesOk : Bool = if ("chg" == entry.entryType) {
-                    assert(
-                        entry.title.encode_utf8().length >0 || 
-                        entry.content.encode_utf8().length > 0,
-                         "either title or content must change"
-                    );
-                    peLength: Int = entry.changeParentEntry.encode_utf8().length;
-                    assert(
-                        peLength > 15, 
-                        "changeParent entry too short: "+peLength.show()
-                    );
-
-                    // the value of the id-token:
-                    parentRec : Value = mkTv(mph, entry.changeParentEntry);
-
-                    entry.changeParentTxn.switch {
-                        Some{txid} => {
-                            ctx.tx.ref_inputs.find_safe((txin: TxInput) -> {
-                                txin.output_id.tx_id == txid &&
-                                txin.output.value >= parentRec
-                            }).switch{
-                                Some => {
-                                    entry.changeParentOidx.switch{
-                                        Some => true,
-                                        None => error("missing required output-index for changeParentOidx")
-                                    } &&
-                                    true
-                                },
-                                None => error("no ref_input matching changeParentTxn, changeParentEntry")
-                            }
-                        },
-                        _ => error("missing required changeParentTxn")
-                    }        
-                } else {
-                    needsLength(entry.title, "title", 10);
-                    needsLength(entry.content, "content", 40);
-
-                    true    
-                };
-                
-                validatesOk
+            BookEntry{_, entry} => {                
+                entry.validate(ctx, mph)
             },
             _ => error("wrong datum type")//"validateEntry only works on BookEntry datum")
         }
     }
 
-    func txnHasUpdateAuthority(self, ownerAuthority: RelativeDelegateLink, oldListing: BookEntryStruct, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+    func txnHasUpdateAuthority(self, 
+        ownerAuthority: RelativeDelegateLink, 
+        oldListing: BookEntryStruct, 
+        ctx: ScriptContext,
+        mph: MintingPolicyHash
+    ) -> Bool {
         self.switch{
             BookEntry{newOwnerAuthority, bookEntry} => {
-        
-                // hasCollabToken : Bool = (
-                //     ownerAuthority.uutName.starts_with("collab-") &&
-                //     requiresValidDelegateOutput(ownerAuthority, mph, ctx)
-                // );
+                hasCollabToken : Bool = (
+                    ownerAuthority.uutName.starts_with("collab-") &&
+                    requiresValidDelegateOutput(ownerAuthority, mph, ctx, false)
+                );
 
-                needsEditorForActivity : Option[String] = 
+                editorRequired : Option[String] = 
                     //! if the entryType is changing to "pg", requires editor authority.
                     if (oldListing.entryType == "spg" && bookEntry.entryType == "pg") { 
                         Option[String]::Some{"change from spg to pg"}
@@ -156,22 +95,33 @@ enum Datum {
 
                 charterData : Option[Datum::CharterToken] = self.hasCharterRefInput(ctx, mph);
 
-                availableAuthority : RelativeDelegateLink = charterData.switch{
-                    Some{Datum::CharterToken{govAuthority, _}} => {
-                        print("using editor's govAuthority for doc update");
-                        govAuthority
-                    },
-                    None => {
-                        needsEditorForActivity.switch{
-                            Some{activity} => error("update: insufficient authority for "+activity),
-                            None => {
-                                print("no charter-ref; requiring document-owner authority for doc update");
-                                ownerAuthority
-                            }
-                        }
+                // determine if the editor authority needs to be used here:
+                wantsEditor : Bool = editorRequired.switch{
+                    Some => true, // editor required
+                    None => if (hasCollabToken) {
+                        print("editorRequired = None. We have a collabToken");
+                        false 
+                    } else {
+                        print( "no collaborator token for doc owner; requiring editor authority for update" );
+                        true // editor is needed if the document owner isn't involved.
                     }
                 };
-                hasSufficientAuthority : Bool = requiresValidDelegateOutput(availableAuthority, mph, ctx);
+                hasSufficientAuthority : Bool = if (wantsEditor) {
+                    charterData.switch{
+                        Some{Datum::CharterToken{govAuthority, _}} => {
+                            print("using editor's govAuthority for doc update ");
+                            // print(editorRequired.unwrap().show());
+                            requiresValidDelegateOutput(govAuthority, mph, ctx)                                
+                        },
+                        None => {
+                            print("no charter-ref; can't resolve editor-authority");
+                            error("no collaborator token, no editor-authority")
+                        }
+                    }
+                } else {
+                    assert(hasCollabToken, "no authority provided for doc update");
+                    hasCollabToken
+                };
 
                 hasSufficientAuthority
             }, 
@@ -261,16 +211,22 @@ func hasCharterRefInput(
 }
 enum Activity {
     // standard redeemer types:
-    spendingDatum
-    updatingCharter    
-    usingAuthority
-
+    updatingCharter    // 0
+    usingAuthority      //  1
     //custom redeemer types:
-    // registeringEntry can't be from this script unless there's a spend
-    updatingEntry
-    retiringEntry
+    //xxx registeringEntry - can't be from this script unless there's a spend.
 
-       func allowRetiringEntry(self, datum: Datum, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
+    // writing changes to a 'pg' or 'spg' entry
+    updatingEntry    // 2 - an edit is being applied directly to a page or suggestion record.
+    acceptingChanges // 3 - a page is accepting one or more change-suggestions
+
+    // closing out suggestions by accepting or rejecting
+    suggestionBeingAccepted  // 4 - a suggestion record is being accepted (and its uut burned)
+    suggestionBeingRejected // 5 - a suggestion record is being rejected (and its uut burned)
+    // removing an obsolete page
+    retiringPage  // 6
+
+    func allowRetiringPage(self, datum: Datum, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
         // rc -> if is severely outdated, burn the UUT and allow minUtxo recovery
         false && ( 
             self.serialize() /* never */ == datum.serialize()  ||
@@ -330,9 +286,47 @@ enum Activity {
         )
     }
 
+    func allowMergingChanges(
+        self, 
+        ownerAuthority: RelativeDelegateLink, 
+        oldListing: BookEntryStruct, 
+        ctx: ScriptContext, 
+        mph: MintingPolicyHash,
+        peid: String,
+        eids: []String
+    ) -> Bool {
+        // includes the change's eid-* token in the entry's mergedChanges field
+        //!!! verify it burns all the accepted changes (from eids list)
+        //    // no need to check that it spends the change's eid-* token (
+        //    // (implied by the burn check) 
+        // // it has a refUtxo for the charterAuthority (so the mintDelegate can be checked)
+        // // includes the mint delegate
+        // has a refUtxo for the suggestion's ownerAuthority
+        // returns the change's minUtxo to the suggester (via the refUtxo's address)
+        
+        isAcceptingChangeIds : Bool = eids.length > 1;
+        // charterData : Option[Datum::CharterToken] = self.hasCharterRefInput(ctx, mph).switch
+
+
+        self == self && 
+        ownerAuthority == ownerAuthority && 
+        oldListing  == oldListing &&
+        ctx == ctx &&
+        mph     == mph &&
+        eids == eids &&
+        peid == peid &&
+
+        // should burn the eids (this is handled directly by each 'sug' record's suggestionBeingAccepted activity
+        // should have the eids in ctx.tx.inputs
+        isAcceptingChangeIds &&
+        false
+    }
+
+    //! called by the base minting policy when a custom activity is used
+    //  for spending a Utxo held in this capo's script address    
     func allowActivity(self, datum: Datum, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
         //! Note: an overridden Reedeemer def doesn't have to replicate the checks
-        // ... for the baseline enum variants; it's not called in those cases.
+        // ... for the baseline Activity enum variants; it's not called in those cases.
 
         txnTime : TimeRange = ctx.tx.time_range;        
         assert(/* ✅ limited txn validity */ 
@@ -344,8 +338,43 @@ enum Activity {
         datum.switch{
             BookEntry{ownerAuthority, entry} => {
                 self.switch{
-                    updatingEntry => self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph),
-                    retiringEntry => self.allowRetiringEntry(datum, ctx, mph),
+                    updatingEntry => {
+                        self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph)
+                    },
+                    suggestionBeingAccepted => {
+                        assert(entry.entryType == "sug", "invalid entry type for suggestionBeingAccepted");
+                        peid : String = entry.changeParentEid.switch{
+                            Some{eid} => eid,
+                            None => error("invalid suggestion without changeParentEid")
+                        };
+                        (_, pageUtxo : TxInput) = requiresPageInput(
+                            ctx, mph, peid
+                        );
+                        // enforces that the parent-page is currently updating with acceptingChanges activity
+                        isAcceptingChangesOnPage(ctx, pageUtxo) &&
+                        // main record's acceptingChanges() activity checks that the change record UUT is burned (
+                        // todo: the page must include this change suggestion's eid-* token in its acceptingChanges field
+                        true
+                    },
+                    suggestionBeingRejected => {
+                        // self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph) &&
+                        // self.dustPaidToOwner(ownerAuthority, entry, ctx, mph, eids) &&
+                        // self.burnedChangeEntry()
+                        true
+                    },
+                    acceptingChanges => {
+                        eids: []String = entry.appliedChanges;
+                        pgVal : Map[ByteArray]Int = ctx.
+                            get_current_input().
+                            value.get_policy(mph);
+
+                        assert(pgVal.length == 1, "invalid contract utxo with coalesced entries");
+                        peid : String = pgVal.head_key.decode_utf8();
+
+                        self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph) &&
+                        self.allowMergingChanges(ownerAuthority, entry, ctx, mph, peid, eids)
+                    },
+                    retiringPage => self.allowRetiringPage(datum, ctx, mph),
                     // registeringEntry => assert(false, "unreachable code"),
                     _ => error("unreachable code")
                 }

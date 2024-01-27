@@ -1,12 +1,69 @@
-import { BasicMintDelegate, HeliosModuleSrc, mkHeliosModule } from "@donecollectively/stellar-contracts";
+import { Activity, BasicMintDelegate, HeliosModuleSrc, SeedAttrs, UutName, isActivity, mkHeliosModule } from "@donecollectively/stellar-contracts";
 
 //@ts-expect-error because TS doesn't understand helios
 import CMDBSpecialMintDelegate from "./specializedMintDelegate.hl";
 
 //@ts-expect-error because TS doesn't understand helios
 import CMDBSpecialCapo from "./specializedCMDBCapo.hl";
+import { CMDBController } from "./CMDBController.js";
 
 export class CMDBMintDelegate extends BasicMintDelegate {
+    @Activity.redeemer
+    activityMintingCollaboratorToken(seedAttrs: SeedAttrs) : isActivity {
+        const MCT = this.mustGetActivity("MintingCollaboratorToken");
+        const {seedTxn, seedIndex} = seedAttrs
+        const t = new MCT(seedTxn, seedIndex);
+        return { redeemer: t._toUplcData() };
+    }
+    
+    @Activity.redeemer
+    activityCreatingBookPage(
+        seedAttrs: SeedAttrs,
+    ) : isActivity {
+        const Creating = this.mustGetActivity("CreatingBookPage");
+        const {seedTxn, seedIndex} = seedAttrs
+        const t = new Creating(
+            seedTxn,
+            seedIndex,
+        );
+        return { redeemer: t._toUplcData() };
+    }
+
+    @Activity.redeemer
+    activitySuggestingPageChanges(
+        seedAttrs: SeedAttrs,
+    ) : isActivity {
+        const SuggestingChange = this.mustGetActivity("SuggestingPageChange");
+
+        const {seedTxn, seedIndex} = seedAttrs
+        const t = new SuggestingChange(
+            seedTxn,
+            seedIndex,
+        );
+        return { redeemer: t._toUplcData() };
+    }
+
+    @Activity.redeemer
+    activityAcceptingSuggestions(pageEid: string) : isActivity {
+        const Accepting = this.mustGetActivity("AcceptingSuggestions");
+
+        const t = new Accepting(pageEid);
+        return { redeemer: t._toUplcData() };
+    }
+
+    @Activity.redeemer
+    burnSuggestionsBeingAccepted(pageEid: string) : isActivity {
+        const Rejecting = this.mustGetActivity("burnSuggestionsBeingAccepted");
+        const t = new Rejecting(pageEid);
+        return { redeemer: t._toUplcData() };
+    }
+
+    @Activity.redeemer
+    burnSuggestionsBeingRejected(pageEid: string) : isActivity {
+        const Rejecting = this.mustGetActivity("burnSuggestionsBeingRejected");
+        const t = new Rejecting(pageEid);
+        return { redeemer: t._toUplcData() };
+    }
 
     _m : HeliosModuleSrc 
     get specializedMintDelegate(): HeliosModuleSrc {
@@ -17,6 +74,7 @@ export class CMDBMintDelegate extends BasicMintDelegate {
 
     _c : HeliosModuleSrc
     get specializedCapo(): HeliosModuleSrc {
+        throw new Error("unused?");
         if (this._c) return this._c;
 
         return this._c = mkHeliosModule(CMDBSpecialCapo, "specializedCapo")

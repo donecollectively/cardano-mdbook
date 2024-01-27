@@ -13,24 +13,32 @@ module specializedMintDelegate
 
 import {
      DelegationDetail,
-     unmodifiedDelegation,
-     tvAuthorityToken    
+     mustReturnValueToScript,
+     tvAuthorityToken,
+     unmodifiedDelegation
 } from CapoDelegateHelpers
 
 import {
     getOutputWithValue,
     mkTv,
-    outputDatum
+    outputDatum,
+    returnsValue
 } from StellarHeliosHelpers
 
 import {
     Activity as MinterActivity,
-    mkUutTnFactory
+    mkUutTnFactory,
+    validateUutMinting
 } from CapoMintHelpers
 
 import {
     Datum as CMDBookDatum
 } from specializedCapo
+
+import {
+    requiresPageInput,
+    isAcceptingChangesOnPage
+} from CMDBController
 
 // struct DredRegistrationSettings {
 //     currentPrice,
@@ -56,11 +64,102 @@ enum MintDelegateDatum {
     }
 }
 
+// todo: Move all Book-related activities to a bookEntryDelegate
 enum MintDelegateActivity {
-    Authorizing
+    // Authorizing
     Reassigning
     Retiring
     Modifying
+    _reserved3
+    _reserved4
+    _reserved5
+    _reserved6
+    _reserved7
+    _reserved8
+    _reserved9
+
+    // reedeemer index 10
+    mintingUuts { 
+        seedTxn: TxId
+        seedIndex: Int
+        purposes: []String
+    }
+
+    // reedeemer index 11
+    MintingCollaboratorToken { 
+        seedTxn: TxId
+        seedIndex: Int
+    }
+
+    // reedeemer index 12
+    CreatingBookPage {// mints an eid-* with entryType 'spg' or 'pg'
+        seedTxn: TxId
+        seedIndex: Int
+    }
+    //   UpdatingBookPage - not a mint or burn
+    // reedeemer index 13
+    SuggestingPageChange { // mints an eid-* with entryType 'sug'
+        seedTxn: TxId
+        seedIndex: Int
+    }
+
+    //   UpdatingSuggestion - not a mint or burn
+    // reedeemer index 14
+    burnSuggestionsBeingAccepted{  // burns some 'sug' eid-*'s while updating the parent page
+        pageEid: String
+        
+    }
+    // reedeemer index 15
+    burnSuggestionsBeingRejected{ // burns some 'sug' eid-*'s and doesn't modify the page
+        pageEid: String
+    }
+
+    func usesGenericUutMinting(self) -> Bool {
+        // use this error to completely disable the uutMinting activity
+        // in favor of application-specific activities with more directed validations:
+        // error("no generic UUT minting in this delegate")
+        if(true) {
+            error("no generic UUT minting in this delegate")
+        };
+        self == self
+        && true
+    }
+
+    // this function gives a general-purpose implementation of checking for 
+    // valid uut mints. A specialization might modify it use different policies
+    // or enforce additional requirements
+    func genericUutMinting(self, 
+        mdd: MintDelegateDatum,
+        ctx: ScriptContext
+    ) -> Bool {
+        MintDelegateActivity::mintingUuts{sTxId, sIdx, purposes} = self;
+
+        assert(self.usesGenericUutMinting(), "no genericUutMinting");
+        o : []TxOutput = ctx.get_cont_outputs();
+        if (o.length != 1) { error("single utxo only") };
+
+        MintDelegateDatum::IsDelegation{dd, _} = mdd;
+        isOk : Bool = mustReturnValueToScript(tvAuthorityToken(dd), ctx) &&                    
+
+        // A project that wants to evolve the Datum's isDelegation.CustomConfig 
+        // should enforce that requirement instead of this "not modified" check.
+        unmodifiedDelegation( /* isD, same as mdd */ mdd.serialize(), ctx) &&
+
+        // This call can serve as a template for enforcing expected mints 
+        // of uuts (and additional token values) in validation of application-
+        // specific activities.
+        validateUutMinting(
+            ctx: ctx, 
+            mph: dd.mph,
+            seedTxId: sTxId, 
+            seedIdx: sIdx, 
+            purposes: purposes,
+            // additionalValues: ()
+            mkTokenName: mkUutTnFactory(sTxId, sIdx)
+        );
+
+        isOk
+    }
     //! used only for validating IsDelegation datum, that is,
     //   ... to approve minting requests or any customize spending modes 
     //   ... of that datum.  In this unspecialized version, 
@@ -73,34 +172,81 @@ enum MintDelegateActivity {
     //   ... enforces the authZor UUT being returned to the delegate script,
     //   ... and other basic administrative expectations, so any specialization
     //   ... can focus on higher-level policy considerations.
+    func additionalMintValidation( self,
+        fields: []Data,
+        priorMddd: MintDelegateDatum::IsDelegation, 
+        ctx: ScriptContext
+    ) -> Bool {
+        purposes: []String = []String::from_data(fields.get(2));
+
+        eidPurpose : String = "eid";
+
+        // 1. ✅ a BookEntry & its authority delegate can be minted
+        // !!! more options to honor suggested-page and suggested-change scenarios
+        isMintingBookEntry : Bool = 
+            purposes.length == 1 &&
+            purposes.get(0) == eidPurpose;
+
+        //! 2. Allows minting collaborator tokens, by authority of the charter's govAuthz
+        //! 2a. collaborator token is sent to a provided address
+        // isMintingCollaboratorToken : Bool = 
+        //     purposes.length == 1 &&
+        //     purposes.get(0) == collaboratorPurpose;
+
+        assert(isMintingBookEntry , 
+            "minting unrecognized UUTs "
+            ///BAD: + purposes.show()
+        );
+
+        txId: TxId = TxId::from_data(fields.get(0));
+        txoIndex : Int = Int::from_data(fields.get(1));
+
+        mkTokenName : (String) -> String = mkUutTnFactory(txId, txoIndex);
+
+        if (isMintingBookEntry) {
+            self.checkBookEntryMint(priorMddd, eidPurpose, mkTokenName, ctx)
+        } else {
+            error("unreachable")
+        }
+    }
+
+    func additionalBurnValidation( self,
+        priorMddd: MintDelegateDatum::IsDelegation, 
+        ctx: ScriptContext
+    ) -> Bool {
+        self == self &&
+        priorMddd == priorMddd &&
+        ctx == ctx &&
+        false
+    }
+
+    //! used only for validating IsDelegation datum, that is,
+    //   ... to approve minting requests or any customize spending modes 
+    //   ... of that datum.  In this unspecialized version, 
+    //   ... the "Modifying" activity is an unsupported stand-in for that use-case, always rejecting.
+    //! in a real-life customization case, additional custom IsDelegation config can be
+    //   ... enforced in "Modifying" event the second field of IsDelegation (the "CDConfig" stand-in here)
+    //   ... the BasicMintDelegate allows for that field's presence, without any assumptions
+    //   ... about its type.
+    //  Note that the basic mint delegate already enforces some basic
+    //    administrative expectations for Reassigning, Retiring, Modifying activites, 
+    //    so a specialization doesn't need to re-implement those checks.
     func additionalDelegateValidation( self,
         priorMddd: MintDelegateDatum::IsDelegation, 
         ctx: ScriptContext
     ) -> Bool {
-        self.switch {
-            Authorizing => {
-                //! 1. allows minting BookEntry records (eid-* uut)
-                //! 1a. creating a (non-suggestion, type=pg) BookEntry requires charter authority
-                //! 1b. creating a Suggested Page (type=spg) requires a collaborator token
-                //! 1c. creating a Suggested Change (type=chg) requires a collaborator token
-                //! 2. Allows minting collaborator tokens, by authority of the charter token
-                //! 2a. collaborator token is sent to a provided address
-                //! 3a. createdAt has to match "now"
-                //! 3b. updatedAt should be 0
-                //! 3c. only allows the transaction to be valid for 1 hour
-                //! 4. only allows the page expiration to be 1 year in the future
-                //! 5. doesn't allow the delegation details to be modified
+        // mph : MintingPolicyHash = priorMddd.dd.mph;                
 
-                mph : MintingPolicyHash = priorMddd.dd.mph;                
-                ourMinter : ScriptPurpose = ctx.tx.redeemers.find_key( 
-                    (purpose : ScriptPurpose) -> { purpose.switch{ 
-                        sp: Minting => {
-                            sp.policy_hash == mph
-                        }, 
-                        _ => false 
-                    } }
-                );
+        // ourMinter : ScriptPurpose = ctx.tx.redeemers.find_key( 
+        //     (purpose : ScriptPurpose) -> { purpose.switch{ 
+        //         sp: Minting => {
+        //             sp.policy_hash == mph
+        //         }, 
+        //         _ => false 
+        //     } }
+        // );
 
+        // todo: delete this stuff
                 // mintRedeemerData : Data = ctx.tx.redeemers.get(k);
                 // print("::::::: mintRedeemer: "+ mintRedeemerData.serialize().show());
                 // mintingActivity : MinterActivity = MinterActivity::from_data(mintRedeemerData);
@@ -112,53 +258,80 @@ enum MintDelegateActivity {
                 // //  fails with surprising error:
                 // targetValue : Value = mintingActvity.tvForPurpose(pgIdPurpose)
 
+        self.switch {
+            mintingUuts => self.genericUutMinting(priorMddd, ctx),
+            //! 1. allows minting BookEntry records (eid-* uut)
+            //! 1a. creating a (non-suggestion, entryType=pg) BookEntry requires charter authority
+            //! 1b. creating a Suggested Page (entryType=spg) requires a collaborator token
+            //! 1c. creating a Suggested Change (entryType=sug) requires a collaborator token
+            //! 2. Allows minting collaborator tokens, by authority of the charter token
+            //! 2a. collaborator token is sent to a provided address
+            //! 3a. createdAt has to match "now"
+            //! 3b. updatedAt should be 0
+            //! 3c. only allows the transaction to be valid for 1 hour
+            //! 4. only allows the page expiration to be 1 year in the future
+            //! 5. doesn't allow the delegation details to be modified
+            //! 6. Allows an eid-* uut to be burned when merging a change-suggestion
+            //! 6b. Allows an eid-* uut to be burned when rejecting a change-suggestion 
+
+            MintingCollaboratorToken{sTxId, sIdx} => {
                 collaboratorPurpose : String = "collab";
-                eidPurpose : String = "eid";
-                ctx.tx.redeemers.get(ourMinter).switch {
-                    (index: Int, fields: []Data) => { // MintingUUTs activity
-                        assert (index == 1 && fields.length == 3,
-                           "authz token not spent with mintingUuts activity!"
-                        );
-                        purposes: []String = []String::from_data(fields.get(2));
-
-                        // 1. ✅ a BookEntry & its authority delegate can be minted
-                        // !!! more options to honor suggested-page and suggested-change scenarios
-                        isMintingBookEntry : Bool = 
-                            purposes.length == 1 &&
-                            purposes.get(0) == eidPurpose;
-
-                        //! 2. Allows minting collaborator tokens, by authority of the charter's govAuthz
-                        //! 2a. collaborator token is sent to a provided address
-                        isMintingCollaboratorToken : Bool = 
-                            purposes.length == 1 &&
-                            purposes.get(0) == collaboratorPurpose;
-
-                        assert(isMintingBookEntry || isMintingCollaboratorToken, 
-                            "minting unrecognized UUTs "
-                            ///BAD: + purposes.show()
-                        );
-
-                        txId: TxId = TxId::from_data(fields.get(0));
-                        txoIndex : Int = Int::from_data(fields.get(1));
-            
-                        mkTokenName : (String) -> String = mkUutTnFactory(txId, txoIndex);
-                
-                        if (isMintingCollaboratorToken) {
-                            self.checkCollaboratorTokenMint(priorMddd, collaboratorPurpose, mkTokenName, ctx)
-                        } else if (isMintingBookEntry) {
-                            self.checkBookEntryMint(priorMddd, eidPurpose, mkTokenName, ctx)
-                        } else {
-                            error("unreachable")
-                        }
-                    },
-                    _ => error("missing or wrong mint redeemer for our mph")
-                }
+                print("minting collaborator token");
+                self.checkCollaboratorTokenMint(
+                    priorMddd, 
+                    collaboratorPurpose, 
+                    mkUutTnFactory(sTxId, sIdx),
+                    ctx
+                )        
             },
+
+            CreatingBookPage {sTxId, sIdx} => {
+                eidPurpose : String = "eid";
+                print("minting book entry");
+                self.checkBookEntryMint(
+                    priorMddd, 
+                    eidPurpose, 
+                    mkUutTnFactory(sTxId, sIdx),
+                    ctx
+                )        
+            },
+            // Authorizing => {
+            //     ctx.tx.redeemers.get(ourMinter).switch {
+            //         (index: Int, fields: []Data) => { // MintingUUTs activity
+            //             if(index == 1 && fields.length == 3) {
+            //                 self.additionalMintValidation(fields, priorMddd, ctx)
+            //             } else {
+            //                 true
+            //             }
+            //         },
+            //         _ => error("missing or wrong mint redeemer for our mph")
+            //     }
+            // },
+
+
             // Modifying => {
             //     // require that the charter is providing its authority
             //     // allow a change to the currentPrice
             // },
-            _ => false //!!! doesn't allow any activity except Authorizing!
+            burnSuggestionsBeingAccepted{toPageEid} => {
+                // re-delegates to the controller of the eid-* into which
+                // the suggestion is being merged.  
+                // TRUSTS THAT THE SPEND POLICY ENFORCES THE RIGHT BURNS
+                //   FOR the model script's acceptingSuggestions activity (using the 
+                //   list of suggestions being accepted in the updated page's 
+                //   datum.appliedChanges field)
+                (pageUut: Value, pageUtxo : TxInput) = requiresPageInput(ctx, 
+                    priorMddd.dd.mph, toPageEid
+                );
+                // 
+                delegatedEnforcement : Bool = returnsValue(pageUut, ctx, pageUtxo);
+                isAcceptingChangesOnPage(ctx, pageUtxo) &&
+                delegatedEnforcement 
+            },
+            _ => {
+                print("unrecognized activity: "+self.serialize().show());
+                false //!!! doesn't allow any activity except Authorizing!
+            }
         } || ctx.tx.serialize() /* never */ == priorMddd.serialize()
         // ^^^ this is a no-op, uses this syntax to avoid unused variable errors
     }
@@ -221,7 +394,6 @@ enum MintDelegateActivity {
 
         newDatum : CMDBookDatum = CMDBookDatum::from_data(newTxo.datum.get_inline_data());
         CMDBookDatum::BookEntry{_, newListing} = newDatum;
-
         canBeCreated : Bool = newDatum.txnHasCreateAuthority(ctx, mph);
         assert(canBeCreated, "no creation authority in txn");
 
@@ -254,17 +426,20 @@ enum MintDelegateActivity {
     }
 
     //! used only for validating non-IsDelegation datum types.
-    //   if you have any admininstrative data structures that inform
-    func otherDatumValidation( self,
-        mdd: MintDelegateDatum, 
+    //   if you have any admininstrative data structures that inform 
+    //   your minting policy, this might be useful
+     func otherDatumValidation( self,
+        priorMdd: MintDelegateDatum, 
         ctx: ScriptContext
     ) -> Bool {
-        // this is a no-op, structured this way only 
-        //  ... to avoid unused variable errors
+        neverTriggered = () -> {  error("never called") };
         self.switch{
-            Authorizing => error("never called"),
-            _ => true
-        } || ctx.tx.serialize() != mdd.serialize()
+            // Authorizing => neverTriggered(),
+            Reassigning => neverTriggered(),
+            Retiring => neverTriggered(),
+            Modifying => neverTriggered(),
+            _ => false
+        } && (priorMdd.serialize() != ctx.serialize())
     }
 }
 

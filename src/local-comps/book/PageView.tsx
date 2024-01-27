@@ -8,7 +8,7 @@ import React, { useState } from "react";
 // import { createPortal } from "react-dom";
 // import { Prose } from "@/components/Prose.jsx";
 // import { useLiveQuery } from "dexie-react-hooks";
-import type { BookEntryOnchain, BookEntryForUpdate, forOnChainEntry } from "../../contracts/CMDBCapo.js";
+import type { BookEntryOnchain, BookEntryForUpdate, forOnChainEntry, BookIndexEntry } from "../../contracts/CMDBCapo.js";
 import { helios } from "@donecollectively/stellar-contracts";
 import { Markdoc } from "../../components/Markdoc.jsx";
 import type { BookManagementProps } from "./sharedPropTypes.js";
@@ -21,7 +21,7 @@ const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hWallet = typeof Cip30Wallet.prototype;
 
 type propsType = {
-    entry: BookEntryOnchain | forOnChainEntry<any>;
+    entry: BookIndexEntry;
     wallet?: hWallet;
     preview? : true
 } & BookManagementProps
@@ -36,11 +36,22 @@ export class PageView extends React.Component<propsType, stateType> {
         if (!rendered) setTimeout(() => this.setState({rendered:true}), 10);
 
         const {
-            entry: { entry: page },
+            entry: { pageEntry, changes=[] },
             wallet,
             preview,
         } = this.props;
 
+        const {
+            entry: page
+        }= pageEntry;
+
+        const altTitles = changes.map(x => {
+            const {entry: {title}, id } = x.change
+            if (!title) return undefined;
+            return { title, id }
+        }).filter(x => !!x)
+        debugger
+        const pageContent = page.content;
         // const tt =  new Address("addr1qx6p9k4rq077r7q4jdkv7xfz639tts6jzxsr3fatqxdp2y9w9cdd2uueqwnv0cw9gne02c0mzrvfsrk884lry7kpka8shpy5qw")
         // const ttt = Address.fromHash(tt.pubKeyHash, false)
         // {ttt.toBech32()}
@@ -59,9 +70,12 @@ export class PageView extends React.Component<propsType, stateType> {
                     </div>
                 )}
                 <h2>{page.title}</h2>
+                {altTitles.map( 
+                    ({title, id}) => <h3><span className="text-"> -or- </span>{title}</h3>
+                )}
 
                 <div>
-                    <Markdoc content={page.content} />
+                    <Markdoc content={pageContent} />
                 </div>
                 {this.props.wallet && this.props.roles?.includes("collaborator") || !this.props.connectingWallet ||
                     <div className="italic text-right text-xs text-[#ccc]">No editing permission; request collaborator privileges from this project's editor</div>
