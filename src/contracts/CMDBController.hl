@@ -33,7 +33,7 @@ func requiresAcceptingChangesActivity(ctx: ScriptContext, pageUtxo : TxInput ) -
                 redeemer.switch {
                     (index: Int, fields: []Data) => {
                         isExpected: Bool = (index == 3);
-                        assert(isExpected, "unexpected redeemer: want index 3, got "+ index.show());
+                        assert(isExpected, "wrong page-level activity for this mint-delegate's burnSuggestionsBeingAccepted: want index 3, got "+ index.show());
                         // print ("right redeemer with index "+ index.show()+" hasExpectedIndex=" + isExpected.show());
                         isExpected && // acceptingChanges to a page
                         fields == fields

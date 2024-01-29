@@ -1,13 +1,16 @@
 import {
-    Diff,
-    applyPatch,
-    createPatch,
-    diffChars,
-    diffLines,
-    diffSentences,
-    parsePatch,
-    structuredPatch,
-} from "diff";
+    diff_match_patch as dmp
+} from "../diff-match-patch-uncompressed.js"
+
+const differ = new dmp();
+// what is the Patch_Margin?  It's the number of characters of context to include in the patch
+differ.Patch_Margin = 15
+
+// what is the Match_Distance?  It's the number of characters to scan for a match before giving up
+differ.Match_Distance = 300 // default = 1000
+
+// what is the Match_Threshold?  
+differ.Match_Threshold = 0.33 // default = 0.5
 
 import type {
     SeedTxnParams,
@@ -194,6 +197,15 @@ export class CMDBCapo extends DefaultCapo {
         return { redeemer: t._toUplcData() };
     }
 
+    @Activity.redeemer
+    activityRetiringPage() {
+        const Retiring = this.mustGetActivity("retiringPage");
+        const t = new Retiring();
+        return { redeemer: t._toUplcData() };
+    }
+
+
+
     @datum
     mkDatumBookEntry<T extends BookEntryCreate | BookEntryUpdated>(
         d: T
@@ -255,7 +267,6 @@ export class CMDBCapo extends DefaultCapo {
         const OptIndex = Option(helios.HInt);
         //@ts-expect-error
         const OptString = Option(helios.HString);
-        debugger;
         const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
         const bookEntryStruct = new hlBookEntryStruct(
             entryType,
@@ -685,38 +696,67 @@ export class CMDBCapo extends DefaultCapo {
             // const lineDiff = diffLines(contentBefore, newContent);
             // const sentenceDiff = diffSentences(contentBefore, newContent);
 
-            const options = { context: 1, newlineIsToken: true };
-            const p = createPatch(
-                "",
-                contentBefore,
-                newContent,
-                "",
-                "",
-                options
-            );
+            // const options = { context: 1, newlineIsToken: true };
+
+            // const pOld = createPatch(
+            //     "",
+            //     contentBefore,
+            //     newContent,
+            //     "",
+            //     "",
+            //     options
+            // );
             //! trims unnecessary header content from textual patch
-            const p2 = p.split("\n").splice(4).join("\n");
+            // const p2old = pOld.split("\n").splice(4).join("\n");
+
+            // uses diff-match-patch library
+            const diffs = differ.diff_main(contentBefore, newContent)
+            differ.diff_cleanupSemantic(diffs)
+
+            const pNew = differ.patch_toText(
+                differ.patch_make(
+                    contentBefore,
+                    diffs
+                )
+            );
 
             // const sp = structuredPatch(id, id, contentBefore, newContent, "", "", options);
-            const [pp] = parsePatch(p2); // works fine; VERY similar to result of structuredPatch
-            const patched = applyPatch(contentBefore, p2);
-            if (!patched) {
+            // const [ppOld] = parsePatch(p2old); // works fine; VERY similar to result of structuredPatch
+            // const patchedOld = applyPatch(contentBefore, p2old);
+            // uses diff-match-patch library
+            const [updatedText, successes] = differ.patch_apply(
+                differ.patch_fromText(pNew),
+                contentBefore
+            ) as [ string, boolean[] ];
+
+            // if (!patchedOld) {
+            //     console.error({ contentBefore });
+            //     console.error({ patch: p2 });
+            //     console.error({ pp });
+            //     console.error({ newContent });
+            //     throw new Error(`patch reported a conflict`);
+            // }
+            if (false === successes.find((x) => !x)) {
                 console.error({ contentBefore });
-                console.error({ patch: p2 });
-                console.error({ pp });
-                console.error({ newContent });
+                console.error({ patch: pNew });
+                console.error({ diffs });
+                console.error({ 
+                    expected: newContent,
+                    actual: updatedText,
+                    successes
+                });
+
                 throw new Error(`patch reported a conflict`);
             }
 
-            if (patched != newContent) {
+            if (updatedText != newContent) {
                 debugger;
-                console.error("patched: ", patched);
+                console.error("patched: ", updatedText);
                 console.error("newContent: ", newContent);
                 throw new Error(`patch doesn't produce expected result`);
             }
 
-            debugger;
-            diffUpdate.content = p2;
+            diffUpdate.content = pNew;
         }
 
         return this.mkTxnCreatingBookEntry(diffUpdate);
@@ -725,7 +765,7 @@ export class CMDBCapo extends DefaultCapo {
     async mkTxnAcceptingPageChanges(
         page: BookEntryForUpdate,
         suggestions: BookEntryForUpdate[],
-        merged: { content?: string; title?: string } = {}
+        merged: Partial<Pick<BookEntryUpdateAttrs, "content" | "title">> = {}
     ) {
         const { entry: pageEntry, id: pageEid } = page;
         const { title: pageTitle, content: pageContent } = pageEntry;
@@ -737,6 +777,16 @@ export class CMDBCapo extends DefaultCapo {
         let autoMergedTitle = "";
 
         let suggestionIds: string[] = [];
+        
+        // todo: consider modifying each later-applied
+        //  suggestion, modifying its patch-offsets to account for
+        //  the earlier patches that have been applied.  This is 
+        //  complicated by the fact that the patches are not
+        //  necessarily applied in the order they were created,
+        //  or to the same version of the content.  Possibly this
+        //  complication can be reduced by first rebasing each
+        //  patch so that they all refer to the current version of the doc.
+
         for (const suggestion of suggestions) {
             const { entry: suggestionEntry } = suggestion;
             const { changeParentEid, changeParentOidx, changeParentTxId } =
@@ -755,11 +805,15 @@ export class CMDBCapo extends DefaultCapo {
             // tries to apply all the patches, unless pre-merged content is provided
             if (!mergedContent) {
                 // throws exception if patch doesn't apply cleanly
-                const patched = applyPatch(autoMergedContent, patchContent);
-                if (!patched)
+                const [ patched, successes ] = differ.patch_apply(
+                    differ.patch_fromText(patchContent),
+                    autoMergedContent
+            ) as [ string, boolean[] ];
+                if (false == successes.find((x) => !x)) { 
                     throw new Error(
                         `suggestion ${suggestion.id} doesn't apply cleanly to page ${page.id}`
                     );
+                }
                 autoMergedContent = patched;
             }
 
@@ -798,16 +852,42 @@ export class CMDBCapo extends DefaultCapo {
             burningSuggestions
         );
     }
+    applyPatch(patchText : string, content: string) {
+        const [patched, successes ] = differ.patch_apply(
+            differ.patch_fromText(patchText),
+            content
+        ) as [ string, boolean[] ];
+
+        if (false == successes.find((x) => !x)) { 
+            throw new Error(
+                `suggestion doesn't apply cleanly to page`
+            );
+        }
+        return patched
+    }
 
     @partialTxn  // used by accepting-multiple-suggestions code path
     async txnAcceptingOneSuggestion<
         TCX extends StellarTxnContext & isBurningSuggestions
     >(tcx: TCX, suggestionId: string) {
-        const utxo = await this.mustFindMyUtxo(
+        const entry = await this.findBookEntry(suggestionId);
+        const {
+            utxo,
+            ownerAuthority
+        } = entry;
+        const utxo2 = await this.mustFindMyUtxo(
             `suggestion ${suggestionId}`,
             this.mkTokenPredicate(this.mph, suggestionId)
         );
-        // tcx.attachScript(this.compiledScript).
+
+        // TODO: v9e5fds -Need to be able to find the collab-* owner-address to return
+        //    minUtxo to the suggester.
+        // const collaborator = await this.mustFindUtxo(
+        //     `suggestion collaborator ${ownerAuthority.uutName}`,
+        //     this.mkTokenPredicate(this.mph, ownerAuthority.uutName),
+        //     {}
+        // );
+        // tcx.addRefInput(collaborator)
         tcx.addInput(utxo, this.activitySuggestionBeingAccepted());
         tcx.state.burningSuggestions.push(new UutName("eid", suggestionId));
         return tcx;
@@ -1027,7 +1107,6 @@ export class CMDBCapo extends DefaultCapo {
         const tcx = await this.addSeedUtxo(new StellarTxnContext(this.myActor));
 
         const mintDelegate = await this.getMintDelegate();
-        debugger;
         const tcx2 = await this.txnMintingUuts(tcx, ["collab"], {
             mintDelegateActivity: mintDelegate.activityMintingCollaboratorToken(
                 tcx.getSeedAttrs()
@@ -1175,9 +1254,12 @@ export class CMDBCapo extends DefaultCapo {
                 ],
                 requires: ["application-layer conflict management"],
                 mech: [
-                    "TODO: editor can accept a suggested change",
-                    "TODO: page owner can accept a suggested change",
-                    "TODO: a random collaborator can't accept a suggested change",
+                    "editor can accept a suggested change",
+                    "page owner can accept a suggested change",
+                    "a random collaborator can't accept a suggested change",
+                    "all accepted suggestions have their eid-* UUT burned",
+                    "can adopt multiple suggestions that don't conflict",
+                    "can adopt conflicting sugestions with a provided resolution",
                     "TODO: when accepted, the change originator receives the suggestion's minUtxo",
                     "TODO: when accepted, the suggestion's eid-* UUT is burned.",
                 ],

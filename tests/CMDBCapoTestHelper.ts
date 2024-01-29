@@ -31,11 +31,22 @@ function updatedResource<T extends StellarTxnContext<any>>(
 export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
     CMDBCapo
 ) {
+    _start: number;
+    constructor(config) {
+        super(config)
+        this._start = new Date().getTime();;
+    }
+    get relativeTs() {
+        const ms = new Date().getTime() - this._start;
+        const s = ms / 1000;
+        return `@ ${s}s`
+    }
     setupActors() {
         this.addActor("editor", 1100n * ADA, ... Array(7).fill( 7n * ADA));
         // collaborators
         this.addActor("charlie", 13n * ADA);
         this.addActor("camilla", 120n * ADA);
+        this.addActor("cindy", 13n * ADA);
 
         // a random person
         this.addActor("ralph", 13n * ADA);
@@ -53,11 +64,13 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
             this.currentActor = "editor";
         }
         const { book } = this;
-        console.log("--------------------------- Test helper: Create collaborator token");
+        console.log("--------------------------- "+this.relativeTs +" Test helper: Create collaborator token");
         const tcx = await book.mkTxnMintCollaboratorToken(
             (await collaborator.usedAddresses)[0]
         );
+        console.log("--- mkTxnMintCollaboratorToken "+ this.relativeTs);
         await book.submit(tcx);
+        console.log("--- submit collaborator token "+ this.relativeTs);
         await this.network.tick(1n);
         return tcx;
     }
@@ -66,7 +79,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         if (!this.book) await this.bootstrap();
 
         console.log(
-            `--------------------------- Test helper: Create book page '${pageContent.title}'`
+            `--------------------------- ${this.relativeTs} Test helper: Create book page '${pageContent.title}'`
         );
         const tcx = await this.book.mkTxnCreatingBookEntry({
             // entryType: "spg", // default, can be overridden
@@ -96,7 +109,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         }
 
         console.log(
-            "--------------------------- Test helper: Editor modifying book page",
+            `--------------------------- ${this.relativeTs} Test helper: Editor modifying book page`,
             entry.id
         );
         return this.collaboratorModifiesPage(entry, updates);
@@ -106,7 +119,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         updates: BookEntryUpdateAttrs
     ) {
         console.log(
-            "  ------------------------- Test helper: modifying book page",
+            `  -------------------------  ${this.relativeTs} Test helper: modifying book page`,
             entry.id
         );
         debugger;
@@ -137,7 +150,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
             );
 
         console.log(
-            "--------------------------- Test helper: Suggest book page update",
+            `---------------------------  ${this.relativeTs} Test helper: Suggest book page update`,
             entry.id
         );
         const tcx = await this.book.mkTxnSuggestingUpdate({
@@ -159,21 +172,10 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         )
     }
 
-    async editorAcceptsSuggestion() {
-        
-
-
-
-
-
-
-
-
-    }
-
     async acceptSuggestions(
         page: BookEntryForUpdate, 
-        suggestions: BookEntryForUpdate[]
+        suggestions: BookEntryForUpdate[],
+        merged? : Partial<Pick<BookEntryUpdateAttrs, "content" | "title">>
     ) {
         if (!this.book)
             throw new Error(
@@ -181,11 +183,11 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
             );
 
         console.log(
-            "--------------------------- Test helper: suggestion being accepted",
+            `---------------------------  ${this.relativeTs} Test helper: suggestion being accepted`,
             page.id
         );
         const tcx = await this.book.mkTxnAcceptingPageChanges(
-            page, suggestions
+            page, suggestions, merged
         );
         const resourceId = tcx.state.uuts.entryId.name;
         console.log("               -------------------------------------\nbefore submitting suggestion-merge", dumpAny(tcx))

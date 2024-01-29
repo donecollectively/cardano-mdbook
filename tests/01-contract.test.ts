@@ -17,6 +17,8 @@ import {
     helios,
     utxosAsString,
     byteArrayAsString,
+    TxOutput,
+    Value,
 } from "@donecollectively/stellar-contracts";
 
 import {
@@ -146,7 +148,7 @@ describe("Capo", async () => {
                     testPageEntry
                 );
 
-                const onChainEntry = (await book.findBookEntry(resourceId))!
+                const onChainEntry = (await book.findBookEntry(resourceId))!;
 
                 expect(onChainEntry.entry.content).toBe(expectedContent);
                 expect(onChainEntry.entry.entryType).toBe("pg");
@@ -162,24 +164,25 @@ describe("Capo", async () => {
             it("can't have updatedBy during creation", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
-                
-                  // const strella = 
-                await h.bootstrap(); 
-                
+
+                // const strella =
+                await h.bootstrap();
+
                 await h.editorInvitesCollaborator(actors.editor);
                 const { content: expectedContent } = testPageEntry;
-                await expect(h.collaboratorCreatesPage(
-                    {...testPageEntry,
+                await expect(
+                    h.collaboratorCreatesPage({
+                        ...testPageEntry,
                         //@ts-expect-error
                         updatedBy: "bad",
-                    }
-                )).rejects.toThrow("updatedBy must be empty");
+                    })
+                ).rejects.toThrow("updatedBy must be empty");
             });
 
             it("an editor's created pages are owned by their collaborator role, not the capoGov- token", async (context: localTC) => {
                 console.log("tested at c8br02x");
             });
-        
+
             it("a collaborator can only create a SUGGESTED page, with entryType='spg'", async (context: localTC) => {
                 context.initHelper({ skipSetup: true });
                 const {
@@ -214,9 +217,7 @@ describe("Capo", async () => {
                 // expect(camillaTokenNames[0]).toMatch(/^collab-/);
 
                 const pageCreation = h.collaboratorCreatesPage(testPageEntry);
-                await expect(pageCreation).rejects.toThrow(
-                    /trace: 8rf2o3j4/
-                );
+                await expect(pageCreation).rejects.toThrow(/trace: 8rf2o3j4/);
                 await expect(pageCreation).rejects.toThrow(
                     /missing.*delegat.*capoGov/
                 );
@@ -258,10 +259,12 @@ describe("Capo", async () => {
                 const camillaCollabToken = await h.book.findUserRoleInfo(
                     "collab"
                 );
-                if (!camillaCollabToken) throw new Error("no camillaCollabToken");
+                if (!camillaCollabToken)
+                    throw new Error("no camillaCollabToken");
 
                 h.currentActor = "editor";
-                const editorUut = ( await h.book.findUserRoleInfo("collab") )!.uut;
+                const editorUut = (await h.book.findUserRoleInfo("collab"))!
+                    .uut;
                 const onChainEntry = await h.book.findBookEntry(resourceId);
                 if (!onChainEntry) throw new Error("no onChainEntry");
                 const { entry } = onChainEntry;
@@ -279,8 +282,11 @@ describe("Capo", async () => {
 
                 {
                     // d9msju4
-                    const fresherOnChainEntry = await h.book.findBookEntry(resourceId);
-                    if (!fresherOnChainEntry) throw new Error("no onChainEntry");
+                    const fresherOnChainEntry = await h.book.findBookEntry(
+                        resourceId
+                    );
+                    if (!fresherOnChainEntry)
+                        throw new Error("no onChainEntry");
                     const { entry } = fresherOnChainEntry;
 
                     await h.editorModifiesPage(fresherOnChainEntry, {
@@ -290,7 +296,9 @@ describe("Capo", async () => {
                     const freshestPage = await h.book.findBookEntry(resourceId);
                     if (!freshestPage) throw new Error("no updatedPage");
                     expect(freshestPage.entry.entryType).toEqual("pg");
-                    expect(freshestPage.entry.updatedBy).toEqual(editorUut.name);
+                    expect(freshestPage.entry.updatedBy).toEqual(
+                        editorUut.name
+                    );
                     expect(freshestPage.ownerAuthority.uutName).toEqual(
                         camillaCollabToken.uut.name
                     );
@@ -314,7 +322,8 @@ describe("Capo", async () => {
                     testSuggestedPage
                 );
                 h.currentActor = "editor";
-                const editorUut = ( await h.book.findUserRoleInfo("collab") )!.uut;
+                const editorUut = (await h.book.findUserRoleInfo("collab"))!
+                    .uut;
 
                 const onChainEntry = await h.book.findBookEntry(resourceId);
                 if (!onChainEntry) throw new Error("no onChainEntry");
@@ -346,7 +355,7 @@ describe("Capo", async () => {
                 h.currentActor = "charlie";
                 const existingPage = await h.book.findBookEntry(resourceId);
                 if (!existingPage) throw new Error("no existingPage");
-                
+
                 const updates = {
                     ...existingPage.entry,
                     title: testPageEntry.title + " - rando can't update this",
@@ -428,7 +437,9 @@ describe("Capo", async () => {
                 if (!updatedPage) throw new Error("no updatedPage");
                 console.log("     🐞 updated page", updatedPage.entry.title);
 
-                expect(updatedPage!.entry.updatedBy).toEqual(tcx.state.uuts.collab.name);
+                expect(updatedPage!.entry.updatedBy).toEqual(
+                    tcx.state.uuts.collab.name
+                );
                 expect(updatedPage.entry.title).toMatch(/owner-did-update/);
                 expect(updatedPage.entry.content).toMatch(
                     /Owner updated content/
@@ -455,7 +466,7 @@ describe("Capo", async () => {
                 const { resourceId: pageId } = resourceUpdated;
                 const newPage = await h.book.findBookEntry(pageId);
                 if (!newPage) throw new Error("no newPage");
-                return [resourceUpdated,  newPage];
+                return [resourceUpdated, newPage];
             }
 
             it("a collaborator token is required to suggest changes", async (context: localTC) => {
@@ -478,8 +489,8 @@ describe("Capo", async () => {
                 const offChainFailure = h.collaboratorSuggestsChange(
                     page,
                     updates
-                    );
-                    await expect(offChainFailure).rejects.toThrow(
+                );
+                await expect(offChainFailure).rejects.toThrow(
                     /doesn't have a collab.*token/
                 );
 
@@ -536,7 +547,7 @@ describe("Capo", async () => {
 
                 const { uut: charlieToken } = (await h.book.findUserRoleInfo(
                     "collab"
-                ))!
+                ))!;
 
                 // h642bx
                 expect(newSuggestion.ownerAuthority.uutName).toEqual(
@@ -703,14 +714,19 @@ describe("Capo", async () => {
                         suggestionId
                     );
 
-                    const { title, content: contentDiff } = newSuggestion!.entry;
+                    const { title, content: contentDiff } =
+                        newSuggestion!.entry;
+                    console.log("     🐞 contentDiff", contentDiff);
                     expect(
                         contentDiff.length,
                         "expected content diff"
                     ).toBeTruthy();
                     expect(title.length, "expected empty title").toBeFalsy();
 
-                    const patched = applyPatch(page.entry.content, contentDiff);
+                    const patched = h.book.applyPatch(
+                        contentDiff,
+                        page.entry.content
+                    );
                     expect(
                         patched,
                         "applyPatch shouldn't fail with false"
@@ -721,8 +737,12 @@ describe("Capo", async () => {
         describe("accepting change suggestions: ", () => {
             async function setup(
                 context: localTC,
-                addContent: string = "Collaborator suggested update",
-                newTitle: string = ""
+                options: {
+                    updatedContent?: string;
+                    addContent?: string;
+                    newTitle?: string;
+                    initialPageAttrs?: BookEntryCreationAttrs;
+                } = {}
             ): Promise<
                 [
                     // returns the page-creation txn details, the page record,
@@ -738,13 +758,19 @@ describe("Capo", async () => {
                     h,
                     h: { network, actors, delay, state },
                 } = context;
+                const {
+                    addContent = "Collaborator suggested update",
+                    newTitle = "",
+                    initialPageAttrs = testSuggestedPage,
+                    updatedContent = testPageEntry.content + addContent,
+                } = options;
 
                 await h.bootstrap();
                 await h.editorInvitesCollaborator(actors.camilla);
                 // await h.editorInvitesCollaborator(actors.charlie);
                 h.currentActor = "camilla";
                 const pageCreated = await h.collaboratorCreatesPage(
-                    testSuggestedPage
+                    initialPageAttrs
                 );
                 const { resourceId: pageId } = pageCreated;
                 const page = await h.book.findBookEntry(pageId);
@@ -755,7 +781,7 @@ describe("Capo", async () => {
 
                 const updates = {
                     ...page.entry,
-                    content: testPageEntry.content + addContent,
+                    content: updatedContent,
                 };
                 if (newTitle) updates.title = newTitle;
 
@@ -763,7 +789,7 @@ describe("Capo", async () => {
                     page,
                     updates
                 );
-                debugger
+                debugger;
                 const { resourceId: suggestionId, tcx, txid } = suggestedUpdate;
                 const suggestion = await h.book.findBookEntry(suggestionId);
 
@@ -787,29 +813,175 @@ describe("Capo", async () => {
                 await h.acceptSuggestions(page, [suggestion]);
                 const updated = await h.book.findBookEntry(pageId);
                 expect(updated).toBeTruthy();
-                expect (updated!.entry.content).toMatch(/Page content here/);
-                expect (updated!.entry.content).toMatch(/Collaborator suggested update/);
+                expect(updated!.entry.content).toMatch(/Page content here/);
+                expect(updated!.entry.content).toMatch(
+                    /Collaborator suggested update/
+                );
             });
 
-            it.todo("TODO: can adopt multiple suggestions that don't conflict", async (context: localTC) => {
+            it("can adopt multiple suggestions that don't conflict", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
-                
-                  // const strella = 
-                await h.bootstrap(); 
-                            
+
+                const book = await h.bootstrap();
+
+                const content =
+                    `# doc title\n\nintroduction text\n\n` +
+                    `## section 1\n\nsection 1 content\n\n` +
+                    `## section 2\n\nsection 2 content`;
+                //prettier-ignore
+                const [
+                    pageCreated, page, 
+                    suggestedUpdate1, suggestion1
+                ] = await setup(context, {
+                    initialPageAttrs: {
+                        ...testSuggestedPage,
+                        content
+                    },
+                    updatedContent: content.replace(/1 content/, "1 updated content")
+                });
+
+                const { resourceId: pageId } = pageCreated;
+                const { resourceId: suggestionId1 } = suggestedUpdate1;
+                const {
+                    state: {
+                        uuts: { collab: cindyCollab },
+                    },
+                } = await h.editorInvitesCollaborator(actors.cindy);
+                h.currentActor = "cindy";
+
+                const suggestedUpdate2 = await h.collaboratorSuggestsChange(
+                    page,
+                    {
+                        ...page.entry,
+                        content: content.replace(/1 content/, "1 good content"),
+                    }
+                );
+                const suggestion2 = await h.book.findBookEntry(
+                    suggestedUpdate2.resourceId
+                );
+                console.log("diff 2 ", suggestion2.entry.content);
+                expect(
+                    suggestion2.ownerAuthority.uutName,
+                    "suggestion2 not attributed to cindy"
+                ).toEqual(cindyCollab.name);
+
+                h.currentActor = "camilla";
+                const { tcx } = await h.acceptSuggestions(page, [
+                    suggestion1,
+                    suggestion2,
+                ]);
+                const updated = await h.book.findBookEntry(pageId);
+                expect(updated).toBeTruthy();
+                expect(updated!.entry.content).toEqual(
+                    content.replace(/1 content/, "1 updated good content")
+                );
+
+                // // v9e5fds - change originator receives the suggestion's minUtxo
+                // let foundCindyOutput : TxOutput | undefined;
+                // let foundCharlieOutput : TxOutput | undefined;
+                // for (const output of tcx.outputs) {
+                //     if (output.address === actors.cindy.address) {
+                //         foundCindyOutput = output;
+                //     }
+                //     if (output.address === actors.charlie.address) {
+                //         foundCharlieOutput = output;
+                //     }
+                // }
+                // expect(
+                //     foundCindyOutput?.value.eq(
+                //         new Value(suggestion2.utxo.value.lovelace)
+                //     ), "minUtxo value not returned to suggester"
+                // ).toBeTruthy();
+                // expect(
+                //     foundCharlieOutput?.value.eq(
+                //         new Value(suggestion1.utxo.value.lovelace)
+                //     ), "minUtxo value not returned to suggester"
+                // ).toBeTruthy();
+
+                // c4km5ol - suggestion UUTs are burned
+                await expect(
+                    h.book.findBookEntry(suggestionId1)
+                ).rejects.toThrow(/not found/);
+                await expect(
+                    h.book.findBookEntry(suggestedUpdate2.resourceId)
+                ).rejects.toThrow(/not found/);
+            });
+            it("all accepted suggestions have their eid-* UUT burned", (context: localTC) => {
+                console.log("tested at c4km5ol");
             });
 
-            it.todo("TODO: can adopt conflicting sugestions, with a provided resolution", async (context: localTC) => {
+            it.todo(
+                "TODO: when accepted, the change originator receives the suggestion's minUtxo",
+                (context: localTC) => {
+                    console.log(
+                        "tested at v9e5fds, but disabled due to implementation difficulties"
+                    );
+                }
+            );
+
+            it("can adopt conflicting sugestions with a provided resolution", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
-                
-                  // const strella = 
-                await h.bootstrap(); 
-                            
-            })
 
-            it("editor can accept suggestions", async (context: localTC ) => { 
+                // const strella =
+                await h.bootstrap();
+
+                const content =
+                    `# doc title\n\nintroduction text\n\n` +
+                    `## section 1\n\nsection 1 content\n\n` +
+                    `## section 2\n\nsection 2 content`;
+                //prettier-ignore
+                const [
+                        pageCreated, page, 
+                        suggestedUpdate1, suggestion1
+                    ] = await setup(context, {
+                        initialPageAttrs: {
+                            ...testSuggestedPage,
+                            content
+                        },
+                        updatedContent: content.replace(
+                            /1 content/, "number-one updated content")
+                    });
+
+                const { resourceId: pageId } = pageCreated;
+                const { resourceId: suggestionId1 } = suggestedUpdate1;
+
+                const suggestedUpdate2 = await h.collaboratorSuggestsChange(
+                    page,
+                    {
+                        ...page.entry,
+                        content: content.replace(
+                            /1 content/,
+                            "first-bit conflicting info"
+                        ),
+                    }
+                );
+                const suggestion2 = await h.book.findBookEntry(
+                    suggestedUpdate2.resourceId
+                );
+                console.log("diff 2 ", suggestion2.entry.content);
+
+                h.currentActor = "camilla";
+                debugger;
+                await expect(
+                    h.acceptSuggestions(page, [suggestion1, suggestion2])
+                ).rejects.toThrow(/apply cleanly/);
+
+                const resolved = content.replace(
+                    /1 content/,
+                    "number-one updated with conflict resolved"
+                );
+
+                await h.acceptSuggestions(page, [suggestion1, suggestion2], {
+                    content: resolved,
+                });
+                const updated = await h.book.findBookEntry(pageId);
+                expect(updated).toBeTruthy();
+                expect(updated!.entry.content).toEqual(resolved);
+            });
+
+            it("editor can accept suggestions", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
                 const book = await h.bootstrap();
@@ -824,22 +996,25 @@ describe("Capo", async () => {
 
                 await h.editorInvitesCollaborator(actors.editor);
                 h.currentActor = "editor";
-                const editorUut = ( await h.book.findUserRoleInfo("collab") )!.uut;
+                const editorUut = (await h.book.findUserRoleInfo("collab"))!
+                    .uut;
                 await h.acceptSuggestions(page, [suggestion]);
 
                 const updated = await h.book.findBookEntry(pageId);
                 expect(updated).toBeTruthy();
                 expect(updated.entry.updatedBy).toEqual(editorUut.name);
-                expect (updated!.entry.content).toMatch(/Page content here/);
-                expect (updated!.entry.content).toMatch(/Collaborator suggested update/);
+                expect(updated!.entry.content).toMatch(/Page content here/);
+                expect(updated!.entry.content).toMatch(
+                    /Collaborator suggested update/
+                );
             });
 
             it("a random collaborator can't accept a suggested change", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
-                
-                  // const strella = 
-                await h.bootstrap(); 
+
+                // const strella =
+                await h.bootstrap();
                 //prettier-ignore
                 const [
                     pageCreated, page, 
@@ -848,9 +1023,7 @@ describe("Capo", async () => {
 
                 const { resourceId: pageId } = pageCreated;
                 const {
-                    ownerAuthority: {
-                        uutName: ownerTokenName
-                    }
+                    ownerAuthority: { uutName: ownerTokenName },
                 } = page;
                 const { resourceId: suggestionId } = suggestedUpdate;
 
@@ -862,7 +1035,7 @@ describe("Capo", async () => {
                 );
 
                 vi.spyOn(h.book, "userHasOwnership").mockReturnValue(true);
-                const onChain = h.acceptSuggestions(page, [suggestion])
+                const onChain = h.acceptSuggestions(page, [suggestion]);
                 await expect(onChain).rejects.toThrow(
                     new RegExp(`owner ${ownerTokenName} missing`)
                 );
@@ -870,11 +1043,39 @@ describe("Capo", async () => {
                     /missing.*delegation token/
                 );
             });
-            it.todo(
-                "TODO: when accepted, the change originator receives the suggestion's minUtxo"
-            );
-            it.todo("TODO: when accepted, its eid-* UUT is burned.");
-            it.todo("TODO: when NOT accepting changes, the mint-delegate's AcceptingPageChanges activity fails");
+            it("when NOT accepting changes, the mint-delegate's AcceptingPageChanges activity fails", async (context: localTC) => {
+                // prettier-ignore
+                const {h, h:{network, actors, delay, state} } = context;
+
+                // const strella =
+                await h.bootstrap();
+
+                //prettier-ignore
+                const [
+                    pageCreated, page, 
+                    suggestedUpdate, suggestion
+                ] = await setup(context);
+
+                const { resourceId: pageId } = pageCreated;
+                const {
+                    ownerAuthority: { uutName: ownerTokenName },
+                } = page;
+                const { resourceId: suggestionId } = suggestedUpdate;
+
+                // back to the owner of the document created in setup():
+                h.currentActor = "camilla";
+
+                const orig = h.book.mkTxnUpdatingEntry.bind(h.book);
+                const spy = vi.spyOn(h.book, "mkTxnUpdatingEntry").mockImplementation(
+                    (arg, activity) => {
+                        return orig(arg, h.book.activityRetiringPage())
+                    }
+                );
+                const onChain = h.acceptSuggestions(page, [suggestion]);
+                await expect(onChain).rejects.toThrow(
+                    /wrong page-level activity/
+                );
+            });
         });
 
         describe("rejecting changes", () => {
@@ -886,7 +1087,9 @@ describe("Capo", async () => {
             it.todo(
                 "TODO: when a change is rejected, its eid-* UUT is burned."
             );
-            it.todo("TODO: when NOT rejecting changes, the mint-delegate's RejectingPageChanges activity fails");
+            it.todo(
+                "TODO: when NOT rejecting changes, the mint-delegate's RejectingPageChanges activity fails"
+            );
         });
 
         describe("page expiration and freshening", () => {
