@@ -1,25 +1,17 @@
-import {
-    diff_match_patch as dmp
-} from "../diff-match-patch-uncompressed.js"
-
-const differ = new dmp();
-// what is the Patch_Margin?  It's the number of characters of context to include in the patch
-differ.Patch_Margin = 15
-
-// what is the Match_Distance?  It's the number of characters to scan for a match before giving up
-differ.Match_Distance = 300 // default = 1000
-
-// what is the Match_Threshold?  
-differ.Match_Threshold = 0.33 // default = 0.5
 
 import type {
     SeedTxnParams,
     RelativeDelegateLink,
     hasUutContext,
     hasSeedUtxo,
+    TxInput as TxInputType,
+    isActivity,
+    InlineDatum,
 } from "@donecollectively/stellar-contracts";
 
 import {
+    TxInput,
+    UutName,
     mkHeliosModule,
     DefaultCapo,
     hasReqts,
@@ -45,22 +37,24 @@ const {
     TxOutputId,
 } = helios;
 
-import {
-    TxInput,
-    type TxInput as TxInputType,
-    UutName,
-} from "@donecollectively/stellar-contracts";
-
-import type {
-    isActivity,
-    InlineDatum,
-} from "@donecollectively/stellar-contracts";
-
 //@ts-expect-error importing a file typescript isn't expected to understand
 import specializedCapo from "./specializedCMDBCapo.hl"; // assert { type: 'text' };
 
 import { CMDBMintDelegate } from "./CMDBMintDelegate.js";
 import { CMDBController } from "./CMDBController.js";
+import {
+    diff_match_patch as dmp
+} from "../diff-match-patch-uncompressed.js"
+
+const differ = new dmp();
+// what is the Patch_Margin?  It's the number of characters of context to include in the patch
+differ.Patch_Margin = 15
+
+// what is the Match_Distance?  It's the number of characters to scan for a match before giving up
+differ.Match_Distance = 300 // default = 1000
+
+// what is the Match_Threshold?  
+differ.Match_Threshold = 0.33 // default = 0.5
 
 export type BookEntryOnchain = {
     ownerAuthority: RelativeDelegateLink<AuthorityPolicy>;
@@ -103,7 +97,7 @@ export type BookEntry = {
 
 export type BookIndexEntry = {
     pageEntry: BookEntryForUpdate;
-    changes: ChangeDetails[];
+    pendingChanges: ChangeDetails[];
 };
 
 export type ChangeDetails = {
@@ -450,7 +444,7 @@ export class CMDBCapo extends DefaultCapo {
             } else {
                 pageIndex[e.id] = {
                     pageEntry: e,
-                    changes: [],
+                    pendingChanges: []
                 };
             }
         }
@@ -458,7 +452,7 @@ export class CMDBCapo extends DefaultCapo {
         const staleEntriesByTxId: Record<txidString, BookEntryForUpdate> = {};
 
         // with a list of changes for each page-id, we can make a change-list for each page.
-        for (const [eid, { pageEntry, changes }] of Object.entries(pageIndex)) {
+        for (const [eid, { pageEntry, pendingChanges }] of Object.entries(pageIndex)) {
             for (const change of changesByPageId[eid]) {
                 const { changeParentTxId: pTxId, changeParentOidx: pTxIdx } =
                     change.entry;
@@ -467,7 +461,7 @@ export class CMDBCapo extends DefaultCapo {
 
                 const changeIsFresh = pTxId.eq(pageEntry.utxo.outputId.txId);
                 if (changeIsFresh) {
-                    changes.push({
+                    pendingChanges.push({
                         change,
                         isCurrent: true,
                     });
@@ -491,7 +485,7 @@ export class CMDBCapo extends DefaultCapo {
                             prevDatum;
                     }
 
-                    changes.push({
+                    pendingChanges.push({
                         change,
                         isCurrent: false,
                         baseEntry: changeBaseEntry,

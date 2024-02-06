@@ -36,7 +36,7 @@ export class PageView extends React.Component<propsType, stateType> {
         if (!rendered) setTimeout(() => this.setState({rendered:true}), 10);
 
         const {
-            entry: { pageEntry, changes=[] },
+            entry: { pageEntry, pendingChanges=[] },
             wallet,
             preview,
         } = this.props;
@@ -45,7 +45,7 @@ export class PageView extends React.Component<propsType, stateType> {
             entry: page
         }= pageEntry;
 
-        const altTitles = changes.map(x => {
+        const altTitles = pendingChanges.map(x => {
             const {entry: {title}, id } = x.change
             if (!title) return undefined;
             return { title, id }

@@ -8,6 +8,9 @@ import { defineConfig } from "vite"
 import { string } from "rollup-plugin-string"
 
 export default defineConfig({
+    resolve: {
+        conditions: ["node", "import", "module", "browser", "default" ]
+    },
     plugins: [
         string({
             // Required to be specified
@@ -18,7 +21,8 @@ export default defineConfig({
         // include: ['tests/new*.test.ts', ],
         include: ["tests/*.test.ts", "tests/*.test.js"],
         globals: true,
-        restoreMocks: true,
+        sourcemap: true,
+         restoreMocks: true,
         testTimeout: 500000,
         hookTimeout: 19000,
         teardownTimeout: 23000,

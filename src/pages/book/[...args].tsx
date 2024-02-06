@@ -50,7 +50,10 @@ import {
     helios,
 } from "@donecollectively/stellar-contracts";
 
-import type { BookEntryForUpdate, BookIndex } from "../../contracts/CMDBCapo.js";
+import type {
+    BookEntryForUpdate,
+    BookIndex,
+} from "../../contracts/CMDBCapo.js";
 import { CMDBCapo } from "../../contracts/CMDBCapo.js";
 import { PageEditor } from "../../local-comps/book/PageEditor.jsx";
 import { BookPages } from "../../local-comps/book/BookPages.jsx";
@@ -539,7 +542,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         const { tcx } = this.state;
         if (!tcx) return;
 
-        const txnDump = tcx && dumpAny(tcx);
+        const txnDump = tcx && dumpAny(tcx, this.state.bookContract?.networkParams);
         {
             txnDump && (
                 <pre
@@ -650,6 +653,19 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             return;
         }
         const wallet = new helios.Cip30Wallet(handle);
+        const walletHelper = new helios.WalletHelper(wallet);
+
+        const newState = {
+            wallet,
+            connectingWallet: false,
+            walletHelper,
+            networkName,
+        };
+        await this.updateState(
+            "",
+            newState,
+            "//wallet connected; no existing bookContract: not reinitializing"
+        );
 
         const collateralUtxos = await handle.getCollateral();
         if (!collateralUtxos?.length) {
@@ -663,8 +679,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             return;
         }
 
-        const walletHelper = new helios.WalletHelper(wallet);
-
         walletHelper.getUtxos().then((walletUtxos) => {
             this.updateState(
                 undefined,
@@ -672,25 +686,13 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 "//found wallet utxos"
             );
         });
-        const newState = {
-            wallet,
-            connectingWallet: false,
-            walletHelper,
-            networkName,
-        };
-        if (bookContract) {
+        if (this.state.bookContract && !this.state.bookContract.wallet) {
             await this.updateState(
                 "reinitializing registry with wallet connected",
-                newState,
+                {},
                 "//reinit after wallet"
             );
             return this.connectBookContract(autoNext);
-        } else {
-            return this.updateState(
-                "",
-                newState,
-                "//wallet connected; no existing bookContract: not reinitializing"
-            );
         }
     }
 
