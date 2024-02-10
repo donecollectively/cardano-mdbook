@@ -219,7 +219,7 @@ describe("Capo", async () => {
                 const pageCreation = h.collaboratorCreatesPage(testPageEntry);
                 await expect(pageCreation).rejects.toThrow(/trace: 8rf2o3j4/);
                 await expect(pageCreation).rejects.toThrow(
-                    /missing.*delegat.*capoGov/
+                    /missing.*dgTkn capoGov-/
                 );
 
                 const { content: expectedContent } = testSuggestedPage;
@@ -508,7 +508,7 @@ describe("Capo", async () => {
                 );
                 // await randoCantSuggest;
                 await expect(randoCantSuggest).rejects.toThrow(
-                    /missing.*delegation token/
+                    /missing.*dgTkn collab-/
                 );
                 expect(hasFakeRoleInfo).toHaveBeenCalled();
                 expect(mockedUserToken).toHaveBeenCalled();
@@ -1039,8 +1039,10 @@ describe("Capo", async () => {
                 await expect(onChain).rejects.toThrow(
                     new RegExp(`owner ${ownerTokenName} missing`)
                 );
+
+                // the editor's token that's required when the doc owner isn't found
                 await expect(onChain).rejects.toThrow(
-                    /missing.*delegation token/
+                    /missing.*dgTkn capoGov/  
                 );
             });
             it("when NOT accepting changes, the mint-delegate's AcceptingPageChanges activity fails", async (context: localTC) => {
