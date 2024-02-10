@@ -16,8 +16,7 @@
         "start": "next start",
         "lint": "next lint",
         "test": "vitest",
-        "test:debug": "vitest --inspect --threads false",
-        "testing": "vitest --inspect --threads false",
+        "testing:debug": "vitest --inspect --threads false",
         "test:ui": "vitest --ui",
         "test:run": "vitest run"
     },
