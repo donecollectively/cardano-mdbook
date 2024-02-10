@@ -190,7 +190,10 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
             page, suggestions, merged
         );
         const resourceId = tcx.state.uuts.entryId.name;
-        console.log("               -------------------------------------\nbefore submitting suggestion-merge", dumpAny(tcx))
+        console.log(
+            "               -------------------------------------\nbefore submitting suggestion-merge", 
+            dumpAny(tcx, this.book.networkParams)
+        )
         return this.book.submit(tcx).then(
             (txid) => {
                 this.network.tick(1n);

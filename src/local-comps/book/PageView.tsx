@@ -36,7 +36,7 @@ export class PageView extends React.Component<propsType, stateType> {
         if (!rendered) setTimeout(() => this.setState({rendered:true}), 10);
 
         const {
-            entry: { pageEntry, pendingChanges=[] },
+            entry: { pageEntry, pendingChanges=[] } = {},
             wallet,
             preview,
         } = this.props;

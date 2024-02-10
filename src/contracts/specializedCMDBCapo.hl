@@ -1,5 +1,8 @@
 module specializedCapo
 
+const devGen : Int = 1
+const isDev: Bool = false
+
 // exports a Datum and Redeemer.  
 //! the Datum and Redeemer of specializations
 //  MUST include the same enum variants as in this
@@ -170,7 +173,6 @@ enum Datum {
     ) -> Option[Datum::CharterToken] {
         chVal : Value = tvCharter(mph);
         hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
-
         assert(
             self.serialize() != ctx.serialize() &&
             self.serialize() != mph.serialize(), "never thrown"
@@ -190,25 +192,25 @@ enum Datum {
     }
     
 }
-func hasCharterRefInput(
-    ctx: ScriptContext, 
-    mph : MintingPolicyHash
-) -> Option[Datum::CharterToken] {
-    chVal : Value = tvCharter(mph);
-    hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
+// func hasCharterRefInput(
+//     ctx: ScriptContext, 
+//     mph : MintingPolicyHash
+// ) -> Option[Datum::CharterToken] {
+//     chVal : Value = tvCharter(mph);
+//     hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
     
-    ctx.tx.ref_inputs.find_safe(hasCharter).switch{
-        Some{txin} => Option[Datum::CharterToken]::Some{
-            Datum::from_data( 
-                txin.datum.get_inline_data() 
-            ).switch{
-                c : CharterToken => c,
-                _ => error("wrong enum")
-            }
-        },
-        None => Option[Datum::CharterToken]::None
-    }
-}
+//     ctx.tx.ref_inputs.find_safe(hasCharter).switch{
+//         Some{txin} => Option[Datum::CharterToken]::Some{
+//             Datum::from_data( 
+//                 txin.datum.get_inline_data() 
+//             ).switch{
+//                 c : CharterToken => c,
+//                 _ => error("wrong enum")
+//             }
+//         },
+//         None => Option[Datum::CharterToken]::None
+//     }
+// }
 enum Activity {
     // standard redeemer types:
     updatingCharter    // 0
@@ -248,19 +250,20 @@ enum Activity {
      
         newDatum : Datum = outputDatum[Datum](newTxo);
         Datum::BookEntry{newAuthority, newListing} = newDatum;
-        assert(newAuthority == ownerAuthority, "authority change invalid");
+        assert(newAuthority == ownerAuthority, "bad authz chg");
 
         // createdAt: Int
-        assert(newListing.createdAt == oldListing.createdAt, "createdAt must not be modified");
+
+        assert(newListing.createdAt == oldListing.createdAt, "chg cAt"); // "createdAt must not be modified");
         // updatedAt: Int
-        assert(txnTime.contains(Time::new(newListing.updatedAt)), "incorrect updatedAt");
+        assert(txnTime.contains(Time::new(newListing.updatedAt)), "bad upAt"); // "incorrect updatedAt");
         // expiresAt: Int
         assert(Time::new(newListing.expiresAt) < Time::new(newListing.updatedAt) + (365 * Duration::DAY),
-            "expiry must be less than 1y"
+            "expiry must < 1y"
         );
         // lastExpiredAt: Int
     
-        assert(newListing.updatedBy.starts_with("collab-"), "updatedBy must be a collab-* token");
+        assert(newListing.updatedBy.starts_with("collab-"), "updatedBy not collab-*");
         // check that the transaction has the collab-* token as an input
         correctUpdatedBy: Bool = requiresValidDelegateOutput(
             RelativeDelegateLink{newListing.updatedBy, "address", Option[ValidatorHash]::None}, 
@@ -269,7 +272,7 @@ enum Activity {
 
         
         datumCanUpdate : Bool = newDatum.txnHasUpdateAuthority(ownerAuthority, oldListing, ctx, mph);
-        assert(datumCanUpdate, "no update authority in txn");
+        assert(datumCanUpdate, "no upd authz");
 
         // charterData : Option[Datum::CharterToken] = hasCharterRefInput(ctx, mph);
         // availableAuthority : RelativeDelegateLink = charterData.switch{
@@ -351,10 +354,10 @@ enum Activity {
                         self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph)
                     },
                     suggestionBeingAccepted => {
-                        assert(entry.entryType == "sug", "invalid entry type for suggestionBeingAccepted");
+                        assert(entry.entryType == "sug", "invalid etp for sBA"); //  "invalid entry type for suggestionBeingAccepted");
                         peid : String = entry.changeParentEid.switch{
                             Some{eid} => eid,
-                            None => error("invalid suggestion without changeParentEid")
+                            None => error("invalid sug needs chPEid") // "invalid suggestion without changeParentEid")
                         };
                         (_, pageUtxo : TxInput) = requiresPageInput(
                             ctx, mph, peid
@@ -377,7 +380,7 @@ enum Activity {
                             get_current_input().
                             value.get_policy(mph);
 
-                        assert(pgVal.length == 1, "invalid contract utxo with coalesced entries");
+                        assert(pgVal.length == 1, "invalid; coalesced"); // "invalid contract utxo with coalesced entries");
                         peid : String = pgVal.head_key.decode_utf8();
 
                         self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph) &&
@@ -385,7 +388,7 @@ enum Activity {
                     },
                     retiringPage => self.allowRetiringPage(datum, ctx, mph),
                     // registeringEntry => assert(false, "unreachable code"),
-                    _ => error("unreachable code")
+                    _ => error("!poss" ) //unreachable code")
                 }
                // not executed, but prevents the args from showing up as unused:
                 || ( ownerAuthority.serialize() != entry.serialize() )

@@ -32,7 +32,9 @@ import {
 } from CapoMintHelpers
 
 import {
-    Datum as CMDBookDatum
+    Datum as CMDBookDatum,
+    isDev,
+    devGen
 } from specializedCapo
 
 import {
@@ -52,6 +54,7 @@ enum MintDelegateDatum {
         dd: DelegationDetail
         customConfig : String // DredRegistrationSettings
     }
+    ScriptReference
     
     func validateCDConfig(self, updated: MintDelegateDatum::IsDelegation) -> Bool {
         self.switch {
@@ -194,7 +197,7 @@ enum MintDelegateActivity {
         //     purposes.get(0) == collaboratorPurpose;
 
         assert(isMintingBookEntry , 
-            "minting unrecognized UUTs "
+            "minting unrecognized UUTs!"
             ///BAD: + purposes.show()
         );
 
@@ -276,7 +279,7 @@ enum MintDelegateActivity {
 
             MintingCollaboratorToken{sTxId, sIdx} => {
                 collaboratorPurpose : String = "collab";
-                print("minting collaborator token");
+                    // print("minting collaborator token");
                 self.checkCollaboratorTokenMint(
                     priorMddd, 
                     collaboratorPurpose, 
@@ -323,14 +326,14 @@ enum MintDelegateActivity {
                 (pageUut: Value, pageUtxo : TxInput) = requiresPageInput(ctx, 
                     priorMddd.dd.mph, toPageEid
                 );
-                print("pageInput ok");
+                // print("pageInput ok");
                 delegatedEnforcement : Bool = spendsAndReturns(pageUut, ctx, pageUtxo);
-                print("delegatedEnforcement is " + delegatedEnforcement.show());
+                // print("delegatedEnforcement is " + delegatedEnforcement.show());
                 requiresAcceptingChangesActivity(ctx, pageUtxo) &&
                 delegatedEnforcement 
             },
             _ => {
-                print("unrecognized activity: "+self.serialize().show());
+                print("bad activity: "+self.serialize().show());
                 false //!!! doesn't allow any activity except Authorizing!
             }
         } || ctx.tx.serialize() /* never */ == priorMddd.serialize()
@@ -348,17 +351,17 @@ enum MintDelegateActivity {
         newTxo : TxOutput = getOutputWithValue(ctx, expectedUutValue);
         assert(
             newTxo.value.get_assets().to_map().length == 1,
-            //  "too many policies"  
-             "invalid token bundle with various assets: "+newTxo.value.show()
+             "too many policies"  
+            //  "invalid token bundle with various assets: "+newTxo.value.show()
         );
         assert(
             newTxo.value.contains_policy(mph),
-            "output doesn't have expected mph"
+            "missing expected mph"
         );
         assert(
             newTxo.value.get_policy(mph).length == 1, 
-            // "too many tokens"
-            "invalid with multiple tokens in the utxo"
+            "too many tokens"
+            // "invalid with multiple tokens in the utxo"
         );
         true ||
             self.serialize() /*never executed */ == ctx.serialize()
@@ -377,16 +380,17 @@ enum MintDelegateActivity {
         
         assert(
             newTxo.value.get_assets().to_map().length == 1,
-            //  "too many policies"  
-            "invalid token bundle with various assets: "+newTxo.value.show()
+             "too many policies"  
+            // "invalid token bundle with various assets: "+newTxo.value.show()
         );
         assert(
             newTxo.value.contains_policy(mph),
-            "output doesn't have expected mph"
+            "wrong mph"// "output doesn't have expected mph"
         );
         assert(
             newTxo.value.get_policy(mph).length == 1, 
-            "invalid with multiple tokens in the utxo"
+            "multiple tokens in utxo"
+            // "invalid with multiple tokens in the utxo"
         );
     
         // print("parsing datum on "+newTxo.value.show());
@@ -397,7 +401,7 @@ enum MintDelegateActivity {
         CMDBookDatum::BookEntry{_, newListing} = newDatum;
         print("trace: 8rf2o3j4 ");
         canBeCreated : Bool = newDatum.txnHasCreateAuthority(ctx, mph);
-        assert(canBeCreated, "no creation authority in txn");
+        assert(canBeCreated, "no create authz");
 
         txnTime : TimeRange = ctx.tx.time_range;        
         now : Time = txnTime.start;
@@ -410,14 +414,14 @@ enum MintDelegateActivity {
         ); 
         assert(/*  2c. ✅ */ 
             (txnTime.end - txnTime.start) < 1 * Duration::HOUR, 
-            "validity period must be less than 1h"
+            "validity must < 1h"
             //    +", got "
             //    + ((txnTime.end - txnTime.start) / Duration::new(1)).show() + 
             // "ms instead" 
         ); 
         assert(/* 3. ✅ */ 
             Time::new(newListing.expiresAt) < ( now + 365*Duration::DAY ),
-                "expiration time must be less than 1y") ; 
+                "expiry must < 1y") ; 
 
         // 4. ✅ 
         notModified : Bool = unmodifiedDelegation(mintDelegateData.serialize(), ctx);

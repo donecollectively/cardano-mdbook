@@ -112,7 +112,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const { entry, bookContract } = this.props;
         // console.error(`MOUNTED CredForm ${this.i}`)
         const current =
-            entry?.pageEntry ||
+            entry?.pageEntry.entry ||
             ({
                 ...testBookPage,
             } as BookEntry);
@@ -164,13 +164,15 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const { entry, collabUut } = this.props;
         if (!entry || !collabUut) return false;
 
-        return entry.ownerAuthority.uutName == collabUut?.name;
+        return entry.pageEntry.ownerAuthority.uutName == collabUut?.name;
     }
 
     async save(e: React.SyntheticEvent) {
         const { current: rec, saveAs } = this.state;
         const {
-            entry: entryForUpdate,
+            entry: {
+                pageEntry: entryForUpdate,
+            },
             refresh,
             updateState,
             reportError,
@@ -336,6 +338,16 @@ export class PageEditor extends React.Component<propsType, stateType> {
         }
 
         const breadcrumbTitle = create ? "new" : rec.title;
+        const bookIndexEntryWithUpdates : BookIndexEntry | undefined = entry && modified && {
+             ...entry, 
+             pageEntry: {
+                ... (entry.pageEntry),
+                updated: rec 
+             }
+        };
+        if (entry && modified) {
+            debugger
+        }
         return (
             <div>
                 <Head>
@@ -543,7 +555,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                             <hr className="not-prose mb-2" />
                             <PageView
                                 {...{
-                                    entry: { ...entry, pageEntry: rec },
+                                    entry: bookIndexEntryWithUpdates,
                                     bookContract,
                                     collabUut: this.props.collabUut,
                                     connectingWallet:

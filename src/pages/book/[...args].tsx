@@ -11,15 +11,15 @@
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
     mph: {
-        bytes: "561eb0667d4a150480a7326badceea132768abaf5f8c21cd6d895ef5",
+        bytes: "3999de477a809eaa6f97ecb2c81f52d479e71ade973233c4ddb59b88",
     },
     rev: "1",
     seedTxn: {
-        bytes: "8fcea29037d6d2698f5e7e5677c5e0e96bce9aef715b79d81c379a226733e6e6",
+        bytes: "ac18fe4b7e818d48865aae253db7d705e3f0f313f59579308fea05544aefa650",
     },
-    seedIndex: "2",
+    seedIndex: "3",
     rootCapoScriptHash: {
-        bytes: "2df5b6b7a00386563c04ab08cc49fc01752d726dfa21b828100edeb8",
+        bytes: "05190835706da6ad2acfbb62c8b814681e8d1510a9d04b48067745af",
     },
 };
 
@@ -132,7 +132,12 @@ let mountCount = 0;
 
 type moreStatusOptions = {
     clearAfter?: number;
-}
+};
+
+const bfKeys = {
+    mainnet: "mainnetvtlJdtsOo7nNwf58Az9F5HRDGCIkxujZ",
+    preprod: "preprodCwAM4ABR6SowGsmURORvDJvQTyWmCHJP",
+};
 
 export class BookHomePage extends React.Component<paramsType, BookPageState> {
     bf: hBlockfrost;
@@ -150,7 +155,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         this.closeForm = this.closeForm.bind(this);
         this.connectWallet = this.connectWallet.bind(this);
         this.state = { status: "connecting to blockfrost" };
-
         this.bf = new BlockfrostV0(
             "preprod",
             "preprodCwAM4ABR6SowGsmURORvDJvQTyWmCHJP"
@@ -436,6 +440,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         ) : (
             ""
         );
+        const addrInfo = "development" == process.env.NODE_ENV && bookContract ? bookContract.address.toBech32() : ""
         return (
             <div>
                 <Head>
@@ -447,6 +452,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 {results}
                 {this.txnDump()}
                 {progResult}
+                {addrInfo ? "address: " + addrInfo : ""}
                 {/* <Prose className="">
                     <div className="suppressHydrationWarning"> instance {this.i} </div>
                 </Prose> */}
@@ -542,7 +548,8 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         const { tcx } = this.state;
         if (!tcx) return;
 
-        const txnDump = tcx && dumpAny(tcx, this.state.bookContract?.networkParams);
+        const txnDump =
+            tcx && dumpAny(tcx, this.state.bookContract?.networkParams);
         {
             txnDump && (
                 <pre
@@ -686,7 +693,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 "//found wallet utxos"
             );
         });
-        if (this.state.bookContract && !this.state.bookContract.wallet) {
+        if (this.state.bookContract && !this.state.bookContract.isConnected) {
             await this.updateState(
                 "reinitializing registry with wallet connected",
                 {},
@@ -752,9 +759,23 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             await this.connectWallet();
         }
         const { networkParams, wallet } = this.state;
+        let localConfig = window.localStorage.getItem("cmdbConfig");
+        if (localConfig) try {
+            localConfig = JSON.parse(localConfig);
+
+            this.updateState("using dev-time config from localStorage", {
+                clearAfter: 5000,                
+            }, "// dev-time notice");
+        } catch(e) {
+            return this.reportError(e, "parsing devCfg from localStorage", {
+                actionLabel: "reset devCfg",
+                nextAction: "initializeBookContract",
+            });
+        }
+        const bestKnownConfig = (localConfig || CMDB_BookContractConfig)
         let config =
-            !reset && CMDB_BookContractConfig
-                ? { config: CMDBCapo.parseConfig(CMDB_BookContractConfig) }
+            !reset && bestKnownConfig
+                ? { config: CMDBCapo.parseConfig(bestKnownConfig) }
                 : { partialConfig: {} };
 
         if (!wallet) console.warn("connecting to registry with no wallet");
@@ -764,7 +785,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 networkParams,
                 myActor: wallet,
                 isDev: "development" == process.env.NODE_ENV,
-                optimize: false,
+                optimize: true,
             },
             // partialConfig: {},
             ...config,
@@ -864,6 +885,18 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
         try {
             await bookContract.submit(tcx);
+            console.warn(
+                "------------------- Boostrapped Config -----------------------\n",
+                tcx.state.bootstrappedConfig,
+                "\n------------------- deploy this! -----------------------\n"
+            );
+
+            if ("development" == process.env.NODE_ENV) {
+                window.localStorage.setItem("cmdbConfig", JSON.stringify(tcx.state.bootstrappedConfig));
+                return this.updateState("Okay: self-deployed dev-time config.  It might take 10-20s for the charter to be found on-chain", {
+                    clearAfter: 5000,
+                }, "//stored bootstrapped config in localStorage");
+            }
             await this.updateState(
                 `Book contract creation submitted.  Deploy the following details...`,
                 {
@@ -874,11 +907,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                     ),
                 },
                 "//ok: charter txn submitted to network"
-            );
-            console.warn(
-                "------------------- Boostrapped Config -----------------------\n",
-                tcx.state.bootstrappedConfig,
-                "\n------------------- deploy this! -----------------------\n"
             );
 
             // this.seekConfirmation()
@@ -992,14 +1020,9 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             if (clearAfter) {
                 setTimeout(() => {
                     if (this.state.status == status)
-                        this.updateState(
-                            "",
-                            {},
-                            "//clear previous message"
-                        );
+                        this.updateState("", {}, "//clear previous message");
                 }, clearAfter);
             }
-
         });
     }
     static nextPrev = false;
