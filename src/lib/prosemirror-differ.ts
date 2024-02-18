@@ -1,10 +1,12 @@
 import {
-    Transform, ReplaceStep
+    Transform, ReplaceStep,
+    Step
 } from 'prosemirror-transform'
 import {
-    applyPatch, createPatch
+    applyPatch, createPatch, type Patch
 } from 'rfc6902'
 import {diffWordsWithSpace, diffChars} from 'diff'
+import type { Node, Schema } from "prosemirror-model";
 
 // ORIGINALLY FROM prosemirror-recreate-steps
 // Its NOTICE file is included here, to comply with its APACHE license.
@@ -14,9 +16,11 @@ import {diffWordsWithSpace, diffChars} from 'diff'
 // --- end
 // see also LICENSE-prosemirror-recreate-steps file.
 
-// THIS FILE IS (will be) MODIFIED FROM the ORIGINAL
+// THIS FILE IS MODIFIED FROM the ORIGINAL
 
-function getReplaceStep (fromDoc, toDoc) {
+
+
+function getReplaceStep (fromDoc: Node, toDoc: Node) {
     let start = toDoc.content.findDiffStart(fromDoc.content)
     if (start === null) {
         return false
@@ -42,6 +46,15 @@ function getReplaceStep (fromDoc, toDoc) {
 }
 
 class RecreateTransform {
+    fromDoc: Node
+    toDoc: Node
+    complexSteps: boolean
+    wordDiffs: boolean
+    schema: Schema
+    currentJSON: any;
+    finalJSON: any;
+    ops: Patch;
+    tr: Transform;
     constructor(fromDoc, toDoc, complexSteps, wordDiffs) {
         this.fromDoc = fromDoc
         this.toDoc = toDoc
@@ -76,10 +89,10 @@ class RecreateTransform {
 
     recreateChangeContentSteps() {
         // First step: find content changing steps.
-        let ops = []
+        let ops = [];
         while (this.ops.length) {
-            let op = this.ops.shift(),
-                toDoc = false
+            let op = this.ops.shift();
+            let toDoc : false | Node = false;
             const afterStepJSON = JSON.parse(JSON.stringify(this.currentJSON)),
                 pathParts = op.path.split('/')
             ops.push(op)
@@ -143,14 +156,14 @@ class RecreateTransform {
         })
     }
 
-    marklessDoc(doc) {
+    marklessDoc(doc: Node) : Node{
         const tr = new Transform(doc)
         tr.removeMark(0, doc.nodeSize - 2)
         return tr.doc
     }
 
     // From http://prosemirror.net/examples/footnote/
-    addReplaceStep(toDoc, afterStepJSON) {
+    addReplaceStep(toDoc : Node, afterStepJSON : any) {
         const fromDoc = this.schema.nodeFromJSON(this.currentJSON),
             step = getReplaceStep(fromDoc, toDoc)
         if (!step) {
@@ -253,7 +266,7 @@ class RecreateTransform {
         const newTr = new Transform(this.tr.docs[0]),
             oldSteps = this.tr.steps.slice()
         while (oldSteps.length) {
-            let step = oldSteps.shift()
+            let step : Step = oldSteps.shift()
             while (oldSteps.length && step.merge(oldSteps[0])) {
                 const addedStep = oldSteps.shift()
                 if (step instanceof ReplaceStep && addedStep instanceof ReplaceStep) {
