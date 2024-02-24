@@ -1,4 +1,7 @@
 import React from "react";
+import link from "next/link.js";
+const Link = link.default;
+
 import { CMDBCapo } from "../../contracts/CMDBCapo.js";
 import type {
     BookEntryForUpdate,
@@ -7,9 +10,7 @@ import type {
     BookIndexEntry,
 } from "../../contracts/CMDBCapo.js";
 import { Prose } from "../../components/Prose.jsx";
-import link from "next/link.js";
-import { BookManagementProps } from "./sharedPropTypes.js";
-const Link = link.default;
+import { hasBookMgr } from "./sharedPropTypes.js";
 
 type propsType = {
     bookDetails: BookEntryForUpdate[];
@@ -18,7 +19,7 @@ type propsType = {
     createBookEntry: Function;
     isCollaborator?: true;
     index: BookIndex
-} & BookManagementProps;
+} & hasBookMgr;
 type stateType = {};
 
 export class BookPages extends React.Component<propsType, stateType> {
@@ -37,7 +38,7 @@ export class BookPages extends React.Component<propsType, stateType> {
     }
 
     get router() {
-        return this.props.bookMgrDetails.router;
+        return this.props.mgr.router;
     }
 
     editItem(id) {
@@ -46,7 +47,7 @@ export class BookPages extends React.Component<propsType, stateType> {
 
     renderResultsTable(filteredBookDetails: BookIndexEntry[]) {
         const { isCollaborator } = this.props;
-        const { pageViewUrl, goEditPage } = this.props.bookMgrDetails;
+        const { pageViewUrl, goEditPage } = this.props.mgr;
         return (
             <Prose className="">
                 <table>

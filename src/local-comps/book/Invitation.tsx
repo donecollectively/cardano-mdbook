@@ -1,11 +1,11 @@
 import React from "react";
 import type { MouseEventHandler } from "react";
 import type { BookEntryForUpdate } from "../../contracts/CMDBCapo.js";
-import type { BookManagementProps } from "./sharedPropTypes.js";
+import type { hasBookMgr } from "./sharedPropTypes.js";
 import { Button } from "../../components/Button.jsx";
 import { helios, Address as AddressType } from "@donecollectively/stellar-contracts";
 
-type propsType = BookManagementProps;
+type propsType = hasBookMgr;
 
 type stateType = {
     addrString: string;
@@ -81,7 +81,7 @@ export class Invitation extends React.Component<propsType, stateType> {
     }
 
      mintCollaboratorToken: MouseEventHandler<HTMLButtonElement> = async () => {
-        const { bookContract, updateState, reportError } = this.props.bookMgrDetails;
+        const { bookContract, updateState, reportError } = this.props.mgr;
         const {address} = this.state;
 
         await updateState("building txn to mint collaborator token", {}, "//mkTxnMintCollaboratorToken()");

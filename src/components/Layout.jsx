@@ -198,7 +198,7 @@ export function Layout({ children, title, tableOfContents, notProse = false, nex
                         </h1>
                     </header>
                 )) || (
-                    <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
+                    <div className="-mt-16 min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
                         <article>
                             {(title || section) && (
                                 <header className="mb-9 space-y-1">

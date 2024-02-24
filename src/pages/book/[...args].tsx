@@ -63,7 +63,7 @@ import { ClientSideOnly } from "../../components/ClientSideOnly.js";
 import { inPortal } from "../../inPortal.js";
 import { Progress } from "../../components/Progress.js";
 import { Invitation } from "../../local-comps/book/Invitation.jsx";
-import { BookManagementProps } from "../../local-comps/book/sharedPropTypes.js";
+import { hasBookMgr } from "../../local-comps/book/sharedPropTypes.js";
 
 // Helios types
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
@@ -381,13 +381,18 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             }
         } else if ("view" == route) {
             // status = "";
+            const [ id, changeId ] = arg2.split("+");
             const entry = this.state.bookEntryIndex[id];
+            const change = entry.pendingChanges.find(
+                (x) => x.change.id == changeId
+            );
             // type XXXXXX = typeof entry.pageEntry
             results = (
                 <PageView
                     {...{
                         ...this.mkBookManagementProps(),
                         entry,
+                        change,
                     }}
                 />
             );
@@ -442,7 +447,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
     }
 
-    mkBookManagementProps(): BookManagementProps {
+    mkBookManagementProps(): hasBookMgr {
         const {
             bookContract,
             roles,
@@ -454,7 +459,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         } = this.state;
 
         return {
-            bookMgrDetails: {
+            mgr: {
                 bookContract,
                 roles,
                 collabUut,
@@ -488,11 +493,12 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         this.props.router.push("/book/invite", "", { shallow: true });
     }
 
-    goViewPage(id: string) {
-        this.props.router.push(this.pageViewUrl(id), "", { shallow: true });
+    goViewPage(id: string, change? : string) {
+        this.props.router.push(this.pageViewUrl(id, change), "", { shallow: true });
     }
 
-    pageViewUrl(id: string) {
+    pageViewUrl(id: string, change? : string) {
+        const frag = change ? `${id}+${change}`: id;
         const be = this.state.bookEntryIndex[id];
         const title = be.pageEntry.entry.title;
         // convert characters in title to be SEO friendly:
@@ -502,7 +508,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             .replace(/-+/g, "-") // replace any multiple hyphens with a single hyphen
             .replace(/^-|-$/g, "") // remove any hyphens at the start or end of the string
             .replace(/\//g, "-"); // replace any slashes with hyphens
-        return `/book/v/${id}/${seoFriendlyTitle}`;
+        return `/book/v/${frag}/${seoFriendlyTitle}`;
     }
 
     goEditPage(id: string) {

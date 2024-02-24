@@ -1323,7 +1323,7 @@ export class CMDBCapo extends DefaultCapo {
                 mech: [
                     "references the parent transaction-id",
                     "formats title as direct change, leaving content empty if unchanged",
-                    "formats content changes as a diff, leaving title empty if unchanged",
+                    "formats content changes as a diff + editing steps, leaving title empty if unchanged",
                 ],
             },
 

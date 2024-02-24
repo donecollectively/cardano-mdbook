@@ -12,20 +12,22 @@ type hWallet = typeof Cip30Wallet.prototype;
 type stateUpdaterFunc = BookHomePage["updateState"];
 type errorFunc = BookHomePage["reportError"];
 
-export type BookManagementProps = {
-    bookMgrDetails: {
-        bookContract: CMDBCapo;
-        router: NextRouter;
-        roles: BookPageState["roles"] | undefined;
-        collabUut : UutName | undefined;
-        updateState: stateUpdaterFunc;
-        reportError: errorFunc;
-        pageViewUrl: Function;
-        goViewPage: Function;
-        goEditPage: Function;
-        wallet? : hWallet;
-        connectingWallet: boolean;
-        walletUtxos? : TxInput[],
-        walletHelper? : WalletHelper
-    }
+export type isBookMgr = {
+    bookContract: CMDBCapo;
+    router: NextRouter;
+    roles: BookPageState["roles"] | undefined;
+    collabUut: UutName | undefined;
+    updateState: stateUpdaterFunc;
+    reportError: errorFunc;
+    pageViewUrl: Function;
+    goViewPage: Function;
+    goEditPage: Function;
+    wallet?: hWallet;
+    connectingWallet: boolean;
+    walletUtxos?: TxInput[];
+    walletHelper?: WalletHelper;
+};
+
+export type hasBookMgr = {
+    mgr: isBookMgr
 }

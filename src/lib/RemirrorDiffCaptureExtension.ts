@@ -160,13 +160,30 @@ tr: Transform;
     const actionType = action?.type;
 
     if (!action && !tr.docChanged) {
-      return this;
+        console.warn("UNCHANGED");
+        return this;
     }
 
-    if (tr.steps.length > 1) {
-        throw new Error(`TODO: multi-step transform??`)
-    }
-    const [thisDiff] = tr.steps
+    // TODO: Unit test various scenarios
+    //  * Add a character at the beginning of the document, then delete it (should result in no steps)
+    //  * Add a character at the beginning of the document, then add another character at the beginning (should result in one step)
+    //  * Add a character at the end of the document, then add another character at the end (should result in one step)
+    //  * Add a character at the end, then delete it (should result in no steps)
+    //  * Remove a character at the beginning of the document, then add it back (should result in no steps)
+    //  * Remove a character at the beginning of the document, then add another character at the beginning (should result in one step)
+    //  * Remove a character at the end of the document, then add another character at the end (should result in one step)
+    //  * Remove a character at the end, then add it back (should result in no steps)
+    //  * Add two characters, separately, at the end of the document (should result in one step)
+    //  * Add two chars, separately, at the end; remove one (should result in one step)
+    //  * Add two chars, separately, at the end; remove each, separately (should result in no steps)
+    //  * Add two characters, separately, at the beginning of the document (should result in one step)
+    //  * Add two chars, separately, at the beginning; remove one (should result in one step)
+    //  * Add two chars, separately, at the beginning; remove each, separately (should result in no steps)
+    //  * Remove a character in the middle, and add a different character (should result in one step having the combined effect)
+    //  * Remove a character in the middle, and add the same character (should result in no steps)
+    //  * Add two characters anywhere, then add another character between them (should result in one step)
+    //  * Add three characters anywhere, then remove one from the middle (should result in one step)
+
     // Adjust cached annotation positions based on changes in the editor, e.g.
     // if new text was added before the decoration.
     //
@@ -176,9 +193,9 @@ tr: Transform;
     // used by the Yjs extension for supporting `undo`, can cause issues.
     // Consider using the `disableUndo` option of the Yjs extension, if you are
     // using both the Yjs and Annotations extensions.
-    let merged = false
+    debugger
     this.diffs = this.diffs.map((diff, i) => {        
-        const newDiff = diff.map(tr.mapping)
+        let newDiff = diff.map(tr.mapping)
         //     ...diff,
         //     // 1 indicates that the annotation isn't extended when the user types
         //     // at the beginning of the annotation
@@ -187,24 +204,41 @@ tr: Transform;
         //     // at the end of the annotation
         //     to: tr.mapping.map(diff.to, -1),
         // }
-        const mergedInto = newDiff.merge(thisDiff)
-        if (mergedInto) {
-            console.log("merged into edit #"+ (i+1))
-            merged = true
-            return mergedInto;
+        const transformed: Step[] = [];
+        for (const oneDiff of tr.steps) {
+            let merged = false;
+            debugger
+            if (!diff.map(tr.mapping)) {
+                // an existing diff was removed
+                merged = true;
+            } else {
+                const mergedInto = oneDiff ? newDiff.merge(oneDiff) : newDiff
+                if (mergedInto) {
+                    // new text added on end of an existing change
+                    console.log("content added to end of (and merged into) edit #"+ (i+1))
+                    merged = true
+                    newDiff = mergedInto;
+                } else {
+                    const mergedWith = oneDiff?.merge(newDiff) || newDiff
+                    if (mergedWith) {
+                        // new text added on beginning of an existing change
+                        console.log("prepending to edit #"+ (i+1) + ", merged into this change")
+                        merged = true
+                        newDiff = mergedWith;
+                    }
+                }
+            }
+            if (merged) {
+                transformed.push(newDiff)
+            } else {
+                console.log("added new change");
+                transformed.push(newDiff, oneDiff)
+            }
         }
-        const mergedWith = thisDiff.merge(newDiff) ;
-         if (mergedWith) {
-            console.log("merged edit #"+ (i+1) + " into this change")
-            merged = true
-            return mergedWith;
-        }
-        return newDiff
-    })
-    if (!merged) {
-        console.log("added new change");
-        this.diffs.push(thisDiff)
-    }
+        console.log("transformed", transformed);
+        return transformed
+    }).flat();
+
     // // Remove annotations for which all containing content was deleted
     // .filter((diff) => diff.to !== diff.from);
 
@@ -212,7 +246,8 @@ tr: Transform;
     // // Update the store with the updated annotation positions, and the remove ones
     // this.store.setAnnotations(this.annotations);
 
-    console.log(this.diffs.length + " diffs: ", this.diffs)
+    if (!this.diffs.length) this.diffs.push(...tr.steps)
+    console.log(this.diffs.length + " diffs: ", this.diffs.map(x => JSON.stringify(x)).join("\n"));
     return this;
   }
 }

@@ -20,13 +20,16 @@ Please use `pnpm`, not `npm`.
   - ✅ non-owner can't update
   - ✅ enable change-suggestion by non-owner; post 'sug' entry
   - ✅ Capture editing steps for suggestions
-  - Capture editing steps for direct edits
   - ✅ Enable markdown editor for page-creation
-  - List pending suggestions on page-view, with change markers
+  - ✅ List pending suggestions on page-view, with change markers
   - Allow a suggestion to be accepted, when user is editor or page-owner
-  - When a suggestion is obsolete, fetch its parent-txn and rebase the suggestion for presentation  
-  - optionally integrate suggested changes to page View
-  - gather topic index and include in site menu
+
+#### Future work
+  - When a suggestion is obsolete, fetch its parent-txn and rebase the suggestion for presentation
+  - Gather topic index and include in site menu
+  - Work on unit testing scenarios for editor's DiffCapture extension, so the resulting editing steps can be relied on.  See a laundry list of simple cases that should resolve most odd behaviors seen while experimenting with the prototype
+  - Capture editing steps for direct edits
+
 
 #### future:
   - display each page's change-history using on-chain records

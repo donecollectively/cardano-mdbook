@@ -315,7 +315,7 @@ const extensions = () => [
     new BlockquoteExtension(),
     new BulletListExtension({ enableSpine: true }),
     new OrderedListExtension(),
-    new RemirrorDiffCaptureExtension(),
+    // new RemirrorDiffCaptureExtension(),
     new ListItemExtension({
         priority: ExtensionPriority.High,
         enableCollapsible: true,

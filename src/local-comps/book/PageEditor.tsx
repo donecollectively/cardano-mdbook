@@ -45,9 +45,10 @@ import type {
 import { Prose } from "../../components/Prose.jsx";
 
 import { TxOutput, Wallet, dumpAny } from "@donecollectively/stellar-contracts";
-import type { BookManagementProps } from "./sharedPropTypes.js";
+import type { hasBookMgr } from "./sharedPropTypes.js";
 import type { NextRouter } from "next/router.js";
 import { DualEditor } from "../../lib/RemirrorDual.jsx";
+import { Step } from "prosemirror-transform";
 
 type PMEvent = {
     markdownValue: string,
@@ -61,7 +62,7 @@ type propsType = {
     refresh: Function;
     onSave: Function;
     onClose: Function;
-} & BookManagementProps;
+} & hasBookMgr;
 
 type stateType = {
     modified: boolean;
@@ -149,7 +150,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
 
     get mgr() {
-        return this.props.bookMgrDetails;
+        return this.props.mgr;
     }
 
     async componentDidMount() {
@@ -332,8 +333,8 @@ export class PageEditor extends React.Component<propsType, stateType> {
             problems,
         } = this.state || {};
 
-        const { bookMgrDetails, entry, create, onClose, onSave } = this.props;
-        const { roles, bookContract } = bookMgrDetails;
+        const { mgr, entry, create, onClose, onSave } = this.props;
+        const { roles, bookContract } = mgr;
         if (!rec) return ""; //wait for didMount
         const showTitle = <>{create ? "Creating new" : "Edit"} page</>;
         let sidebarContent;
@@ -344,7 +345,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         //! if they don't have authority, they can only make a suggestion.
         let saveAs = saveAsState;
         if (!("saveAs" in (this.state || {}))) {
-            if (this.mgr.collabUut) {
+            if (mgr.collabUut) {
                 saveAs = hasAuthority ? "update" : "suggestion";
                 setTimeout(() => {
                     // alert("appkying " +saveAs);
@@ -496,7 +497,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                             return "must be at least 8 characters";
                                     },
                                 })}
-                                {this.mgr.roles?.includes("editor") &&
+                                {mgr.roles?.includes("editor") &&
                                     this.field("Entry Type", "entryType", {
                                         type: "select",
                                         options: {
@@ -628,8 +629,8 @@ export class PageEditor extends React.Component<propsType, stateType> {
                     {modified && (
                         <>
                              {changeSteps.length} changes
-                            <pre>
-                                {JSON.stringify(changeSteps, null, 2)}
+                            <pre style={{overflowX: "visible"}}>
+                                {changeSteps.map((x: Step) => <>{JSON.stringify(x)}<br /></>)}
                             </pre>
                         </>
                     )}
@@ -826,7 +827,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
             current: updatedEntry,
             modified: true,
             contentMarkdown,
-            pmSteps,
+            pmSteps: "[]", // can't trust the pmSteps from the prototype RemirrorDiffCaptureExtension
             gen: 1 + gen,
         });
     };
