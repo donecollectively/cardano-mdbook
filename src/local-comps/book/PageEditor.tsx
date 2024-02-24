@@ -18,6 +18,21 @@ import {
 
 import { ProseMirror } from "@nytimes/react-prosemirror";
 
+import {
+    BoldExtension,
+    ItalicExtension,
+    UnderlineExtension,
+    MarkdownExtension,
+} from "remirror/extensions";
+import { Remirror, useRemirror, OnChangeJSON } from "@remirror/react";
+import { MarkdownEditor } from "@remirror/react-editors/markdown";
+
+const extensions = () => [
+    new BoldExtension({}),
+    new ItalicExtension(),
+    new MarkdownExtension({}),
+];
+
 import { CMDBCapo } from "../../contracts/CMDBCapo.js";
 import type {
     BookEntry,
@@ -32,7 +47,13 @@ import { Prose } from "../../components/Prose.jsx";
 import { TxOutput, Wallet, dumpAny } from "@donecollectively/stellar-contracts";
 import type { BookManagementProps } from "./sharedPropTypes.js";
 import type { NextRouter } from "next/router.js";
-import { PageView } from "./PageView.jsx";
+import { DualEditor } from "../../lib/RemirrorDual.jsx";
+
+type PMEvent = {
+    markdownValue: string,
+    pmSteps: string,
+    prosemirror: true,
+}
 
 type propsType = {
     entry?: BookIndexEntry;
@@ -48,7 +69,8 @@ type stateType = {
     error?: string;
     submitting?: boolean;
     saveAs?: "suggestion" | "update";
-    contentMarkdown: string;
+    contentMarkdown: string;    
+    pmSteps: string;
     problems: Record<string, string>;
     current: BookEntryUpdateAttrs | BookEntryCreationAttrs;
 };
@@ -57,6 +79,7 @@ type FieldProps = {
     rec: BookEntryUpdateAttrs | BookEntryCreationAttrs;
     fn: string;
     as?: React.ElementType;
+    bare?: true;
     rows?: number;
     options?: HtmlSelectOptions;
     placeholder?: string;
@@ -99,6 +122,7 @@ type HtmlSelectOptions = string[] | Record<string, string>;
 type fieldOptions =
     | {
           array?: true;
+          bare?: true;
           helpText?: string;
           length?: number;
           placeholder?: string;
@@ -403,6 +427,8 @@ export class PageEditor extends React.Component<propsType, stateType> {
         if (entry && modified) {
             // debugger;
         }
+        const pmSteps = this.state.pmSteps;
+        const changeSteps = pmSteps ? JSON.parse(pmSteps ) : []
         return (
             <div>
                 <Head>
@@ -478,13 +504,6 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                             spg: "Suggested Page",
                                         },
                                     })}
-                                {this.field("Content", "content", {
-                                    type: ProseMirrorField,
-                                    validator(v) {
-                                        if (v.length < 40)
-                                            return "must be at least 40 characters";
-                                    },
-                                })}
                                 <tr>
                                     {!create && (
                                         <>
@@ -548,7 +567,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                             <tfoot>
                                 <tr>
                                     <td></td>
-                                    <td>
+                                    <td style={{ textAlign: "right" }}>
                                         {(modified || !create) && (
                                             <>
                                                 <button
@@ -569,8 +588,6 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                                             <br />
                                                         </div>
                                                     )}
-
-                                                    <div>See preview below</div>
                                                 </div>
                                             </>
                                         )}
@@ -599,24 +616,21 @@ export class PageEditor extends React.Component<propsType, stateType> {
                                 )}
                             </tfoot>
                         </table>
+                        {this.field("", "content", {
+                            bare: true,
+                            type: RemirrorField,
+                            validator(v) {
+                                if (v.length < 40)
+                                    return "must be at least 40 characters";
+                            },
+                        })}
                     </form>
                     {modified && (
                         <>
-                            <h3
-                                id="preview"
-                                className="mt-0 mb-2 text-slate-700"
-                            >
-                                Preview
-                            </h3>
-                            <hr className="not-prose mb-2" />
-                            <PageView
-                                {...{
-                                    entry: bookIndexEntry,
-                                    creatingEntry,
-                                    bookMgrDetails,
-                                }}
-                                preview
-                            />
+                             {changeSteps.length} changes
+                            <pre>
+                                {JSON.stringify(changeSteps, null, 2)}
+                            </pre>
                         </>
                     )}
                 </Prose>
@@ -628,12 +642,22 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const { current: rec, problems, submitting } = this.state;
         const { 
             array, type: as = 'input',  
+            bare,
             options: selectOptions,
             style,
             validator,            
             tableCellStyle,
             rows, helpText, placeholder, defaultValue, 
         } = options || {}; //prettier-ignore
+
+        if (bare) {
+            if (label) {
+                throw new Error(`Field: a bare field must have an empty label`);
+            }
+            if (array) {
+                throw new Error(`Field: bare and Array are not compatible`);
+            }
+        }
 
         // if (fn == "content") debugger;
         if (!array) {
@@ -653,6 +677,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                         fn,
                         fieldId,
                         label,
+                        bare,
                         placeholder,
                         defaultValue,
                         helpText,
@@ -748,7 +773,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
             if (validate) {
                 //@ts-expect-error from looking at e.markdownValue, which is our funny convention
                 // for passing the current markdown version of the prosemirror content
-                const value = e.markdownValue || e.target.value;
+                const value = e.prosemirror ?  e.markdownValue : e.target.value;
                 const problem = validate(value, rec, index);
                 if (this.state.problems[fieldId] !== problem) {
                     this.setStateLater(({ problems }) => {
@@ -778,17 +803,21 @@ export class PageEditor extends React.Component<propsType, stateType> {
             gen = 0,
         } = this.state;
 
-        let { contentMarkdown } = this.state;
+        let { contentMarkdown, pmSteps } = this.state;
         //@ts-expect-error
         if (e.prosemirror) {
-            //@ts-expect-error
-            const { markdownValue } = e;
+            const { markdownValue, pmSteps: pms } = e as unknown as PMEvent;
             contentMarkdown = markdownValue;
-            this.setState({ contentMarkdown: markdownValue });
+            pmSteps = pms;
         }
 
         const f = this.form.current;
-        const updatedEntry = this.capture(f, contentMarkdown);
+
+        if (!f) {
+            console.error("no form; no capture.");
+            return;
+        }
+        const updatedEntry = this.capture(f, contentMarkdown, pmSteps);
         // //@ts-expect-error
         // if (updatedEntry.saveAs) {
         //     debugger;
@@ -796,20 +825,31 @@ export class PageEditor extends React.Component<propsType, stateType> {
         this.setState({
             current: updatedEntry,
             modified: true,
+            contentMarkdown,
+            pmSteps,
             gen: 1 + gen,
         });
     };
-    capture(form, contentMarkdown: string=this.state.contentMarkdown) {
+    capture(form, contentMarkdown: string = this.state.contentMarkdown, pmSteps: string = this.state.pmSteps) {
         const formData = new FormData(form);
+        debugger
         const currentForm: BookEntryUpdateAttrs = Object.fromEntries(
-            formData.entries()
+            [...formData.entries()].map(([k, v]) => {
+                //prettier-ignore
+                const decoded = 
+                    typeof v == "string" ? decodeURIComponent(v)
+                        : Array.isArray(v) ? v.map(decodeURIComponent)
+                        : v;
+                    console.warn("decoding", k, v, "=>", decoded);
+                return [k, decoded];
+            })
         ) as unknown as BookEntry;
-
         const initial = this.props.entry || {};
         const updatedEntry = {
             ...(this.state?.current || {}),
             ...currentForm,
             content: contentMarkdown,
+            pmSteps,
         };
 
         return updatedEntry;
@@ -820,46 +860,28 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
 }
 
-function ProseMirrorField({
+function RemirrorField({
     rec,
     fn,
     onInput,
     defaultValue,
     style,
 }: Partial<FieldProps> & { onInput: FieldProps["onChange"] }) {
-    
-    if (!rec) return null;
-
-    const [state, setState] = useState(
-        EditorState.create({
-            schema: markdownSchema,
-            doc: defaultMarkdownParser.parse(rec[fn] || defaultValue || ""),
-        })
-    );
-
-    const [mount, setMount] = useState<HTMLElement | null>(null);
-
-    const dispatchTransaction = useCallback(
-        (tr: Transaction) => {
-            setState((s) => s.apply(tr));
-
-            const markdown = defaultMarkdownSerializer.serialize(state.doc);
-            // Note: this is abusing the event object to provide markdownValue to the change-capture function
-            onInput({
-                target: mount as HTMLInputElement,
-                currentTarget: mount as HTMLInputElement,
-                //@ts-expect-error
-                markdownValue: markdown,
-            });
-        },
-        [state, mount]
-    );
-
     return (
-        <div className="w-full wrapper" style={style}>
-            <ProseMirror {...{ mount, state, dispatchTransaction }}>
-                <div ref={setMount} />
-            </ProseMirror>
+        <div className="wrapper" style={style}>
+            <DualEditor
+                defaultValue={defaultValue}
+                onChange={(md: string, diffsJson: string) => {
+                    // alert("pe on change: "+md);
+                    debugger
+                    onInput({
+                        //@ts-expect-error
+                        markdownValue: md,
+                        pmSteps: diffsJson,
+                        prosemirror: true,
+                    });
+                }}
+            />
         </div>
     );
 }
@@ -879,12 +901,12 @@ function Field({
     tableCellStyle,
     fieldId,
     validator,
+    bare,
     problem,
     onChange,
 }: FieldProps) {
     const rVal = rec[fn];
     let value = rVal;
-
     if ("undefined" !== typeof index)
         value = rec[fn][index] || (rec[fn][index] = "");
 
@@ -916,49 +938,58 @@ function Field({
     const errorBorder = problem ? { border: "1px solid #f66" } : {};
     // if (fn == "content") debugger;
 
+    const content = (
+        <>
+            <As
+                autoComplete="off"
+                className="invalid:border-pink-500"
+                style={{
+                    width: "100%",
+                    color: "#ccc",
+                    fontWeight: "bold",
+                    padding: "0.4em",
+                    background: "#000",
+                    ...errorBorder,
+                    ...style,
+                }}
+                id={fieldId}
+                aria-invalid={errorId ? true : false}
+                aria-describedby={`${helpId} ${errorId}`}
+                rows={rows}
+                name={fn}
+                onInput={onChange}
+                children={renderedOptions}
+                {...{
+                    rec,
+                    placeholder,
+                    defaultValue: value || defaultValue,
+                }}
+            ></As>
+            {problem && (
+                <div id={errorId} className="text-[#f66]">
+                    {problem}
+                </div>
+            )}
+            {isOnlyOrLastRow && helpText && (
+                <div
+                    id={helpId}
+                    style={{
+                        marginTop: "0.5em",
+                        fontSize: "91%",
+                        fontStyle: "italic",
+                    }}
+                >
+                    {helpText}
+                </div>
+            )}
+        </>
+    );
+    if (bare) return content;
+
     return (
         <tr {...arrayTableStyle}>
             <th>{!!index || <label htmlFor={fieldId}> {label}</label>}</th>
-            <td style={tableCellStyle || {}}>
-                <As
-                    autoComplete="off"
-                    className="invalid:border-pink-500"
-                    style={{
-                        width: "100%",
-                        color: "#ccc",
-                        fontWeight: "bold",
-                        padding: "0.4em",
-                        background: "#000",
-                        ...errorBorder,
-                        ...style,
-                    }}
-                    id={fieldId}
-                    aria-invalid={errorId ? true : false}
-                    aria-describedby={`${helpId} ${errorId}`}
-                    rows={rows}
-                    name={fn}
-                    onInput={onChange}
-                    children={renderedOptions}
-                    {...{ rec, placeholder, defaultValue: value || defaultValue }}
-                ></As>
-                {problem && (
-                    <div id={errorId} className="text-[#f66]">
-                        {problem}
-                    </div>
-                )}
-                {isOnlyOrLastRow && helpText && (
-                    <div
-                        id={helpId}
-                        style={{
-                            marginTop: "0.5em",
-                            fontSize: "91%",
-                            fontStyle: "italic",
-                        }}
-                    >
-                        {helpText}
-                    </div>
-                )}
-            </td>
+            <td style={tableCellStyle || {}}>{content}</td>
         </tr>
     );
 }

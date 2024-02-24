@@ -1,23 +1,24 @@
 import React from "react";
-import {
-    CMDBCapo,
-} from "../../contracts/CMDBCapo.js";
+import { CMDBCapo } from "../../contracts/CMDBCapo.js";
 import type {
     BookEntryForUpdate,
     BookEntryOnchain,
+    BookIndex,
+    BookIndexEntry,
 } from "../../contracts/CMDBCapo.js";
 import { Prose } from "../../components/Prose.jsx";
 import link from "next/link.js";
+import { BookManagementProps } from "./sharedPropTypes.js";
 const Link = link.default;
 
 type propsType = {
-    bookContract: CMDBCapo;    
     bookDetails: BookEntryForUpdate[];
     // refreshCreds: Function;
     bookMgrStatus: string;
     createBookEntry: Function;
-    isCollaborator?: true
-};
+    isCollaborator?: true;
+    index: BookIndex
+} & BookManagementProps;
 type stateType = {};
 
 export class BookPages extends React.Component<propsType, stateType> {
@@ -26,39 +27,73 @@ export class BookPages extends React.Component<propsType, stateType> {
         super(props);
     }
     render() {
-        const { bookDetails: bookDetails } = this.props;
-        return this.renderResultsTable(bookDetails);
+        const { 
+            bookDetails,
+            index,
+        } = this.props;
+
+        const indexEntries = Object.entries(index).map( ([k,v]) => v);
+        return this.renderResultsTable(indexEntries);
     }
 
-    renderResultsTable(filteredBookDetails: BookEntryForUpdate[]) {
-        const {isCollaborator} = this.props
+    get router() {
+        return this.props.bookMgrDetails.router;
+    }
+
+    editItem(id) {
+        this.router.push(`/book/${id}/edit`, "", { shallow: true });
+    }
+
+    renderResultsTable(filteredBookDetails: BookIndexEntry[]) {
+        const { isCollaborator } = this.props;
+        const { pageViewUrl, goEditPage } = this.props.bookMgrDetails;
         return (
             <Prose className="">
                 <table>
                     <thead>
                         <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Status</th>
+                            <th scope="col" className="pl-2">Name</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Pending changes</th>
+                            
                             <th scope="col">Created by</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredBookDetails.map(({ id, entry, ownerAuthority }) => (
-                            <tr key={`table-${id}`}>
-                                <td>
-                                    <Link href={`/book/${id}` }>
-                                        {entry.title}
-                                    </Link>
-                                </td>
-                                <td>
-                                    {"spg" == entry.entryType ? "Suggested Page" : "Page"}
-                                    {/* &nbsp;{entry.entryType /*temp*/}
-                                </td>
-                                <td>
-                                    {ownerAuthority.uutName}
-                                </td>
-                            </tr>
-                        ))}
+                        {filteredBookDetails.map(
+                            ({ 
+                                pendingChanges = [],
+                                pageEntry: {
+                                    id, entry, ownerAuthority 
+                                }
+                            }) => (
+                                <tr
+                                    key={`table-${id}`}
+                                    className="hover:bg-slate-800 hover:text-slate-300 dark:hover:bg-slate-950 dark:hover:text-slate-300"
+                                    onDoubleClick={goEditPage.bind(this, id)}
+                                >
+                                    <td className="pl-2">
+                                        <Link href={pageViewUrl(id)}>
+                                            {entry.title}
+                                        </Link>
+                                    </td>                                    
+                                    <td>
+                                        {"spg" == entry.entryType
+                                            ? "Suggested Page"
+                                            : "sug" == entry.entryType ? "Changes"
+                                            : "Page"}
+                                        {/* &nbsp;{entry.entryType /*temp*/}
+                                    </td>
+                                    <td>
+                                        {pendingChanges.length}
+                                    </td>
+                                    <td className="pr-2">
+                                        {ownerAuthority.uutName}
+                                    </td>
+                                </tr>
+                            )
+                        )}
+                        
                         {!filteredBookDetails.length && (
                             <tr>
                                 <td colSpan={3} style={{ textAlign: "center" }}>
@@ -70,24 +105,28 @@ export class BookPages extends React.Component<propsType, stateType> {
                     <tfoot>
                         <tr>
                             <td colSpan={2}>
-                                {isCollaborator && <button
-                                    className="btn border rounded"
-                                    style={{
-                                        padding: "0.75em",
-                                        marginLeft: "0.5em",
-                                        // marginTop: '-0.75em',
-                                        border: "1px solid #162ed5",
-                                        borderRadius: "0.5em",
-                                        backgroundColor: "#142281",
-                                    }}
-                                    onClick={this.create}
-                                >
-                                    Add a Topic
-                                </button>}
+                                {isCollaborator && (
+                                    <button
+                                        className="btn border rounded"
+                                        style={{
+                                            padding: "0.75em",
+                                            marginLeft: "0.5em",
+                                            // marginTop: '-0.75em',
+                                            border: "1px solid #162ed5",
+                                            borderRadius: "0.5em",
+                                            backgroundColor: "#142281",
+                                        }}
+                                        onClick={this.create}
+                                    >
+                                        Add a Topic
+                                    </button>
+                                )}
                             </td>
                             <td colSpan={2} style={{ textAlign: "right" }}>
                                 {(filteredBookDetails.length || "") && (
-                                    <>{filteredBookDetails.length} topics  !!! todo: filter for top-level topics / topic-count</>
+                                    <>
+                                        {filteredBookDetails.length} topic(s)
+                                    </>
                                 )}
                             </td>
                         </tr>

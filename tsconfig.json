@@ -16,6 +16,7 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "incremental": true,
+    "noErrorTruncation": true,
     // "customConditions": [
     //   "import"
     // ],

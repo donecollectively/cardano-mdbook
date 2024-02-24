@@ -81,7 +81,7 @@ export class Invitation extends React.Component<propsType, stateType> {
     }
 
      mintCollaboratorToken: MouseEventHandler<HTMLButtonElement> = async () => {
-        const { bookContract, updateState, reportError } = this.props;
+        const { bookContract, updateState, reportError } = this.props.bookMgrDetails;
         const {address} = this.state;
 
         await updateState("building txn to mint collaborator token", {}, "//mkTxnMintCollaboratorToken()");

@@ -15,7 +15,7 @@ func requiresPageInput(
         txin.value >= pageUutVal
     }).switch{
         Some{txin} => txin,
-        None => error("missing required input with "+ pageEid + 
+        None => error("no reqd input w/ "+ pageEid + 
             "\n expected: "+pageUutVal.show()
         )
     };
@@ -33,7 +33,7 @@ func requiresAcceptingChangesActivity(ctx: ScriptContext, pageUtxo : TxInput ) -
                 redeemer.switch {
                     (index: Int, fields: []Data) => {
                         isExpected: Bool = (index == 3);
-                        assert(isExpected, "wrong page-level activity for this mint-delegate's burnSuggestionsBeingAccepted: want index 3, got "+ index.show());
+                        assert(isExpected, "wrong pg-level activity for mintDgt burnSuggestionsBeingAccepted: want index 3, got "+ index.show());
                         // print ("right redeemer with index "+ index.show()+" hasExpectedIndex=" + isExpected.show());
                         isExpected && // acceptingChanges to a page
                         fields == fields
@@ -50,6 +50,7 @@ struct BookEntryStruct {
     entryType: String
     title: String
     content: String
+    pmSteps: Option[String]
     createdAt: Int
     updatedAt: Int
     updatedBy: String
@@ -72,15 +73,15 @@ struct BookEntryStruct {
         };
 
         needsLength : (String, String, Int) -> () = (v : String, fn : String, min : Int) -> {
-            assert(v.encode_utf8().length >= min,
-                "field length error" // + ": " + fn + " needs " +min.show() + " chars or more"
-            )
+            if(v.encode_utf8().length < min) {
+                error(fn + ": fld len <" + min.show())
+            }
         };
 
         if(self.updatedAt > 0) {
-            assert(self.updatedBy.starts_with("collab-"), "missing required updatedBy")
+            assert(self.updatedBy.starts_with("collab-"), "no reqd updatedBy")
         } else {
-            assert(self.updatedBy.encode_utf8().length == 0, "updatedBy must be empty")
+            assert(self.updatedBy.encode_utf8().length == 0, "non-empty updatedBy")
         };
 
         assert(goodTypes.get_safe(self.entryType).switch{
@@ -94,15 +95,21 @@ struct BookEntryStruct {
             assert(
                 self.title.encode_utf8().length >0 || 
                 self.content.encode_utf8().length > 0,
-                 "either title or content must change"
+                 "no chg in title or content"
+            );
+            assert(
+                self.pmSteps.switch{
+                    None => false,
+                    Some{pm} => pm.encode_utf8().length > 0
+                }, "no reqd pmSteps"
             );
             peLength: Int = self.changeParentEid.switch{
-                None => error("missing required changeParentEid"),
+                None => error("no reqd changeParentEid"),
                 Some{peid} => peid.encode_utf8().length
             };
             assert(
                 peLength > 15, 
-                "changeParent entry too short: "+peLength.show()
+                "chg peid too short: "+peLength.show()
             );
 
             // the value of the id-token:
@@ -117,19 +124,22 @@ struct BookEntryStruct {
                         Some => {
                             self.changeParentOidx.switch{
                                 Some => true,
-                                None => error("missing required output-index in changeParentOidx")
+                                None => error("no reqd changeParentOidx")
                             } &&
                             true
                         },
-                        None => error("no ref_input matching changeParentTxId, changeParentEid")
+                        None => error("no ref_input for chg parent")
                     }
                 },
-                _ => error("missing required changeParentTxId")
+                _ => error("no reqd changeParentTxId")
             }        
         } else {
             needsLength(self.title, "title", 10);
             needsLength(self.content, "content", 40);
-
+            self.pmSteps.switch {
+                Some => error("pmSteps not ok"),
+                None => true
+            } &&
             true    
         };
         

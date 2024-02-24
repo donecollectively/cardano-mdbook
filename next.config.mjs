@@ -11,7 +11,7 @@ if (process.env.BASE_PATH == '/cardano-mdbook') {
     //!!! developing the Cardano-mdbook infrastructure?
     //   set this environment variable to enable local development.
     if (!process.env.CMDBook) {
-        throw new Error(`you need to change your repository name and update .env BASE_PATH to match the repository name. `)
+        throw new Error(`CMDBook: you need to change your repository name and update .env BASE_PATH to suit your project. `)
     }
 }
 

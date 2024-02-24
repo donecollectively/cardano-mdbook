@@ -2,6 +2,7 @@ import { TxInput, UutName, WalletHelper, helios } from "@donecollectively/stella
 import { CMDBCapo } from "../../contracts/CMDBCapo.js"
 import { BookHomePage } from "../../pages/book/[...args].jsx";
 import type { BookPageState } from "../../pages/book/[...args].jsx";
+import { NextRouter } from "next/router.js";
 
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hBlockfrost = typeof BlockfrostV0.prototype;
@@ -12,13 +13,19 @@ type stateUpdaterFunc = BookHomePage["updateState"];
 type errorFunc = BookHomePage["reportError"];
 
 export type BookManagementProps = {
-    bookContract: CMDBCapo;
-    roles: BookPageState["roles"] | undefined;
-    collabUut : UutName | undefined;
-    updateState: stateUpdaterFunc;
-    reportError: errorFunc;
-    wallet? : hWallet;
-    connectingWallet: boolean;
-    walletUtxos? : TxInput[],
-    walletHelper? : WalletHelper
+    bookMgrDetails: {
+        bookContract: CMDBCapo;
+        router: NextRouter;
+        roles: BookPageState["roles"] | undefined;
+        collabUut : UutName | undefined;
+        updateState: stateUpdaterFunc;
+        reportError: errorFunc;
+        pageViewUrl: Function;
+        goViewPage: Function;
+        goEditPage: Function;
+        wallet? : hWallet;
+        connectingWallet: boolean;
+        walletUtxos? : TxInput[],
+        walletHelper? : WalletHelper
+    }
 }

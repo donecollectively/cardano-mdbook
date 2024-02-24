@@ -45,14 +45,14 @@ describe("CMDB Roles & Activities -> ", async () => {
             const {h, h:{network, actors, delay, state} } = context;
             await h.editorInvitesCollaborator(actors.editor);
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const { resourceId } = await h.collaboratorCreatesPage(
                 testSuggestedPage
             );
             const camillaCollabToken = await h.book.findUserRoleInfo("collab");
             if (!camillaCollabToken) throw new Error("no camillaCollabToken");
 
-            h.currentActor = "editor";
+            await h.setActor("editor")
             const editorUut = (await h.book.findUserRoleInfo("collab"))!.uut;
             const onChainEntry = await h.book.findBookEntry(resourceId);
             if (!onChainEntry) throw new Error("no onChainEntry");
@@ -103,11 +103,11 @@ describe("CMDB Roles & Activities -> ", async () => {
             const {h, h:{network, actors, delay, state} } = context;
             await h.editorInvitesCollaborator(actors.editor);
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const { resourceId } = await h.collaboratorCreatesPage(
                 testSuggestedPage
             );
-            h.currentActor = "editor";
+            await h.setActor("editor")
             const editorUut = (await h.book.findUserRoleInfo("collab"))!.uut;
 
             const onChainEntry = await h.book.findBookEntry(resourceId);
@@ -133,11 +133,11 @@ describe("CMDB Roles & Activities -> ", async () => {
             await h.bootstrap();
             await h.editorInvitesCollaborator(actors.camilla);
             await h.editorInvitesCollaborator(actors.charlie);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const { resourceId } = await h.collaboratorCreatesPage(
                 testSuggestedPage
             );
-            h.currentActor = "charlie";
+            await h.setActor("charlie")
             const existingPage = await h.book.findBookEntry(resourceId);
             if (!existingPage) throw new Error("no existingPage");
 
@@ -173,7 +173,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const {h, h:{network, actors, delay, state} } = context;
             await h.bootstrap();
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const { resourceId, tcx } = await h.collaboratorCreatesPage(
                 testSuggestedPage
             );
@@ -203,7 +203,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const {h, h:{network, actors, delay, state} } = context;
             await h.bootstrap();
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const { resourceId, tcx } = await h.collaboratorCreatesPage(
                 testSuggestedPage
             );

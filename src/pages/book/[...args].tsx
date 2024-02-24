@@ -38,7 +38,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 
 import type {
     ConfigFor,
-    StellarConstructorArgs,
+    StellarFactoryArgs,
 } from "@donecollectively/stellar-contracts";
 
 import {
@@ -63,6 +63,7 @@ import { ClientSideOnly } from "../../components/ClientSideOnly.js";
 import { inPortal } from "../../inPortal.js";
 import { Progress } from "../../components/Progress.js";
 import { Invitation } from "../../local-comps/book/Invitation.jsx";
+import { BookManagementProps } from "../../local-comps/book/sharedPropTypes.js";
 
 // Helios types
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
@@ -139,6 +140,8 @@ const bfKeys = {
     preprod: "preprodCwAM4ABR6SowGsmURORvDJvQTyWmCHJP",
 };
 
+type UpdateStateProps = Omit<BookPageState, "status"> & moreStatusOptions;
+
 export class BookHomePage extends React.Component<paramsType, BookPageState> {
     bf: hBlockfrost;
     bfFast: hTxChain;
@@ -150,7 +153,10 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         this.updateState = this.updateState.bind(this);
         this.reportError = this.reportError.bind(this);
         this.goToInvite = this.goToInvite.bind(this);
-        this.createBookEntry = this.createBookEntry.bind(this);
+        this.pageViewUrl = this.pageViewUrl.bind(this);
+        this.goViewPage = this.goViewPage.bind(this);
+        this.goEditPage = this.goEditPage.bind(this);
+        this.goCreatePage = this.goCreatePage.bind(this);
         this.fetchBookEntries = this.fetchBookEntries.bind(this);
         this.closeForm = this.closeForm.bind(this);
         this.connectWallet = this.connectWallet.bind(this);
@@ -166,7 +172,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         return this.props.router;
     }
 
-    async createBookEntry() {
+    async goCreatePage() {
         const { wallet } = this.state;
         if (!wallet) {
             await this.connectWallet(false);
@@ -210,8 +216,8 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             const id = arg1;
             return ["edit", id];
         }
-        if (arg1) {
-            return ["view", arg1];
+        if ("v" == arg1) {
+            return ["view", arg2];
         }
         return ["list", undefined];
     }
@@ -333,18 +339,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             results = inPortal("topCenter", loading);
         } else if ("invite" == route) {
             if (wallet) {
-                results = (
-                    <Invitation
-                        {...{
-                            roles,
-                            collabUut,
-                            connectingWallet,
-                            updateState: this.updateState,
-                            reportError: this.reportError,
-                            bookContract: bookContract,
-                        }}
-                    />
-                );
+                results = <Invitation {...this.mkBookManagementProps()} />;
             } else {
                 this.connectWallet(false);
             }
@@ -353,15 +348,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 results = (
                     <PageEditor
                         {...{
-                            roles,
-                            collabUut,
-                            bookContract,
-                            wallet,
-                            connectingWallet,
-                            walletHelper,
-                            walletUtxos,
-                            updateState: this.updateState,
-                            reportError: this.reportError,
+                            ...this.mkBookManagementProps(),
                             refresh: this.fetchBookEntries,
                             router,
                         }}
@@ -379,13 +366,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 results = (
                     <PageEditor
                         {...{
-                            roles,
-                            collabUut,
-                            bookContract,
-                            wallet,
-                            connectingWallet,
-                            updateState: this.updateState,
-                            reportError: this.reportError,
+                            ...this.mkBookManagementProps(),
                             refresh: this.fetchBookEntries,
                             router,
                         }}
@@ -401,18 +382,12 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         } else if ("view" == route) {
             // status = "";
             const entry = this.state.bookEntryIndex[id];
+            // type XXXXXX = typeof entry.pageEntry
             results = (
                 <PageView
                     {...{
-                        roles,
-                        collabUut,
+                        ...this.mkBookManagementProps(),
                         entry,
-                        connectingWallet,
-                        updateState: this.updateState,
-                        reportError: this.reportError,
-                        wallet,
-                        walletUtxos,
-                        bookContract,
                     }}
                 />
             );
@@ -421,9 +396,10 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 <BookPages
                     {...{
                         bookDetails: bookDetails,
-                        createBookEntry: this.createBookEntry,
-                        bookContract,
+                        index: this.state.bookEntryIndex,
+                        createBookEntry: this.goCreatePage,
                         bookMgrStatus: status,
+                        ...this.mkBookManagementProps(),
                         ...(roles?.includes("collaborator")
                             ? { isCollaborator: true }
                             : {}),
@@ -440,11 +416,17 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         ) : (
             ""
         );
-        const addrInfo = "development" == process.env.NODE_ENV && bookContract ? bookContract.address.toBech32() : ""
+        const title = process.env.NEXT_PUBLIC_CMDBook
+            ? "dev"
+            : "‹proj title here?›";
+        const addrInfo =
+            "development" == process.env.NODE_ENV && bookContract
+                ? bookContract.address.toBech32()
+                : "";
         return (
             <div>
                 <Head>
-                    <title>‹proj title here?›- Cardano MDBook</title>
+                    <title>{`${title} - Cardano MDBook`}</title>
                 </Head>
                 {renderedStatus}
                 {topRightContent}
@@ -460,6 +442,36 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
     }
 
+    mkBookManagementProps(): BookManagementProps {
+        const {
+            bookContract,
+            roles,
+            collabUut,
+            wallet,
+            connectingWallet,
+            walletUtxos,
+            walletHelper,
+        } = this.state;
+
+        return {
+            bookMgrDetails: {
+                bookContract,
+                roles,
+                collabUut,
+                updateState: this.updateState,
+                reportError: this.reportError,
+                goViewPage: this.goViewPage,
+                pageViewUrl: this.pageViewUrl,
+                goEditPage: this.goEditPage,
+                wallet,
+                connectingWallet,
+                walletUtxos,
+                walletHelper,
+                router: this.props.router,
+            },
+        };
+    }
+
     inviteButton() {
         return (
             <Button
@@ -473,7 +485,28 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
     }
 
     goToInvite() {
-        this.props.router.push("/book/invite");
+        this.props.router.push("/book/invite", "", { shallow: true });
+    }
+
+    goViewPage(id: string) {
+        this.props.router.push(this.pageViewUrl(id), "", { shallow: true });
+    }
+
+    pageViewUrl(id: string) {
+        const be = this.state.bookEntryIndex[id];
+        const title = be.pageEntry.entry.title;
+        // convert characters in title to be SEO friendly:
+        const seoFriendlyTitle = title
+            .toLowerCase()
+            .replace(/[^a-zA-Z0-9]/g, "-") // replace any non-alphanumeric characters with hyphens
+            .replace(/-+/g, "-") // replace any multiple hyphens with a single hyphen
+            .replace(/^-|-$/g, "") // remove any hyphens at the start or end of the string
+            .replace(/\//g, "-"); // replace any slashes with hyphens
+        return `/book/v/${id}/${seoFriendlyTitle}`;
+    }
+
+    goEditPage(id: string) {
+        this.props.router.push(`/book/${id}/edit`, "", { shallow: true });
     }
 
     renderRoleInfo() {
@@ -594,8 +627,8 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
     _unmounted?: true;
     async componentWillUnmount() {
         this._unmounted = true;
-        console.error("CCR list unmounted"); // not really an error
-        // debugger
+        console.error("cMDBook unmounted"); // not really an error
+        debugger;
     }
 
     newWalletSelected(selectedWallet: string = "eternl") {
@@ -723,7 +756,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
 
         const roles = [];
-        debugger;
         const collabUtxo = await bookContract.findUserRoleUtxo("collab");
         const isEditor = await bookContract.findUserRoleUtxo("capoGov");
 
@@ -760,38 +792,44 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         }
         const { networkParams, wallet } = this.state;
         let localConfig = window.localStorage.getItem("cmdbConfig");
-        if (localConfig) try {
-            localConfig = JSON.parse(localConfig);
+        if (localConfig)
+            try {
+                localConfig = JSON.parse(localConfig);
 
-            this.updateState("using dev-time config from localStorage", {
-                clearAfter: 5000,                
-            }, "// dev-time notice");
-        } catch(e) {
-            return this.reportError(e, "parsing devCfg from localStorage", {
-                actionLabel: "reset devCfg",
-                nextAction: "initializeBookContract",
-            });
-        }
-        const bestKnownConfig = (localConfig || CMDB_BookContractConfig)
+                debugger;
+                this.updateState(
+                    "using dev-time config from localStorage to load contract ...",
+                    {
+                        clearAfter: 5000,
+                    },
+                    "// dev-time notice"
+                );
+            } catch (e) {
+                return this.reportError(e, "parsing devCfg from localStorage", {
+                    actionLabel: "reset devCfg",
+                    nextAction: "initializeBookContract",
+                });
+            }
+        const bestKnownConfig = localConfig || CMDB_BookContractConfig;
         let config =
             !reset && bestKnownConfig
                 ? { config: CMDBCapo.parseConfig(bestKnownConfig) }
                 : { partialConfig: {} };
 
         if (!wallet) console.warn("connecting to registry with no wallet");
-        let cfg: StellarConstructorArgs<ConfigFor<CMDBCapo>> = {
+        let cfg: StellarFactoryArgs<ConfigFor<CMDBCapo>> = {
             setup: {
                 network: this.bfFast,
                 networkParams,
                 myActor: wallet,
                 isDev: "development" == process.env.NODE_ENV,
-                optimize: true,
+                // optimize: true,
             },
             // partialConfig: {},
             ...config,
         };
         try {
-            const bookContract = new CMDBCapo(cfg);
+            const bookContract = await CMDBCapo.createWith(cfg);
             const isConfigured = await bookContract.isConfigured;
             if (!isConfigured) {
                 const message = autoNext
@@ -853,7 +891,8 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         >;
         try {
             const addresses = await wallet.usedAddresses;
-
+            // type Expand<T> =  T extends infer O ? { [K in keyof O]: O[K] } : never;
+            // type tt = Expand<typeof t.state>
             tcx = await bookContract.mkTxnMintCharterToken({
                 govAuthorityLink: {
                     strategyName: "address",
@@ -861,6 +900,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                         addrHint: addresses,
                     },
                 },
+
                 // mintDelegateLink: {
                 //     strategyName: "default"
                 // }
@@ -885,6 +925,17 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
         try {
             await bookContract.submit(tcx);
+            const refScript = tcx.state.futureTxns.refScriptMintDelegate;
+            await this.updateState(
+                `loading additional txn to wallet: ${refScript.description}`,
+                {
+                    tcx: refScript.tx,
+                    progressBar: true,
+                    moreInstructions: refScript.moreInfo,
+                },
+                "//push refScript txn to wallet"
+            );
+            await bookContract.submit(refScript.tx);
             console.warn(
                 "------------------- Boostrapped Config -----------------------\n",
                 tcx.state.bootstrappedConfig,
@@ -892,11 +943,19 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             );
 
             if ("development" == process.env.NODE_ENV) {
-                window.localStorage.setItem("cmdbConfig", JSON.stringify(tcx.state.bootstrappedConfig));
-                return this.updateState("Okay: self-deployed dev-time config.  It might take 10-20s for the charter to be found on-chain", {
-                    clearAfter: 5000,
-                }, "//stored bootstrapped config in localStorage");
+                window.localStorage.setItem(
+                    "cmdbConfig",
+                    JSON.stringify(tcx.state.bootstrappedConfig)
+                );
+                return this.updateState(
+                    "Okay: self-deployed dev-time config.  It might take 10-20s for the charter to be found on-chain",
+                    {
+                        clearAfter: 5000,
+                    },
+                    "//stored bootstrapped config in localStorage"
+                );
             }
+
             await this.updateState(
                 `Book contract creation submitted.  Deploy the following details...`,
                 {
@@ -924,7 +983,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         }
     }
 
-    reportError(e: Error, prefix: string, addlAttrs: Partial<BookPageState>) {
+    reportError(e: Error, prefix: string, addlAttrs: UpdateStateProps) {
         console.error(e.stack || e.message);
         debugger;
         return this.updateState(
@@ -950,7 +1009,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         const { bookContract } = this.state;
 
         const bookDetails = await bookContract.findBookEntries();
-        const bookEntryIndex = await bookContract.mkEntryIndex(bookDetails);
+        const bookEntryIndex = await bookContract.indexBookEntries(bookDetails);
 
         this.updateState(
             "",
@@ -974,7 +1033,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
      **/
     updateState(
         status: string | undefined,
-        stateProps: Omit<BookPageState, "status"> & moreStatusOptions = {},
+        stateProps: UpdateStateProps = {},
         extraComment: string
     ): Promise<any> {
         const {
@@ -1028,6 +1087,8 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
     static nextPrev = false;
 }
 const bookHomePageWithRouter = withRouter(BookHomePage);
+//@ts-expect-error
+bookHomePageWithRouter.wrapped = BookHomePage;
 //@ts-expect-error
 bookHomePageWithRouter.nextPrev = false;
 export default bookHomePageWithRouter;

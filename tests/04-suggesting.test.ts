@@ -51,7 +51,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             await h.bootstrap();
             await h.editorInvitesCollaborator(actors.camilla);
             // await h.editorInvitesCollaborator(actors.charlie);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const resourceUpdated = await h.collaboratorCreatesPage(
                 testSuggestedPage
             );
@@ -67,11 +67,11 @@ describe("CMDB Roles & Activities -> ", async () => {
             const [pageInfo, page] = await setup(context);
 
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const camillaCollabToken = await h.book.findUserRoleInfo("collab");
 
             // await h.editorInvitesCollaborator(actors.charlie);  // no invite for you!
-            h.currentActor = "charlie";
+            await h.setActor("charlie")
             const updates = {
                 ...page.entry,
                 title: testPageEntry.title + " - collaborator suggestion",
@@ -107,7 +107,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const [pageInfo, page] = await setup(context);
 
             await h.editorInvitesCollaborator(actors.charlie);
-            h.currentActor = "charlie";
+            await h.setActor("charlie")
 
             const updates = {
                 ...page.entry,
@@ -151,7 +151,7 @@ describe("CMDB Roles & Activities -> ", async () => {
 
             const [pageInfo, page] = await setup(context);
             await h.editorInvitesCollaborator(actors.editor);
-            h.currentActor = "editor";
+            await h.setActor("editor")
 
             const updates = {
                 ...page.entry,
@@ -208,7 +208,7 @@ describe("CMDB Roles & Activities -> ", async () => {
                 const [pageInfo, page] = await setup(context);
                 const { txid: pageTxId } = pageInfo;
                 await h.editorInvitesCollaborator(actors.charlie);
-                h.currentActor = "charlie";
+                await h.setActor("charlie")
 
                 const updates = {
                     ...page.entry,
@@ -240,7 +240,7 @@ describe("CMDB Roles & Activities -> ", async () => {
                 await expect(
                     badSuggestionTxn,
                     "contract should throw when the txn is built wrong"
-                ).rejects.toThrow(/no ref_input matching changeParentTxId/);
+                ).rejects.toThrow(/no ref_input for chg parent/);
             });
 
             it("formats title as direct change, leaving content empty if unchanged", async (context: localTC) => {
@@ -250,7 +250,7 @@ describe("CMDB Roles & Activities -> ", async () => {
                 const [pageInfo, page] = await setup(context);
                 const { txid: pageTxId } = pageInfo;
                 await h.editorInvitesCollaborator(actors.charlie);
-                h.currentActor = "charlie";
+                await h.setActor("charlie")
 
                 const altTitle = "alternative title";
                 const updates = {
@@ -269,14 +269,14 @@ describe("CMDB Roles & Activities -> ", async () => {
                 expect(content.length, "expected empty content").toBeFalsy();
             });
 
-            it("formats content changes as a diff, leaving title empty if unchanged", async (context: localTC) => {
+            it("formats content changes as a diff + editing steps, leaving title empty if unchanged", async (context: localTC) => {
                 // prettier-ignore
                 const {h, h:{network, actors, delay, state} } = context;
 
                 const [pageInfo, page] = await setup(context);
                 const { txid: pageTxId } = pageInfo;
                 await h.editorInvitesCollaborator(actors.charlie);
-                h.currentActor = "charlie";
+                await h.setActor("charlie")
 
                 const updatedContent =
                     testPageEntry.content +

@@ -6,6 +6,8 @@ import { Layout } from "@/components/Layout";
 import Script from "next/script";
 
 import "focus-visible";
+import "../lib/diffViewerStyle.css";
+
 import "@/styles/tailwind.css";
 
 function getNodeText(node) {
@@ -51,13 +53,14 @@ function collectHeadings(nodes, slugify = slugifyWithCounter()) {
 }
 
 export default function App({ Component, pageProps }) {
-    let { notProse = false, nextPrev = true } = Component;
+    let { notProse = false, nextPrev = true } = Component.wrapped || Component;
     let title = pageProps.markdoc?.frontmatter.title;
 
     let pageTitle =
         pageProps.markdoc?.frontmatter.pageTitle ||
-        `${pageProps.markdoc?.frontmatter.title}`;
-
+        `${pageProps.markdoc?.frontmatter.title || "untitled page"}`;
+    console.log({pageProps})
+    
     let description = pageProps.markdoc?.frontmatter.description;
 
     let tableOfContents = pageProps.markdoc?.content
@@ -65,6 +68,7 @@ export default function App({ Component, pageProps }) {
         : [];
 
     const GA_ID = "XXXX!!!customize";
+    // console.log("rendering app", Component, pageProps);
     return (
         <>
             <Head>
@@ -78,7 +82,7 @@ export default function App({ Component, pageProps }) {
             gtag('config', '${GA_ID}');
         } 
             `} /> */}
-                <title>{pageTitle}</title>
+                {/* <title>{pageTitle}</title> */}
                 {description && (
                     <meta name="description" content={description} />
                 )}

@@ -41,7 +41,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         const s = ms / 1000;
         return `@ ${s}s`
     }
-    setupActors() {
+    async setupActors() {
         this.addActor("editor", 1100n * ADA, ... Array(7).fill( 7n * ADA));
         // collaborators
         this.addActor("charlie", 13n * ADA);
@@ -51,7 +51,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         // a random person
         this.addActor("ralph", 13n * ADA);
 
-        this.currentActor = "editor";
+        await this.setActor("editor")
     }
     get book() {
         return this.strella;
@@ -61,7 +61,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
         await this.bootstrap()
 
         if (this.actorName != "editor") {
-            this.currentActor = "editor";
+            await this.setActor("editor")
         }
         const { book } = this;
         console.log("--------------------------- "+this.relativeTs +" Test helper: Create collaborator token");
@@ -105,7 +105,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
                 `book contract not bootstrapped; no book pages can exist`
             );
         if (this.actorName != "editor") {
-            this.currentActor = "editor";
+            await this.setActor("editor")
         }
 
         console.log(
@@ -153,6 +153,9 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
             `---------------------------  ${this.relativeTs} Test helper: Suggest book page update`,
             entry.id
         );
+        if (!updates.pmSteps) {
+            updates.pmSteps = "[]"; // synthetic "no editing steps"
+        }
         const tcx = await this.book.mkTxnSuggestingUpdate({
             ...entry, 
             updated: updates

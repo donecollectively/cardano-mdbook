@@ -71,7 +71,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             await h.bootstrap();
             await h.editorInvitesCollaborator(actors.camilla);
             // await h.editorInvitesCollaborator(actors.charlie);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const pageCreated = await h.collaboratorCreatesPage(
                 initialPageAttrs
             );
@@ -80,7 +80,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             if (!page) throw new Error("no page created");
 
             await h.editorInvitesCollaborator(actors.charlie);
-            h.currentActor = "charlie";
+            await h.setActor("charlie")
 
             const updates = {
                 ...page.entry,
@@ -112,7 +112,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const { resourceId: pageId } = pageCreated;
             const { resourceId: suggestionId } = suggestedUpdate;
 
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             await h.acceptSuggestions(page, [suggestion]);
             const updated = await h.book.findBookEntry(pageId);
             expect(updated).toBeTruthy();
@@ -151,7 +151,7 @@ describe("CMDB Roles & Activities -> ", async () => {
                     uuts: { collab: cindyCollab },
                 },
             } = await h.editorInvitesCollaborator(actors.cindy);
-            h.currentActor = "cindy";
+            await h.setActor("cindy")
 
             const suggestedUpdate2 = await h.collaboratorSuggestsChange(page, {
                 ...page.entry,
@@ -166,7 +166,7 @@ describe("CMDB Roles & Activities -> ", async () => {
                 "suggestion2 not attributed to cindy"
             ).toEqual(cindyCollab.name);
 
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const { tcx } = await h.acceptSuggestions(page, [
                 suggestion1,
                 suggestion2,
@@ -259,7 +259,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             );
             console.log("diff 2 ", suggestion2.entry.content);
 
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             debugger;
             await expect(
                 h.acceptSuggestions(page, [suggestion1, suggestion2])
@@ -292,7 +292,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const { resourceId: suggestionId } = suggestedUpdate;
 
             await h.editorInvitesCollaborator(actors.editor);
-            h.currentActor = "editor";
+            await h.setActor("editor")
             const editorUut = (await h.book.findUserRoleInfo("collab"))!.uut;
             await h.acceptSuggestions(page, [suggestion]);
 
@@ -324,7 +324,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const { resourceId: suggestionId } = suggestedUpdate;
 
             await h.editorInvitesCollaborator(actors.ralph);
-            h.currentActor = "ralph";
+            await h.setActor("ralph")
             const offChain = h.acceptSuggestions(page, [suggestion]);
             await expect(offChain).rejects.toThrow(
                 /wallet doesn't have.*authority/
@@ -339,6 +339,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             // the editor's token that's required when the doc owner isn't found
             await expect(onChain).rejects.toThrow(/missing.*dgTkn capoGov/);
         });
+
         it("when NOT accepting changes, the mint-delegate's AcceptingPageChanges activity fails", async (context: localTC) => {
             // prettier-ignore
             const {h, h:{network, actors, delay, state} } = context;
@@ -359,7 +360,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const { resourceId: suggestionId } = suggestedUpdate;
 
             // back to the owner of the document created in setup():
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
 
             const orig = h.book.mkTxnUpdatingEntry.bind(h.book);
             const spy = vi
@@ -368,7 +369,7 @@ describe("CMDB Roles & Activities -> ", async () => {
                     return orig(arg, h.book.activityRetiringPage());
                 });
             const onChain = h.acceptSuggestions(page, [suggestion]);
-            await expect(onChain).rejects.toThrow(/wrong page-level activity/);
+            await expect(onChain).rejects.toThrow(/wrong pg-level activity/);
         });
     });
 

@@ -59,7 +59,7 @@ describe("CMDB Roles & Activities -> ", async () => {
             const book = await h.bootstrap();
 
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             const { resourceId } = await h.collaboratorCreatesPage(
                 testPageEntry
             );
@@ -78,13 +78,14 @@ describe("CMDB Roles & Activities -> ", async () => {
                 const book = await h.bootstrap();
 
                 await h.editorInvitesCollaborator(actors.camilla);
-                h.currentActor = "camilla";
+                await h.setActor("camilla")
                 const { resourceId } = await h.collaboratorCreatesPage(
                     testPageEntry
                 );
                 const existingPage = await h.book.findBookEntry(resourceId);
 
-                h.currentActor = "camilla";
+                await h.setActor("camilla")
+
                 const offChainFailure = h.collaboratorDeletesPage(existingPage);
                 await expect(offChainFailure).rejects.toThrow(
                     /connected wallet.*authority/

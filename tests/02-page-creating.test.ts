@@ -76,7 +76,7 @@ describe("CMDB roles & activities -> ", async () => {
                     //@ts-expect-error
                     updatedBy: "bad",
                 })
-            ).rejects.toThrow("updatedBy must be empty");
+            ).rejects.toThrow("non-empty updatedBy");
         });
 
         it("an editor's created pages are owned by their collaborator role, not the capoGov- token", async (context: localTC) => {
@@ -93,7 +93,7 @@ describe("CMDB roles & activities -> ", async () => {
             const { camilla } = actors;
 
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla")
             book = h.strella;
 
             // const camillaAccount : TxInput[] = (await camilla.utxos);

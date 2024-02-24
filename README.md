@@ -18,10 +18,15 @@ Please use `pnpm`, not `npm`.
   - ✅ allow editor to promote a suggested-page to a page
   - ✅ enable direct editing by editor
   - ✅ non-owner can't update
-  - enable change-suggestion by non-owner; post 'sug' entry
-  - gather topic index and include in site menu
-  - enable markdown editor for page-creation
+  - ✅ enable change-suggestion by non-owner; post 'sug' entry
+  - ✅ Capture editing steps for suggestions
+  - Capture editing steps for direct edits
+  - ✅ Enable markdown editor for page-creation
+  - List pending suggestions on page-view, with change markers
+  - Allow a suggestion to be accepted, when user is editor or page-owner
+  - When a suggestion is obsolete, fetch its parent-txn and rebase the suggestion for presentation  
   - optionally integrate suggested changes to page View
+  - gather topic index and include in site menu
 
 #### future:
   - display each page's change-history using on-chain records

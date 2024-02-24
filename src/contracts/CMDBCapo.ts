@@ -1,3 +1,4 @@
+import { hasStateChannel } from "@cardano-after-dark/dred-client";
 
 import type {
     SeedTxnParams,
@@ -42,24 +43,18 @@ import specializedCapo from "./specializedCMDBCapo.hl"; // assert { type: 'text'
 
 import { CMDBMintDelegate } from "./CMDBMintDelegate.js";
 import { CMDBController } from "./CMDBController.js";
-import {
-    diff_match_patch as dmp
-} from "../diff-match-patch-uncompressed.js"
+import { EditorStateChannel } from "../EditorStateChannel.js";
+import { diff_match_patch as dmp } from "../diff-match-patch-uncompressed.js";
 
 const differ = new dmp();
 // what is the Patch_Margin?  It's the number of characters of context to include in the patch
-differ.Patch_Margin = 15
+differ.Patch_Margin = 15;
 
 // what is the Match_Distance?  It's the number of characters to scan for a match before giving up
-differ.Match_Distance = 300 // default = 1000
+differ.Match_Distance = 300; // default = 1000
 
-// what is the Match_Threshold?  
-differ.Match_Threshold = 0.33 // default = 0.5
-
-export type BookEntryOnchain = {
-    ownerAuthority: RelativeDelegateLink<AuthorityPolicy>;
-    entry: BookEntry;
-};
+// what is the Match_Threshold?
+differ.Match_Threshold = 0.33; // default = 0.5
 
 export type forOnChainEntry<
     VARIANT extends
@@ -83,6 +78,7 @@ export type BookEntry = {
     entryType: "pg" | "spg" | "sug";
     title: string;
     content: string;
+    pmSteps?: string;
     createdAt: bigint;
     updatedAt: bigint;
     updatedBy: string;
@@ -95,9 +91,36 @@ export type BookEntry = {
     // suggestedBy?: string; // XXX see delegate link, whose content serves the same purpose
 };
 
+export type BookEntryCreationAttrs = Pick<
+    BookEntry,
+    | "title"
+    | "content"
+    | "entryType"
+    | "changeParentEid"
+    | "changeParentTxId"
+    | "changeParentOidx"
+    | "pmSteps"
+>;
+
+export type BookEntryUpdateAttrs = BookEntryCreationAttrs &
+    Pick<BookEntry, "appliedChanges" | "createdAt" | "updatedBy" | "expiresAt" | "pmSteps">;
+
+export type BookEntryOnchain = {
+    ownerAuthority: RelativeDelegateLink<AuthorityPolicy>;
+    entry: BookEntry;
+};
+
+export type BookEntryForUpdate = BookEntryOnchain & {
+    id: entryId;
+    utxo: TxInput;
+    updated?: BookEntryUpdateAttrs;
+};
+
 export type BookIndexEntry = {
     pageEntry: BookEntryForUpdate;
     pendingChanges: ChangeDetails[];
+    // see the separate
+    // realtimeChanges?: RealtimeChangeDetails[];
 };
 
 export type ChangeDetails = {
@@ -112,22 +135,14 @@ export type ChangeDetails = {
       }
 );
 
-export type BookEntryCreationAttrs = Pick<
-    BookEntry,
-    | "title"
-    | "content"
-    | "entryType"
-    | "changeParentEid"
-    | "changeParentTxId"
-    | "changeParentOidx"
->;
+export type RealtimeChangeDetails = Required<ChangeDetails>;
+
 export type RoleInfo = { utxo: TxInput; uut: UutName };
 
-export type BookEntryUpdateAttrs = BookEntryCreationAttrs &
-    Pick<BookEntry, "appliedChanges" | "createdAt" | "updatedBy" | "expiresAt">;
-
 export type BookSuggestionAttrs = BookEntryCreationAttrs &
-    Required<Pick<BookEntry, "changeParentTxId" | "changeParentEid">>;
+    Required<
+        Pick<BookEntry, "changeParentTxId" | "changeParentEid" | "pmSteps">
+    >;
 
 type entryId = string;
 export type BookEntryCreate = forOnChainEntry<BookEntryCreationAttrs> & {
@@ -136,12 +151,6 @@ export type BookEntryCreate = forOnChainEntry<BookEntryCreationAttrs> & {
 
 export type BookSuggestionCreate = forOnChainEntry<BookSuggestionAttrs> & {
     id: entryId;
-};
-
-export type BookEntryForUpdate = BookEntryOnchain & {
-    id: entryId;
-    utxo: TxInput;
-    updated?: BookEntryUpdateAttrs;
 };
 
 export type BookEntryUpdated = {
@@ -153,6 +162,8 @@ export type BookIndex = Record<string, BookIndexEntry>;
 type isBurningSuggestions = { state: { burningSuggestions: UutName[] } };
 
 export class CMDBCapo extends DefaultCapo {
+    devGen = 6n;
+
     get specializedCapo() {
         return mkHeliosModule(
             specializedCapo,
@@ -165,9 +176,18 @@ export class CMDBCapo extends DefaultCapo {
         return modules;
     }
 
-    static get defaultParams() {
-        return {};
-    }
+    // editorStateChannel: EditorStateChannel;
+
+    // @hasStateChannel
+    // mkEditorStateChannel() {
+    //     const sc = this.editorStateChannel = new EditorStateChannel();
+    // }
+
+    // static get defaultParams() {
+    //     return {
+
+    //     };
+    // }
 
     @Activity.redeemer
     protected activityUpdatingEntry(): isActivity {
@@ -197,8 +217,6 @@ export class CMDBCapo extends DefaultCapo {
         const t = new Retiring();
         return { redeemer: t._toUplcData() };
     }
-
-
 
     @datum
     mkDatumBookEntry<T extends BookEntryCreate | BookEntryUpdated>(
@@ -234,7 +252,8 @@ export class CMDBCapo extends DefaultCapo {
             expiresAt,
             appliedChanges = [],
         } = rec;
-        let { changeParentTxId, changeParentEid, changeParentOidx } = rec;
+        let { pmSteps, changeParentTxId, changeParentEid, changeParentOidx } =
+            rec;
 
         if ("sug" == entryType) {
             if (!changeParentEid) {
@@ -252,10 +271,14 @@ export class CMDBCapo extends DefaultCapo {
                 throw new Error(`missing required changeParentOidx`);
             }
             console.log("changeParentTxId: ", dumpAny(changeParentTxId));
+            if ("undefined" == typeof pmSteps) {
+                throw new Error(`missing required pmSteps JSON`);
+            }
         } else {
             changeParentEid = "";
             changeParentTxId = undefined;
             changeParentOidx = undefined;
+            pmSteps = undefined;
         }
         const OptTxId = Option(helios.TxId);
         const OptIndex = Option(helios.HInt);
@@ -266,6 +289,7 @@ export class CMDBCapo extends DefaultCapo {
             entryType,
             title,
             content,
+            new OptString(pmSteps || null),
             createdAt,
             updatedAt,
             updatedBy || "",
@@ -369,7 +393,7 @@ export class CMDBCapo extends DefaultCapo {
                 : tcx1c;
 
         //  - create a delegate-link connecting the entry to the collaborator
-        const ownerAuthority = this.txnCreateConfiguredDelegate(
+        const ownerAuthority = await this.txnCreateConfiguredDelegate(
             tcx2,
             "ownerAuthority",
             {
@@ -385,6 +409,9 @@ export class CMDBCapo extends DefaultCapo {
             ownerAuthority,
             entry: entry,
         };
+        if (!entry.pmSteps) {
+            debugger
+        }
         //  - combine the delegate-link with the entry, to package it for on-chain storage
         //  - send the entry's UUT to the contract, with the right on-chain datum
         const tcx3 = await this.txnReceiveBookEntry(tcx2, createEntry);
@@ -423,7 +450,7 @@ export class CMDBCapo extends DefaultCapo {
      * @param entries - the full list of book entries (type=pg, spg, or sug) to index
      * @public
      **/
-    async mkEntryIndex(entries: BookEntryForUpdate[]): Promise<BookIndex> {
+    async indexBookEntries(entries: BookEntryForUpdate[]): Promise<BookIndex> {
         const pageIndex: Record<string, BookIndexEntry> = {};
         const changesByPageId: Record<string, BookEntryForUpdate[]> = {};
         for (const e of entries) {
@@ -444,7 +471,7 @@ export class CMDBCapo extends DefaultCapo {
             } else {
                 pageIndex[e.id] = {
                     pageEntry: e,
-                    pendingChanges: []
+                    pendingChanges: [],
                 };
             }
         }
@@ -452,8 +479,11 @@ export class CMDBCapo extends DefaultCapo {
         const staleEntriesByTxId: Record<txidString, BookEntryForUpdate> = {};
 
         // with a list of changes for each page-id, we can make a change-list for each page.
-        for (const [eid, { pageEntry, pendingChanges }] of Object.entries(pageIndex)) {
-            for (const change of changesByPageId[eid]) {
+        for (const [eid, { pageEntry, pendingChanges }] of Object.entries(
+            pageIndex
+        )) {
+            const pageChanges = changesByPageId[eid] || [];
+            for (const change of pageChanges) {
                 const { changeParentTxId: pTxId, changeParentOidx: pTxIdx } =
                     change.entry;
                 if (!pTxId) throw new Error(`unreachable`);
@@ -493,6 +523,7 @@ export class CMDBCapo extends DefaultCapo {
                 }
             }
         }
+        console.log("Book entry index: ", pageIndex);
         return pageIndex;
     }
 
@@ -518,7 +549,7 @@ export class CMDBCapo extends DefaultCapo {
         entryForUpdate: BookEntryForUpdate // !!! or a more generic type
     ): Promise<RoleInfo | undefined> {
         const collabInfo = await this.findUserRoleInfo("collab");
-        if (!collabInfo) return undefined
+        if (!collabInfo) return undefined;
         if (!this.userHasOwnership(entryForUpdate, collabInfo))
             return undefined;
         return collabInfo;
@@ -611,7 +642,9 @@ export class CMDBCapo extends DefaultCapo {
             // console.log("   🐞 added govAuthority", dumpAny(tcx1a));
             const collabInfo = await this.findUserRoleInfo("collab");
             if (!collabInfo) {
-                throw new Error(`Editor credential found, but missing their required collab-* token`);
+                throw new Error(
+                    `Editor credential found, but missing their required collab-* token`
+                );
             }
             const tcx2 = await this.txnAddUserCollabRole(tcx1, collabInfo);
             console.log(
@@ -624,8 +657,8 @@ export class CMDBCapo extends DefaultCapo {
                 .addInput(currentEntryUtxo, activity)
                 .validFor(tenMinutes);
 
-                entryForUpdate.updated.updatedBy = collabInfo.uut.name;
-                return this.txnReceiveBookEntry(tcx3, entryForUpdate);
+            entryForUpdate.updated.updatedBy = collabInfo.uut.name;
+            return this.txnReceiveBookEntry(tcx3, entryForUpdate);
         }
         throw new Error(
             "The connected wallet doesn't have the needed editor/collaborator authority to update an entry"
@@ -664,13 +697,14 @@ export class CMDBCapo extends DefaultCapo {
         const { entry, updated, id } = entryForUpdate;
 
         let { title: titleBefore, content: contentBefore } = entry;
-        let { title: newTitle, content: newContent } = updated;
+        let { title: newTitle, content: newContent,  pmSteps } = updated;
 
         const outputId = entryForUpdate.utxo.outputId;
         const diffUpdate: BookEntryCreationAttrs = {
             content: "",
             entryType: "sug",
             title: "",
+            pmSteps,
             changeParentEid: id,
             changeParentTxId: outputId.txId,
             changeParentOidx: outputId.utxoIdx,
@@ -688,8 +722,8 @@ export class CMDBCapo extends DefaultCapo {
         if (contentBefore != newContent) {
             // const charDiff = diffChars(contentBefore, newContent);
             // const lineDiff = diffLines(contentBefore, newContent);
+            
             // const sentenceDiff = diffSentences(contentBefore, newContent);
-
             // const options = { context: 1, newlineIsToken: true };
 
             // const pOld = createPatch(
@@ -704,14 +738,11 @@ export class CMDBCapo extends DefaultCapo {
             // const p2old = pOld.split("\n").splice(4).join("\n");
 
             // uses diff-match-patch library
-            const diffs = differ.diff_main(contentBefore, newContent)
-            differ.diff_cleanupSemantic(diffs)
+            const diffs = differ.diff_main(contentBefore, newContent);
+            differ.diff_cleanupSemantic(diffs);
 
             const pNew = differ.patch_toText(
-                differ.patch_make(
-                    contentBefore,
-                    diffs
-                )
+                differ.patch_make(contentBefore, diffs)
             );
 
             // const sp = structuredPatch(id, id, contentBefore, newContent, "", "", options);
@@ -721,7 +752,7 @@ export class CMDBCapo extends DefaultCapo {
             const [updatedText, successes] = differ.patch_apply(
                 differ.patch_fromText(pNew),
                 contentBefore
-            ) as [ string, boolean[] ];
+            ) as [string, boolean[]];
 
             // if (!patchedOld) {
             //     console.error({ contentBefore });
@@ -734,10 +765,10 @@ export class CMDBCapo extends DefaultCapo {
                 console.error({ contentBefore });
                 console.error({ patch: pNew });
                 console.error({ diffs });
-                console.error({ 
+                console.error({
                     expected: newContent,
                     actual: updatedText,
-                    successes
+                    successes,
                 });
 
                 throw new Error(`patch reported a conflict`);
@@ -771,10 +802,10 @@ export class CMDBCapo extends DefaultCapo {
         let autoMergedTitle = "";
 
         let suggestionIds: string[] = [];
-        
+
         // todo: consider modifying each later-applied
         //  suggestion, modifying its patch-offsets to account for
-        //  the earlier patches that have been applied.  This is 
+        //  the earlier patches that have been applied.  This is
         //  complicated by the fact that the patches are not
         //  necessarily applied in the order they were created,
         //  or to the same version of the content.  Possibly this
@@ -799,11 +830,11 @@ export class CMDBCapo extends DefaultCapo {
             // tries to apply all the patches, unless pre-merged content is provided
             if (!mergedContent) {
                 // throws exception if patch doesn't apply cleanly
-                const [ patched, successes ] = differ.patch_apply(
+                const [patched, successes] = differ.patch_apply(
                     differ.patch_fromText(patchContent),
                     autoMergedContent
-            ) as [ string, boolean[] ];
-                if (false == successes.find((x) => !x)) { 
+                ) as [string, boolean[]];
+                if (false == successes.find((x) => !x)) {
                     throw new Error(
                         `suggestion ${suggestion.id} doesn't apply cleanly to page ${page.id}`
                     );
@@ -846,29 +877,24 @@ export class CMDBCapo extends DefaultCapo {
             burningSuggestions
         );
     }
-    applyPatch(patchText : string, content: string) {
-        const [patched, successes ] = differ.patch_apply(
+    applyPatch(patchText: string, content: string) {
+        const [patched, successes] = differ.patch_apply(
             differ.patch_fromText(patchText),
             content
-        ) as [ string, boolean[] ];
+        ) as [string, boolean[]];
 
-        if (false == successes.find((x) => !x)) { 
-            throw new Error(
-                `suggestion doesn't apply cleanly to page`
-            );
+        if (false == successes.find((x) => !x)) {
+            throw new Error(`suggestion doesn't apply cleanly to page`);
         }
-        return patched
+        return patched;
     }
 
-    @partialTxn  // used by accepting-multiple-suggestions code path
+    @partialTxn // used by accepting-multiple-suggestions code path
     async txnAcceptingOneSuggestion<
         TCX extends StellarTxnContext & isBurningSuggestions
     >(tcx: TCX, suggestionId: string) {
         const entry = await this.findBookEntry(suggestionId);
-        const {
-            utxo,
-            ownerAuthority
-        } = entry;
+        const { utxo, ownerAuthority } = entry;
         const utxo2 = await this.mustFindMyUtxo(
             `suggestion ${suggestionId}`,
             this.mkTokenPredicate(this.mph, suggestionId)
@@ -892,10 +918,9 @@ export class CMDBCapo extends DefaultCapo {
         pageEid: string,
         uuts: UutName[]
     ): Promise<TCX> {
-        const minter = this.connectMinter();
         const vEntries = uuts.map((uut) => mkValuesEntry(uut.name, -1n));
         const mintDgt = await this.getMintDelegate();
-        return minter.txnMintWithDelegateAuthorizing(
+        return this.minter.txnMintWithDelegateAuthorizing(
             tcx,
             vEntries,
             mintDgt,
@@ -927,9 +952,18 @@ export class CMDBCapo extends DefaultCapo {
     async findUserRoleInfo(
         roleUutPrefix: string
     ): Promise<RoleInfo | undefined> {
-        const utxos: TxInput[] = await this.wallet.utxos;
+        const wallet = this.wallet;
+        const addr =
+            (await wallet.usedAddresses)[0] ||
+            (await wallet.unusedAddresses)[0];
+        const utxos: TxInput[] = await wallet.utxos;
+        const addrString = addr.toBech32();
         console.info(
-            `found ${utxos.length} wallet utxos, in pursuit of ${roleUutPrefix}-* token from ${this.mph.hex}`
+            `found ${utxos.length} wallet utxos, in pursuit of ${roleUutPrefix}-* token from ${this.mph.hex}` +
+                `\n   (wallet addr ${addrString.slice(
+                    0,
+                    12
+                )}...${addrString.slice(-4)})`
         );
 
         for (const utxo of utxos) {

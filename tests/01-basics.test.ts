@@ -47,10 +47,10 @@ describe("CMDB Basics", async () => {
                 const {h, h:{network, actors, delay, state} } = context;
                 await h.bootstrap();
 
-                h.currentActor = "camilla";
+                await h.setActor("camilla");
                 const notEditor = h.book.findUserRoleInfo("capoGov");
                 await expect(notEditor).resolves.toBeUndefined();
-                h.currentActor = "editor";
+                await h.setActor("editor");
 
                 await expect(
                     h.book.findUserRoleInfo("capoGov")
@@ -69,7 +69,7 @@ describe("CMDB Basics", async () => {
             let book = await h.bootstrap();
 
             await h.editorInvitesCollaborator(actors.camilla);
-            h.currentActor = "camilla";
+            await h.setActor("camilla");
             book = h.strella;
             const foundCollabToken = await book.findUserRoleInfo("collab");
             expect(foundCollabToken).toBeTruthy();
