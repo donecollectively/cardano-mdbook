@@ -33,6 +33,7 @@ export class CMDBMintDelegate extends BasicMintDelegate {
     activitySuggestingPageChanges(
         seedAttrs: SeedAttrs,
     ) : isActivity {
+        // creates a suggestion utxo
         const SuggestingChange = this.mustGetActivity("SuggestingPageChange");
 
         const {seedTxn, seedIndex} = seedAttrs
@@ -45,6 +46,7 @@ export class CMDBMintDelegate extends BasicMintDelegate {
 
     @Activity.redeemer
     activityAcceptingSuggestions(pageEid: string) : isActivity {
+        // accepting suggestions (spends & updates a Page utxo)
         const Accepting = this.mustGetActivity("AcceptingSuggestions");
 
         const t = new Accepting(pageEid);
@@ -53,13 +55,15 @@ export class CMDBMintDelegate extends BasicMintDelegate {
 
     @Activity.redeemer
     burnSuggestionsBeingAccepted(pageEid: string) : isActivity {
-        const Rejecting = this.mustGetActivity("burnSuggestionsBeingAccepted");
-        const t = new Rejecting(pageEid);
+        // burns a suggestion utxo
+        const Accepting = this.mustGetActivity("burnSuggestionsBeingAccepted");
+        const t = new Accepting(pageEid);
         return { redeemer: t._toUplcData() };
     }
 
     @Activity.redeemer
     burnSuggestionsBeingRejected(pageEid: string) : isActivity {
+        // burns a suggestion utxo
         const Rejecting = this.mustGetActivity("burnSuggestionsBeingRejected");
         const t = new Rejecting(pageEid);
         return { redeemer: t._toUplcData() };

@@ -23,6 +23,7 @@ import {
     ItalicExtension,
     UnderlineExtension,
     MarkdownExtension,
+    ScrollEventHandler,
 } from "remirror/extensions";
 import { Remirror, useRemirror, OnChangeJSON } from "@remirror/react";
 import { MarkdownEditor } from "@remirror/react-editors/markdown";
@@ -50,7 +51,7 @@ import type { NextRouter } from "next/router.js";
 import { DualEditor } from "../../lib/RemirrorDual.jsx";
 import { Step } from "prosemirror-transform";
 
-type PMEvent = {
+export type PMEvent = {
     markdownValue: string,
     pmSteps: string,
     prosemirror: true,
@@ -80,6 +81,7 @@ type FieldProps = {
     rec: BookEntryUpdateAttrs | BookEntryCreationAttrs;
     fn: string;
     as?: React.ElementType;
+    fwdRef? : React.RefObject<any>;
     bare?: true;
     rows?: number;
     options?: HtmlSelectOptions;
@@ -95,8 +97,8 @@ type FieldProps = {
     problem?: string;
     onChange: ChangeHandler;
 };
-
-type ChangeHandler = React.ChangeEventHandler<HTMLInputElement>;
+type eventArg = PMEvent | React.ChangeEvent<HTMLInputElement>
+type ChangeHandler = ( event: eventArg ) => void
 
 const testBookPage: Partial<BookEntry> = {
     title: "Test Page",
@@ -127,6 +129,7 @@ type fieldOptions =
           helpText?: string;
           length?: number;
           placeholder?: string;
+          fwdRef? : React.RefObject<any>;
           defaultValue?: string;
           rows?: number;
           style?: Record<string, any>;
@@ -151,11 +154,33 @@ export class PageEditor extends React.Component<propsType, stateType> {
 
     get mgr() {
         return this.props.mgr;
+    }    
+    formBody: React.RefObject<HTMLTableSectionElement> = React.createRef();
+    editor: React.RefObject<HTMLDivElement> = React.createRef();
+    keepControlsOnscreen = (e) => {
+        const currentScroll = window.scrollY;
+        const stickyHeader = document.querySelector("header.sticky");
+        const headerHeight = stickyHeader?.clientHeight || 0;
+
+        // determine the vertical position of the formBody within the document, not the window
+        const formBodyRect = this.formBody.current?.getBoundingClientRect();
+        const formBodyLocation = formBodyRect.top;
+        if (formBodyLocation < headerHeight) {
+            const diff = headerHeight - formBodyLocation;
+            const targetPosition = currentScroll - diff;
+            // console.log("-------------------------", {currentScroll, diff, formBodyLocation, headerHeight});
+            window.scrollTo(0, targetPosition);
+            const maxHeight = formBodyRect.height + headerHeight;
+            if (maxHeight > window.innerHeight) {
+                this.editor.current.style.maxHeight = `${maxHeight}px`
+            }
+        }
     }
 
     async componentDidMount() {
         const { entry } = this.props;
         // console.error(`MOUNTED CredForm ${this.i}`)
+        window.addEventListener("scrollend", this.keepControlsOnscreen);
         const current =
             entry?.pageEntry.entry ||
             ({
@@ -185,6 +210,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
     _unmounting?: true;
     componentWillUnmount(): void {
+        window.removeEventListener("scrollend", this.keepControlsOnscreen);
         // console.error(`UNMOUNTing PageEditor ${this.i}`)
         // this._unmounting = true;
     }
@@ -489,7 +515,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                         }}
                     >
                         <table>
-                            <tbody>
+                            <tbody ref={this.formBody}>
                                 {this.field("Page Title", "title", {
                                     placeholder: "Book Index title",
                                     validator(v) {
@@ -620,6 +646,10 @@ export class PageEditor extends React.Component<propsType, stateType> {
                         {this.field("", "content", {
                             bare: true,
                             type: RemirrorField,
+                            style: {
+                                maxHeight: "70vh",
+                                overflowY: "scroll",
+                            },
                             validator(v) {
                                 if (v.length < 40)
                                     return "must be at least 40 characters";
@@ -644,6 +674,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         const { 
             array, type: as = 'input',  
             bare,
+            fwdRef,
             options: selectOptions,
             style,
             validator,            
@@ -658,6 +689,9 @@ export class PageEditor extends React.Component<propsType, stateType> {
             if (array) {
                 throw new Error(`Field: bare and Array are not compatible`);
             }
+        }
+        if (array && fwdRef) {
+            throw new Error(`Field: array and fwdRef are not compatible`);
         }
 
         // if (fn == "content") debugger;
@@ -675,6 +709,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
                     {...{
                         rec,
                         as,
+                        fwdRef,
                         fn,
                         fieldId,
                         label,
@@ -702,7 +737,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
             <>
                 {items.map((oneValue, index) => {
                     const fieldId = this.mkFieldId(fn, index);
-                    debugger;
+                    // debugger;
                     captureProblems.call(this, fieldId, rec[fn][index], index);
 
                     const showProblem = submitting
@@ -770,11 +805,11 @@ export class PageEditor extends React.Component<propsType, stateType> {
     ): ChangeHandler {
         const v = this.validators[fieldId];
         if (v) return v;
-        const changedWithValidation: ChangeHandler = (e) => {
+        const changedWithValidation: ChangeHandler = (e: eventArg) => {
             if (validate) {
-                //@ts-expect-error from looking at e.markdownValue, which is our funny convention
-                // for passing the current markdown version of the prosemirror content
+                //@ts-expect-error with fields on opposite side of union type
                 const value = e.prosemirror ?  e.markdownValue : e.target.value;
+
                 const problem = validate(value, rec, index);
                 if (this.state.problems[fieldId] !== problem) {
                     this.setStateLater(({ problems }) => {
@@ -805,7 +840,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
         } = this.state;
 
         let { contentMarkdown, pmSteps } = this.state;
-        //@ts-expect-error
+        //@ts-expect-error with fields on opposite side of union type
         if (e.prosemirror) {
             const { markdownValue, pmSteps: pms } = e as unknown as PMEvent;
             contentMarkdown = markdownValue;
@@ -833,7 +868,7 @@ export class PageEditor extends React.Component<propsType, stateType> {
     };
     capture(form, contentMarkdown: string = this.state.contentMarkdown, pmSteps: string = this.state.pmSteps) {
         const formData = new FormData(form);
-        debugger
+        
         const currentForm: BookEntryUpdateAttrs = Object.fromEntries(
             [...formData.entries()].map(([k, v]) => {
                 //prettier-ignore
@@ -861,22 +896,31 @@ export class PageEditor extends React.Component<propsType, stateType> {
     }
 }
 
-function RemirrorField({
+export function RemirrorField({
     rec,
     fn,
+    fwdRef,
     onInput,
     defaultValue,
     style,
 }: Partial<FieldProps> & { onInput: FieldProps["onChange"] }) {
+    const scrollSmooth = useCallback((e : Parameters<ScrollEventHandler>[0]) => {
+        e.preventDefault();
+        e.stopPropagation()
+        debugger
+        // const target = e.target;
+        // const to = target.scrollTop;
+        // target.scrollTo({ top: to, behavior: "smooth" });
+    }, []);
+
     return (
-        <div className="wrapper" style={style}>
+        <div className="wrapper" style={{...style, scrollBehavior: "smooth"}} ref={fwdRef}>
             <DualEditor
                 defaultValue={defaultValue}
                 onChange={(md: string, diffsJson: string) => {
                     // alert("pe on change: "+md);
-                    debugger
+                    // debugger
                     onInput({
-                        //@ts-expect-error
                         markdownValue: md,
                         pmSteps: diffsJson,
                         prosemirror: true,

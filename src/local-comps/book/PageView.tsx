@@ -13,6 +13,19 @@ const Link = link.default;
 // import { Prose } from "@/components/Prose.jsx";
 // import { useLiveQuery } from "dexie-react-hooks";
 import { helios } from "@donecollectively/stellar-contracts";
+
+import { diff_match_patch as dmp } from "../../diff-match-patch-uncompressed.js";
+
+const differ = new dmp();
+// what is the Patch_Margin?  It's the number of characters of context to include in the patch
+differ.Patch_Margin = 60;
+
+// what is the Match_Distance?  It's the number of characters to scan for a match before giving up
+differ.Match_Distance = 300; // default = 1000
+
+// what is the Match_Threshold?
+differ.Match_Threshold = 0.33; // default = 0.5
+
 import type {
     BookEntryOnchain,
     BookEntryForUpdate,
@@ -28,7 +41,7 @@ import { Button } from "../../components/Button.jsx";
 
 import { DiffViewer } from "../../lib/DiffViewer.jsx";
 import { Prose } from "../../components/Prose.jsx";
-import { diff_match_patch } from "../../diff-match-patch-uncompressed.js";
+import { PMEvent, RemirrorField } from "./PageEditor.jsx";
 
 const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
 type hWallet = typeof Cip30Wallet.prototype;
@@ -44,6 +57,7 @@ type propsType = {
 
 type stateType = {
     rendered: boolean;
+    conflictResolution: string;
 };
 
 export class PageView extends React.Component<propsType, stateType> {
@@ -81,16 +95,44 @@ export class PageView extends React.Component<propsType, stateType> {
         let pageContent = page.content;
         let patched = "";
         let patch = change?.change?.entry?.content;
+        let origContent = change?.baseEntry?.entry?.content;
         let currentChange = change?.change?.id;
-        let error = "";
+        let error = "",
+            diff = patch,
+            conflict = false;
+        debugger;
         if (change) {
             try {
-                patched = this.mgr.bookContract.applyPatch(patch, pageContent);
+                patched = this.book.applyPatch(patch, pageContent);
+                diff = diff_lineMode(pageContent, patched);
             } catch (e) {
+                debugger;
                 error = `Error patching document: ${e.message}`;
+                try {
+                    const patchedOriginal = this.mgr.bookContract.applyPatch(
+                        patch,
+                        origContent
+                    );
+                    diff = diff_lineMode(origContent, patchedOriginal);
+
+                    // tries with more context
+                    const { patch: newPatch, diffs } = this.book.mkPatch(
+                        origContent,
+                        pageContent,
+                        differ
+                    );
+
+                    const patchedNew = this.book.applyPatch(
+                        newPatch,
+                        pageContent
+                    );
+                    patched = patchedNew;
+                } catch (e) {
+                    conflict = true;
+                    error = `Conflicting patch.  Apply changes in the editor below and save, or reject the suggestion.`;
+                }
             }
         }
-        let diff = diff_lineMode(pageContent, patched);
         // const tt =  new Address("addr1qx6p9k4rq077r7q4jdkv7xfz639tts6jzxsr3fatqxdp2y9w9cdd2uueqwnv0cw9gne02c0mzrvfsrk884lry7kpka8shpy5qw")
         // const ttt = Address.fromHash(tt.pubKeyHash, false)
         // {ttt.toBech32()}
@@ -122,14 +164,22 @@ export class PageView extends React.Component<propsType, stateType> {
                 {change && (
                     <>
                         <Prose className="text-[#ccc]">
-                            <h4 className="mt-2 ml-4 -mb-3">Proposed Change</h4>
-                            <pre className="pt-4">
+                            <h4 className="mt-2 ml-4 -mb-3">
+                                Proposed Change: {change.change.id}
+                            </h4>
+                            <pre className="pt-4 pl-2">
                                 {decodeURIComponent(diff)}
                             </pre>
                         </Prose>
                         {!error && (
                             <div>
-                                <h4 className="mt-2 ml-4 -mb-3">Preview</h4>
+                                <Button
+                                    onClick={this.acceptSuggestion}
+                                    className="float-right mt-2 bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 border-b-4 border-blue-700 hover:border-blue-500 rounded"
+                                >
+                                    Accept Suggestion
+                                </Button>
+                                <h4 className="mt-2 ml-4 -mb-3">Preview with changes applied</h4>
                                 <Prose
                                     className={`px-2 pt-0 border-2 border-dotted border-sky-900/40`}
                                 >
@@ -139,7 +189,8 @@ export class PageView extends React.Component<propsType, stateType> {
                         )}
                     </>
                 )}
-                {change && !error ? (
+
+                {change && (conflict || !error) ? (
                     ""
                 ) : (
                     <>
@@ -150,6 +201,41 @@ export class PageView extends React.Component<propsType, stateType> {
                         </Prose>
                     </>
                 )}
+                {conflict && (
+                    <>
+                        <Prose
+                            className="prose-slate p-6"
+                            style={{
+                                backgroundColor: "#1e244c",
+                                borderRadius: "0.5em",
+                            }}
+                        >
+                            <div className="bg-red-900 border-2 border-red-700 rounded p-3">
+                                This change conflicts with the current version of the document.  Fix the text
+                                below and save, or reject the suggestion.
+                            </div>
+                            <RemirrorField
+                                onInput={this.captureConflictResolution}
+                                defaultValue={pageContent}
+                                style={{
+                                    backgroundColor: "#000",
+                                    maxHeight: "70vh",
+                                    padding: "0.4em",
+                                    fontSize: "85%",
+                                }}
+                            />
+                            <div className="text-right mt-2">
+                                <Button
+                                    onClick={this.acceptSuggestion}
+                                    className="mt-2 bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 border-b-4 border-blue-700 hover:border-blue-500 rounded"
+                                >
+                                    Accept Suggestion with Resolution
+                                </Button>
+                            </div>
+                        </Prose>
+                    </>
+                )}
+
                 {false && (
                     <div>
                         {(pageEntry?.updated?.content && (
@@ -185,7 +271,7 @@ export class PageView extends React.Component<propsType, stateType> {
                                         change: x,
                                         mgr: this.mgr,
                                         docId: id,
-                                        currentChange
+                                        currentChange,
                                     }}
                                 />
                             ))}
@@ -196,8 +282,56 @@ export class PageView extends React.Component<propsType, stateType> {
         );
     }
 
+    captureConflictResolution = ({ markdownValue: md }: PMEvent) => {
+        this.setState({ conflictResolution: md });
+    };
+
     get changes() {
         return this.props.entry.pendingChanges;
+    }
+
+    acceptSuggestion = async () => {
+        const {
+            change,
+            mgr,
+            entry: { pageEntry },
+        } = this.props;
+        const { conflictResolution } = this.state;
+        this.mgr.updateState("accepting suggestion ...", {
+            progressBar: true
+        }, "//suggestion-accept");
+        const tcx = await this.book.mkTxnAcceptingPageChanges(
+            pageEntry,
+            [change.change],
+            { content: conflictResolution }
+        );
+        // const resourceId = tcx.state.uuts.entryId.name;
+        // console.log(
+        //     "               -------------------------------------\nbefore submitting suggestion-merge",
+        //     dumpAny(tcx, this.book.networkParams)
+        // )
+        this.mgr.updateState("loading the txn into your wallet", {
+            progressBar: true
+        }, "//suggestion-accept");
+        this.book
+            .submit(tcx)
+            .then((success) => {
+                this.mgr.updateState(
+                    "suggestion accepted.  Wait a little bit for confirmation",
+                    {
+                        clearAfter: 5000,
+                    },
+                    "//suggestion-accepted"
+                );
+            })
+            .catch((e) => {
+                debugger
+                this.mgr.reportError(e, "accepting suggestion", {})
+            });
+    };
+
+    get book() {
+        return this.mgr.bookContract;
     }
 
     possibleEditButton() {
@@ -208,7 +342,14 @@ export class PageView extends React.Component<propsType, stateType> {
         if (roles?.includes("collaborator")) {
             const eid = this.props.entry?.pageEntry.id;
             if (!eid) return null;
-            return <Button href={`${eid}/edit`}>Update Listing</Button>;
+            return (
+                <Button
+                    href={`${eid}/edit`}
+                    className="mt-2 bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 border-b-4 border-blue-700 hover:border-blue-500 rounded"
+                >
+                    Update Listing
+                </Button>
+            );
         }
     }
 }
@@ -217,10 +358,15 @@ type ChangePreviewProps = {
     docId: string;
     change: ChangeDetails;
     mgr: isBookMgr;
-    currentChange? : string
+    currentChange?: string;
 };
 
-function ChangePreviewUI({ docId, change, mgr, currentChange }: ChangePreviewProps) {
+function ChangePreviewUI({
+    docId,
+    change,
+    mgr,
+    currentChange,
+}: ChangePreviewProps) {
     const {
         change: {
             ownerAuthority: { uutName: createdBy },
@@ -229,7 +375,10 @@ function ChangePreviewUI({ docId, change, mgr, currentChange }: ChangePreviewPro
         },
     } = change;
     const ts = new Date(Number(updatedAt || createdAt)).toLocaleString();
-    const selectedClass = currentChange === changeId ? "bg-slate-950/40 text-slate-300 border-l-2" : "";
+    const selectedClass =
+        currentChange === changeId
+            ? "bg-slate-950/40 text-slate-300 border-l-2"
+            : "";
     return (
         <div
             key={changeId}
@@ -244,16 +393,15 @@ function ChangePreviewUI({ docId, change, mgr, currentChange }: ChangePreviewPro
 }
 
 function diff_lineMode(text1, text2) {
-    var dmp = new diff_match_patch();
     //@ts-expect-error
-    var a = dmp.diff_linesToChars_(text1, text2);
+    var a = differ.diff_linesToChars_(text1, text2);
     var lineText1 = a.chars1;
     var lineText2 = a.chars2;
     var lineArray = a.lineArray;
-    var diffs = dmp.diff_main(lineText1, lineText2, false);
+    var diffs = differ.diff_main(lineText1, lineText2, false);
     //@ts-expect-error
-    dmp.diff_charsToLines_(diffs, lineArray);
-    dmp.diff_cleanupSemantic(diffs);
+    differ.diff_charsToLines_(diffs, lineArray);
+    differ.diff_cleanupSemantic(diffs);
     let prettyDiff = "";
     let state: "preContext" | "showChange" | "postContext";
     state = "preContext";

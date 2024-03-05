@@ -46,6 +46,7 @@ enum Datum {
         mintDelegateLink: RelativeDelegateLink 
         // config: LocalCapoConfig
     }
+    ScriptReference
     BookEntry {
         ownerAuthority: RelativeDelegateLink
         entry: BookEntryStruct
@@ -96,21 +97,21 @@ enum Datum {
                         } else { Option[String]::None }
                     };
 
-                charterData : Option[Datum::CharterToken] = self.hasCharterRefInput(ctx, mph);
-
-                // determine if the editor authority needs to be used here:
-                wantsEditor : Bool = editorRequired.switch{
-                    Some => true, // editor required
-                    None => if (hasCollabToken) {
-                        print("editor not required; we have a good collab-* authority");
-                        false 
-                    } else {
-                        print( "doc owner "+ ownerAuthority.uutName +" missing; requiring editor authority for update" );
+                    wantsEditor : Bool = editorRequired.switch{
+                        Some => true, // editor required
+                        // determine if the editor authority needs to be used here:
+                        None => if (hasCollabToken) {
+                            print("editor not required; we have a good collab-* authority");
+                            false 
+                        } else {
+                            print( "doc owner "+ ownerAuthority.uutName +" missing; requiring editor authority for update" );
                         true // editor is needed if the document owner isn't involved.
                     }
                 };
                 hasSufficientAuthority : Bool = if (wantsEditor) {
-                    charterData.switch{
+                    self.hasCharterRefInput(
+                        ctx, mph
+                    ).switch{
                         Some{Datum::CharterToken{govAuthority, _}} => {
                             print("using editor's govAuthority for doc update ");
                             // print(editorRequired.unwrap().show());
@@ -166,17 +167,21 @@ enum Datum {
         )
     }
 
+    // this needs to be a method on the Datum enum,
+    // ... because it's called by other methods here, AND
+    // ... it depends on the Datum's own enum variants
     func hasCharterRefInput(
         self,
         ctx: ScriptContext, 
         mph : MintingPolicyHash
     ) -> Option[Datum::CharterToken] {
-        chVal : Value = tvCharter(mph);
-        hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
-        assert(
+        assert( // avoid "unused variable self" error
             self.serialize() != ctx.serialize() &&
             self.serialize() != mph.serialize(), "never thrown"
         );
+        
+        chVal : Value = tvCharter(mph);
+        hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
 
         ctx.tx.ref_inputs.find_safe(hasCharter).switch{
             Some{txin} => Option[Datum::CharterToken]::Some{
@@ -192,41 +197,26 @@ enum Datum {
     }
     
 }
-// func hasCharterRefInput(
-//     ctx: ScriptContext, 
-//     mph : MintingPolicyHash
-// ) -> Option[Datum::CharterToken] {
-//     chVal : Value = tvCharter(mph);
-//     hasCharter = (txin : TxInput) -> Bool { txin.value.contains(chVal) };
-    
-//     ctx.tx.ref_inputs.find_safe(hasCharter).switch{
-//         Some{txin} => Option[Datum::CharterToken]::Some{
-//             Datum::from_data( 
-//                 txin.datum.get_inline_data() 
-//             ).switch{
-//                 c : CharterToken => c,
-//                 _ => error("wrong enum")
-//             }
-//         },
-//         None => Option[Datum::CharterToken]::None
-//     }
-// }
+
+
 enum Activity {
     // standard redeemer types:
     updatingCharter    // 0
     usingAuthority      //  1
+    retiringRefScript   //  2
+
     //custom redeemer types:
     //xxx registeringEntry - can't be from this script unless there's a spend.
 
     // writing changes to a 'pg' or 'spg' entry
-    updatingEntry    // 2 - an edit is being applied directly to a page or suggestion record.
-    acceptingChanges // 3 - a page is accepting one or more change-suggestions
+    updatingEntry    // 3 - an edit is being applied directly to a page or suggestion record.
+    acceptingChanges // 4 - a page is accepting one or more change-suggestions
 
     // closing out suggestions by accepting or rejecting
-    suggestionBeingAccepted  // 4 - a suggestion record is being accepted (and its uut burned)
-    suggestionBeingRejected // 5 - a suggestion record is being rejected (and its uut burned)
+    suggestionBeingAccepted  // 5 - a suggestion record is being accepted (and its uut burned)
+    suggestionBeingRejected // 6 - a suggestion record is being rejected (and its uut burned)
     // removing an obsolete page
-    retiringPage  // 6
+    retiringPage  // 7
 
     func allowRetiringPage(self, datum: Datum, ctx: ScriptContext, mph: MintingPolicyHash) -> Bool {
         // rc -> if is severely outdated, burn the UUT and allow minUtxo recovery
@@ -311,6 +301,9 @@ enum Activity {
         //!!! verify it burns all the accepted changes (from eids list)
         //    // no need to check that it spends the change's eid-* token (
         //    // (implied by the burn check) 
+
+        //^^^ do that thing here.
+
         // // it has a refUtxo for the charterAuthority (so the mintDelegate can be checked)
         // // includes the mint delegate
         // has a refUtxo for the suggestion's ownerAuthority
@@ -319,12 +312,11 @@ enum Activity {
         isAcceptingChangeIds : Bool = eids.length > 1;
         // charterData : Option[Datum::CharterToken] = self.hasCharterRefInput(ctx, mph).switch
 
-
         self == self && 
         ownerAuthority == ownerAuthority && 
         oldListing  == oldListing &&
         ctx == ctx &&
-        mph     == mph &&
+        mph == mph &&
         eids == eids &&
         peid == peid &&
 
@@ -351,9 +343,13 @@ enum Activity {
             BookEntry{ownerAuthority, entry} => {
                 self.switch{
                     updatingEntry => {
+                        // direct update of an entry
                         self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph)
                     },
                     suggestionBeingAccepted => {
+                        // a **suggestion record** is being accepted (and its uut burned)
+                        // Note, a separate validation is done on the page-update,
+                        // through the acceptingChanges activity below.
                         assert(entry.entryType == "sug", "invalid etp for sBA"); //  "invalid entry type for suggestionBeingAccepted");
                         peid : String = entry.changeParentEid.switch{
                             Some{eid} => eid,
@@ -369,12 +365,16 @@ enum Activity {
                         true
                     },
                     suggestionBeingRejected => {
+                        // a suggestion is being rejected (and its uut burned)
+
                         // self.allowUpdatingEntry(ownerAuthority, entry, ctx, mph) &&
                         // self.dustPaidToOwner(ownerAuthority, entry, ctx, mph, eids) &&
                         // self.burnedChangeEntry()
                         true
                     },
                     acceptingChanges => {
+                        // a book page is being updated.  The suggestion records are also spent, 
+                        // with separate validation in the suggestionBeingAccepted activity above.
                         eids: []String = entry.appliedChanges;
                         pgVal : Map[ByteArray]Int = ctx.
                             get_current_input().

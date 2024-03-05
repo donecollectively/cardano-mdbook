@@ -53,7 +53,7 @@ export class CMDBCapoTestHelper extends DefaultCapoTestHelper.forCapoClass(
 
         await this.setActor("editor")
     }
-    get book() {
+    get book() : CMDBCapo {
         return this.strella;
     }
 

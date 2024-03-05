@@ -8,7 +8,7 @@ Currently running on Preprod testnet.
 
 Please use `pnpm`, not `npm`.  
 
-### TODO
+### What it does so far...
 
   - ✅ when not a collaborator, connecting the wallet should guide people to request a 
     collaborator invite from the book's editor(s)
@@ -19,28 +19,23 @@ Please use `pnpm`, not `npm`.
   - ✅ enable direct editing by editor
   - ✅ non-owner can't update
   - ✅ enable change-suggestion by non-owner; post 'sug' entry
-  - ✅ Capture editing steps for suggestions
   - ✅ Enable markdown editor for page-creation
   - ✅ List pending suggestions on page-view, with change markers
-  - Allow a suggestion to be accepted, when user is editor or page-owner
+  - ✅ Allow a suggestion to be accepted, when user is editor or page-owner
 
 #### Future work
-  - When a suggestion is obsolete, fetch its parent-txn and rebase the suggestion for presentation
   - Gather topic index and include in site menu
+  - When a suggestion is obsolete, fetch its parent-txn and rebase the suggestion for presentation
+  - Capture editing steps for suggestions - simple ✅ prototype worked, but it needs refinement to behave as would be generally acceptable; disabled for now.
   - Work on unit testing scenarios for editor's DiffCapture extension, so the resulting editing steps can be relied on.  See a laundry list of simple cases that should resolve most odd behaviors seen while experimenting with the prototype
   - Capture editing steps for direct edits
-
-
-#### future:
   - display each page's change-history using on-chain records
-  - cache page data in browser using Dexie
+  - cache page data in browser
   - do occasional background fetches to keep cache fresh and promptly show 
     changes that may arrive from other users
   - complete the TSDoc for all of the book's StellarContract function-points 
     (until then: Use the Source, Luke)
  - generate dAPI docs from TSDoc
- -  include the Stellar CaaSC protocol to support the SaaS pattern, enabling new 
- projects to be created at the touch of a button.
 
 ## Making your own Cardano MDBook
 
@@ -74,7 +69,7 @@ To make your own on-chain MDBook:
   11.  Check Github Actions, which may require some small configuration at Github, 
   but should otherwise deploy to Github Pages without difficulty.
   
-  If you're not using Github, you can use `next build` and push the resulting static files 
+If you're not using Github, you can use `next build` and push the resulting static files 
   to any static hosting provider.
 
 ## Developing

@@ -192,6 +192,7 @@ const VisualEditor = ({ onChange }: hasChangeHandler) => {
                     onChange(md, diffs);
                     setMarkdown(md);
                 }}
+
                 initialContent={visual.state}
                 classNames={[
                     css`
@@ -256,6 +257,7 @@ const VisualEditor = ({ onChange }: hasChangeHandler) => {
                 ]}
             >
                 <MarkdownToolbar />
+                
             </Remirror>
         </div>
     );
@@ -275,6 +277,7 @@ export const DualEditor = (props: DualEditorProps) => {
 
     const visual = useRemirror({
         extensions,
+
         stringHandler: "markdown",
         content: defaultValue,
     });

@@ -45,6 +45,7 @@ import {
     StellarTxnContext,
     TxInput,
     UutName,
+    ValidatorHash,
     WalletHelper,
     dumpAny,
     helios,
@@ -66,7 +67,7 @@ import { Invitation } from "../../local-comps/book/Invitation.jsx";
 import { hasBookMgr } from "../../local-comps/book/sharedPropTypes.js";
 
 // Helios types
-const { BlockfrostV0, Cip30Wallet, TxChain } = helios;
+const { BlockfrostV0, Cip30Wallet, TxChain, NetworkParams } = helios;
 type hBlockfrost = typeof BlockfrostV0.prototype;
 type hTxChain = typeof TxChain.prototype;
 type hWallet = typeof Cip30Wallet.prototype;
@@ -81,6 +82,32 @@ export type PageStatus = {
     error?: true;
     progressBar?: true | string;
 };
+
+class NetworkParamsWithFeeOverride extends NetworkParams {
+    static withFeeOverride(params: NetParams) : NetworkParamsWithFeeOverride {
+        // return new NetworkParams(params.raw)
+        // create an object wrapping params, with a getter for exFeeParams
+        return new NetworkParamsWithFeeOverride(params);
+    }
+    constructor(params: NetParams) {
+        super(params.raw);
+        const that : NetParams = this;
+        return new Proxy(params, {
+            get(target : NetParams, prop, receiver) {
+                if (prop == "exFeeParams") {
+                    //@ts-expect-error
+                    const { exFeeParams: [ mem, cpu ] } = target;
+                    
+                    return [ mem * 2.5,cpu * 2.5];
+                }
+                if (typeof params[prop] == "function") {
+                    return params[prop].bind(params)
+                }
+                return Reflect.get(params, prop, params);
+            },
+        });
+    }
+}
 
 export type BookPageState = PageStatus & {
     bookContract?: CMDBCapo;
@@ -610,9 +637,10 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
     //  ---- Component setup sequence starts here
     //  -- step 1: get blockfrost's network params
     async componentDidMount() {
-        const networkParams: NetParams = await this.bf.getParameters();
-        console.log("ok: got blockfrost network params");
-
+        const networkParams: NetParams = NetworkParamsWithFeeOverride.withFeeOverride(
+            await this.bf.getParameters()
+        )
+        
         if ("undefined" != typeof window) {
             if (window.localStorage.getItem("autoConnect")) {
                 await this.connectWallet();
@@ -634,7 +662,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
     async componentWillUnmount() {
         this._unmounted = true;
         console.error("cMDBook unmounted"); // not really an error
-        debugger;
+        
     }
 
     newWalletSelected(selectedWallet: string = "eternl") {
@@ -792,6 +820,10 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
 
     // -- step 3 - check if the book contract is ready for use
     async connectBookContract(autoNext = true, reset?: "reset") {
+        // const priorVH = "b30c39d09103f5ed3588adc9179cb957137ffa79568e6a5dfda4e317"
+        // const addr = helios.Address.fromHashes(new helios.ValidatorHash(priorVH))
+        // window.alert(addr.toBech32())
+
         const [route] = this.currentRoute;
         if ("create" == route || "edit" == route) {
             await this.connectWallet();
@@ -879,6 +911,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
 
     //  -- step 3a - initialize the registry if needed
     async bootstrapBookContract() {
+
         if (!this.state.wallet) await this.connectWallet();
 
         await this.connectBookContract(false, "reset");
@@ -931,17 +964,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         );
         try {
             await bookContract.submit(tcx);
-            const refScript = tcx.state.futureTxns.refScriptMintDelegate;
-            await this.updateState(
-                `loading additional txn to wallet: ${refScript.description}`,
-                {
-                    tcx: refScript.tx,
-                    progressBar: true,
-                    moreInstructions: refScript.moreInfo,
-                },
-                "//push refScript txn to wallet"
-            );
-            await bookContract.submit(refScript.tx);
             console.warn(
                 "------------------- Boostrapped Config -----------------------\n",
                 tcx.state.bootstrappedConfig,
@@ -953,12 +975,37 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                     "cmdbConfig",
                     JSON.stringify(tcx.state.bootstrappedConfig)
                 );
-                return this.updateState(
+                await this.updateState(
                     "Okay: self-deployed dev-time config.  It might take 10-20s for the charter to be found on-chain",
                     {
                         clearAfter: 5000,
+                        moreInstructions: "Next: will create 3x onchain reference scripts"
                     },
                     "//stored bootstrapped config in localStorage"
+                );
+                await new Promise(res => setTimeout(res, 5000));
+            }
+        
+            let i = 1;
+            const n = [...Object.keys(tcx.state.addlTxns)] .length
+            await bookContract.submitAddlTxns(tcx, async (addlTxn) => {
+                await this.updateState(
+                    `(${i++} of ${n}): loading txn to wallet: ${addlTxn.description}`,
+                    {
+                        tcx: addlTxn.tcx,
+                        progressBar: true,
+                        moreInstructions: addlTxn.moreInfo,
+                    },
+                    `///push ${addlTxn.description} txn to wallet`
+                );    
+            })
+            if ("development" == process.env.NODE_ENV) {
+                return this.updateState(
+                    `Dev-time config and refScripts submitted.  The refScripts will be found on-chain in 10-20 seconds.`,
+                    {
+                        clearAfter: 5000,
+                    },
+                    "/// acknowledge dev-time config and refScripts submitted"
                 );
             }
 

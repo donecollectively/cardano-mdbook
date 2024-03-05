@@ -128,6 +128,7 @@ export type ChangeDetails = {
 } & (
     | {
           isCurrent: true;
+          baseEntry: undefined
       }
     | {
           isCurrent: false;
@@ -162,7 +163,7 @@ export type BookIndex = Record<string, BookIndexEntry>;
 type isBurningSuggestions = { state: { burningSuggestions: UutName[] } };
 
 export class CMDBCapo extends DefaultCapo {
-    devGen = 6n;
+    devGen = 8n;
 
     get specializedCapo() {
         return mkHeliosModule(
@@ -477,7 +478,7 @@ export class CMDBCapo extends DefaultCapo {
         }
         type txidString = string;
         const staleEntriesByTxId: Record<txidString, BookEntryForUpdate> = {};
-
+        let staleFetches = 0, staleFetchTime = 0;
         // with a list of changes for each page-id, we can make a change-list for each page.
         for (const [eid, { pageEntry, pendingChanges }] of Object.entries(
             pageIndex
@@ -494,8 +495,10 @@ export class CMDBCapo extends DefaultCapo {
                     pendingChanges.push({
                         change,
                         isCurrent: true,
+                        baseEntry: undefined,
                     });
                 } else {
+                    const now = Date.now();
                     const utxo = await this.network.getUtxo(
                         new helios.TxOutputId([pTxId, pTxIdx])
                     );
@@ -506,6 +509,7 @@ export class CMDBCapo extends DefaultCapo {
                     );
                     let changeBaseEntry = staleEntriesByTxId[staleEntryKey];
                     if (!changeBaseEntry) {
+                        staleFetches ++
                         const prevDatum = await this.readBookEntry(utxo);
                         if (!prevDatum)
                             throw new Error(
@@ -514,7 +518,7 @@ export class CMDBCapo extends DefaultCapo {
                         changeBaseEntry = staleEntriesByTxId[staleEntryKey] =
                             prevDatum;
                     }
-
+                    staleFetchTime += Date.now() - now;
                     pendingChanges.push({
                         change,
                         isCurrent: false,
@@ -524,6 +528,9 @@ export class CMDBCapo extends DefaultCapo {
             }
         }
         console.log("Book entry index: ", pageIndex);
+        if (staleFetches) {
+            console.log("Spent ", staleFetchTime, "ms fetching", staleFetches, "stale entries");
+        }
         return pageIndex;
     }
 
@@ -623,11 +630,12 @@ export class CMDBCapo extends DefaultCapo {
 
         if (ownerCollabInfo) {
             const tcx1 = await this.txnAddUserCollabRole(tcx, ownerCollabInfo);
-            console.log("   🐞 book entry update, with ownership");
-            const tcx2 = tcx1
-                .attachScript(this.compiledScript)
-                .addInput(currentEntryUtxo, activity)
-                .validFor(tenMinutes);
+            console.log("   🐞🐞 book entry update, with ownership");
+
+            const tcx2 = await this.txnAttachScriptOrRefScript(
+                tcx1.addInput(currentEntryUtxo, activity)
+                    .validFor(tenMinutes)
+            );
 
             entryForUpdate.updated.updatedBy = ownerCollabInfo.uut.name;
             return this.txnReceiveBookEntry(tcx2, entryForUpdate);
@@ -648,14 +656,14 @@ export class CMDBCapo extends DefaultCapo {
             }
             const tcx2 = await this.txnAddUserCollabRole(tcx1, collabInfo);
             console.log(
-                "   🐞 added editor collab role",
+                "   🐞🐞 added editor collab role",
                 dumpAny(tcx2, this.networkParams)
             );
 
-            const tcx3 = tcx2
-                .attachScript(this.compiledScript)
-                .addInput(currentEntryUtxo, activity)
-                .validFor(tenMinutes);
+            const tcx3 = await this.txnAttachScriptOrRefScript(
+                 tcx2.addInput(currentEntryUtxo, activity)
+                    .validFor(tenMinutes)
+            );
 
             entryForUpdate.updated.updatedBy = collabInfo.uut.name;
             return this.txnReceiveBookEntry(tcx3, entryForUpdate);
@@ -738,19 +746,14 @@ export class CMDBCapo extends DefaultCapo {
             // const p2old = pOld.split("\n").splice(4).join("\n");
 
             // uses diff-match-patch library
-            const diffs = differ.diff_main(contentBefore, newContent);
-            differ.diff_cleanupSemantic(diffs);
-
-            const pNew = differ.patch_toText(
-                differ.patch_make(contentBefore, diffs)
-            );
+            const { patch, diffs } = this.mkPatch(contentBefore, newContent);
 
             // const sp = structuredPatch(id, id, contentBefore, newContent, "", "", options);
             // const [ppOld] = parsePatch(p2old); // works fine; VERY similar to result of structuredPatch
             // const patchedOld = applyPatch(contentBefore, p2old);
             // uses diff-match-patch library
             const [updatedText, successes] = differ.patch_apply(
-                differ.patch_fromText(pNew),
+                differ.patch_fromText(patch),
                 contentBefore
             ) as [string, boolean[]];
 
@@ -763,7 +766,7 @@ export class CMDBCapo extends DefaultCapo {
             // }
             if (false === successes.find((x) => !x)) {
                 console.error({ contentBefore });
-                console.error({ patch: pNew });
+                console.error({ patch: patch });
                 console.error({ diffs });
                 console.error({
                     expected: newContent,
@@ -781,10 +784,20 @@ export class CMDBCapo extends DefaultCapo {
                 throw new Error(`patch doesn't produce expected result`);
             }
 
-            diffUpdate.content = pNew;
+            diffUpdate.content = patch;
         }
 
         return this.mkTxnCreatingBookEntry(diffUpdate);
+    }
+
+    mkPatch(contentBefore: string, newContent: string, diffTool = differ) {
+        const diffs = diffTool.diff_main(contentBefore, newContent);
+        diffTool.diff_cleanupSemantic(diffs);
+
+        const patchText = diffTool.patch_toText(
+            diffTool.patch_make(contentBefore, diffs)
+        );
+        return { patch: patchText, diffs };
     }
 
     async mkTxnAcceptingPageChanges(
@@ -877,9 +890,10 @@ export class CMDBCapo extends DefaultCapo {
             burningSuggestions
         );
     }
-    applyPatch(patchText: string, content: string) {
-        const [patched, successes] = differ.patch_apply(
-            differ.patch_fromText(patchText),
+    applyPatch(patchText: string, content: string, diffTool=differ) {
+        const patch = diffTool.patch_fromText(patchText);
+        const [patched, successes] = diffTool.patch_apply(
+            patch,
             content
         ) as [string, boolean[]];
 
@@ -1135,11 +1149,13 @@ export class CMDBCapo extends DefaultCapo {
         const tcx = await this.addSeedUtxo(new StellarTxnContext(this.myActor));
 
         const mintDelegate = await this.getMintDelegate();
+        
         const tcx2 = await this.txnMintingUuts(tcx, ["collab"], {
             mintDelegateActivity: mintDelegate.activityMintingCollaboratorToken(
                 tcx.getSeedAttrs()
-            ),
-        });
+                ),
+            });
+        console.log("   🐞🐞🐞🐞🐞🐞🐞🐞🐞🐞🐞 mintingUUTs  ^^^")
         return tcx2.addOutput(
             new helios.TxOutput(
                 addr,
