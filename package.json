@@ -35,9 +35,8 @@
     "overrides": {},
     "browserslist": "defaults, not ie <= 11",
     "dependencies": {
-        "@cardano-after-dark/dred-client": "../dred/src/client",
         "@docsearch/react": "^3.5.1",
-        "@donecollectively/stellar-contracts": "../stellar-contracts",
+        "@donecollectively/stellar-contracts": "github:donecollectively/stellar-contracts#d3b7f9a",
         "@emotion/css": "^11.11.2",
         "@headlessui/react": "^1.7.15",
         "@manuscripts/prosemirror-recreate-steps": "^0.1.4",

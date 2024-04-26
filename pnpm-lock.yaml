@@ -5,15 +5,12 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
-  '@cardano-after-dark/dred-client':
-    specifier: ../dred/src/client
-    version: link:../dred/src/client
   '@docsearch/react':
     specifier: ^3.5.1
     version: 3.5.1(@algolia/client-search@4.18.0)(@types/react@18.2.22)(react-dom@18.2.0)(react@18.2.0)(search-insights@2.13.0)
   '@donecollectively/stellar-contracts':
-    specifier: ../stellar-contracts
-    version: link:../stellar-contracts
+    specifier: github:donecollectively/stellar-contracts#d3b7f9a
+    version: github.com/donecollectively/stellar-contracts/d3b7f9a
   '@emotion/css':
     specifier: ^11.11.2
     version: 11.11.2
@@ -5128,7 +5125,6 @@ packages:
     engines: {node: '>=10'}
     dependencies:
       yallist: 4.0.0
-    dev: true
 
   /magic-string@0.30.3:
     resolution: {integrity: sha512-B7xGbll2fG/VjP+SWg4sX3JynwIU0mjoTc6MPpKNuIvftk6u6vqhDnk1R80b8C2GBR6ywqy+1DcKBrevBg+bmw==}
@@ -6278,7 +6274,6 @@ packages:
     hasBin: true
     dependencies:
       lru-cache: 6.0.0
-    dev: true
 
   /shebang-command@2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
@@ -6941,7 +6936,6 @@ packages:
 
   /yallist@4.0.0:
     resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
-    dev: true
 
   /yaml@1.10.2:
     resolution: {integrity: sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==}
@@ -6968,3 +6962,11 @@ packages:
     resolution: {integrity: sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==}
     engines: {node: '>=12.20'}
     dev: true
+
+  github.com/donecollectively/stellar-contracts/d3b7f9a:
+    resolution: {tarball: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/d3b7f9a}
+    name: '@donecollectively/stellar-contracts'
+    version: 0.9.0-alpha2
+    dependencies:
+      semver: 7.5.4
+    dev: false

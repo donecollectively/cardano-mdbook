@@ -1,4 +1,4 @@
-import { hasStateChannel } from "@cardano-after-dark/dred-client";
+// import { hasStateChannel } from "@cardano-after-dark/dred-client";
 
 import type {
     SeedTxnParams,
