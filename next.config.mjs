@@ -10,7 +10,7 @@ if (!process.env.BASE_PATH.startsWith('/')) throw new Error(`BASE_PATH must star
 if (process.env.BASE_PATH == '/cardano-mdbook') {
     //!!! developing the Cardano-mdbook infrastructure?
     //   set this environment variable to enable local development.
-    if (!process.env.CMDBook) {
+    if (!process.env.CMDBOOK) {
         throw new Error(`CMDBook: you need to change your repository name and update .env BASE_PATH to suit your project. `)
     }
 }
