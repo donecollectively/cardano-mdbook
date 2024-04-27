@@ -142,7 +142,7 @@ Please feel free to adjust the NextJS site template in `components/Layout.jsx` a
 
 Please use good contribution practices: maintain the style of code as you make changes, keep things clean, and submit the smallest surgical changes.  Thanks!
 
-When you run the development server, use `CMDBook=1 pnpm dev` to signal the dev server that you're working on the CMDBook project, not your own book based on the project.
+When you run the development server, use `CMDBOOK=1 pnpm dev` to signal the dev server that you're working on the CMDBook project, not your own book based on the project.
 
 ## Some Links
 

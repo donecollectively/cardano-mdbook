@@ -73,9 +73,6 @@ jobs:
                   CMDBOOK: ${{  vars.CMDBOOK }}
             - name: Static HTML export with Next.js
               run: ${{ steps.detect-package-manager.outputs.runner }} next export
-              env:
-                  BASE_PATH: ${{ vars.BASE_PATH }}
-                  CMDBOOK: ${{  vars.CMDBOOK }}
             - name: Upload artifact
               uses: actions/upload-pages-artifact@v3
               with:
