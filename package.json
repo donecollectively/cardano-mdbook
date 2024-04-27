@@ -36,7 +36,7 @@
     "browserslist": "defaults, not ie <= 11",
     "dependencies": {
         "@docsearch/react": "^3.5.1",
-        "@donecollectively/stellar-contracts": "github:donecollectively/stellar-contracts#d3b7f9a",
+        "@donecollectively/stellar-contracts": "github:donecollectively/stellar-contracts#dba21e2",
         "@emotion/css": "^11.11.2",
         "@headlessui/react": "^1.7.15",
         "@manuscripts/prosemirror-recreate-steps": "^0.1.4",
