@@ -863,7 +863,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                 network: this.bfFast,
                 networkParams,
                 myActor: wallet,
-                isDev: "development" == process.env.NODE_ENV,
+                isDev: true // "development" == process.env.NODE_ENV,
                 // optimize: true,
             },
             // partialConfig: {},
