@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: "20"
           cache: ${{ steps.detect-package-manager.outputs.manager }}
-      - name:Preinstall PNPM
+      - name: Preinstall PNPM
         run: npm i -g pnpm@7.29     
       - name: Detect package manager
         id: detect-package-manager
