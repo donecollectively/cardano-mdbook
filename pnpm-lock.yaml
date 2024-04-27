@@ -12,8 +12,8 @@ importers:
         specifier: ^3.5.1
         version: 3.5.1(@algolia/client-search@4.18.0)(@types/react@18.2.22)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(search-insights@2.13.0)
       '@donecollectively/stellar-contracts':
-        specifier: github:donecollectively/stellar-contracts#dba21e2
-        version: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/dba21e2
+        specifier: github:donecollectively/stellar-contracts#1d6f199
+        version: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/1d6f199
       '@emotion/css':
         specifier: ^11.11.2
         version: 11.11.2
@@ -380,8 +380,8 @@ packages:
       react-dom:
         optional: true
 
-  '@donecollectively/stellar-contracts@https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/dba21e2':
-    resolution: {tarball: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/dba21e2}
+  '@donecollectively/stellar-contracts@https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/1d6f199':
+    resolution: {tarball: https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/1d6f199}
     version: 0.9.0-alpha3
 
   '@emotion/babel-plugin@11.11.0':
@@ -3842,7 +3842,7 @@ snapshots:
       - '@algolia/client-search'
       - search-insights
 
-  '@donecollectively/stellar-contracts@https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/dba21e2':
+  '@donecollectively/stellar-contracts@https://codeload.github.com/donecollectively/stellar-contracts/tar.gz/1d6f199':
     dependencies:
       semver: 7.5.4
 
