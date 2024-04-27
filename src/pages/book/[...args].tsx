@@ -10,16 +10,16 @@
 
 //!!! comment out the following block while using the "null" config.
 const CMDB_BookContractConfig = {
-    mph: {
-        bytes: "3999de477a809eaa6f97ecb2c81f52d479e71ade973233c4ddb59b88",
-    },
+    mph: { bytes: "1caa8526c25066237f4d1e5e271790fa7de0bc286c1b39ccac076f92" },
     rev: "1",
+    isDev: true,
+    devGen: "8",
     seedTxn: {
-        bytes: "ac18fe4b7e818d48865aae253db7d705e3f0f313f59579308fea05544aefa650",
+        bytes: "ebea3b3fe691b71fa254682e9232ab14540ea694c13945ac41d32c6487c1e21e",
     },
-    seedIndex: "3",
+    seedIndex: "5",
     rootCapoScriptHash: {
-        bytes: "05190835706da6ad2acfbb62c8b814681e8d1510a9d04b48067745af",
+        bytes: "d3b181cdf036c70178ae4763a0a50f2f829cf8a50abdc59c41958d17",
     },
 };
 
