@@ -37,7 +37,7 @@ jobs:
                   node-version: "20"
                   cache: ${{ steps.detect-package-manager.outputs.manager }}
             - name: Preinstall PNPM
-              run: npm i -g pnpm@7.29
+              run: npm i -g pnpm@9.0.6
             - name: Detect package manager
               id: detect-package-manager
               run: |
@@ -54,8 +54,6 @@ jobs:
               # You may remove this line if you want to manage the configuration yourself.
               # static_site_generator: next
               # generator_config_file: "./next.config.mjs"
-            - name: Install PNPM
-              run: npm i -g pnpm@7.29
             - name: Restore cache
               uses: actions/cache@v4
               with:
