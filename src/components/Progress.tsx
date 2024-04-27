@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { Prose } from "@/components/Prose.jsx";
 
 export const Progress: React.FC<any> = ({ children }) => {
     return (

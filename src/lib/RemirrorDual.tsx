@@ -35,7 +35,7 @@ import {
     UseRemirrorReturn,
 } from "@remirror/react";
 import { MarkdownEditor } from "@remirror/react-editors/markdown";
-import { RemirrorDiffCaptureExtension } from "./RemirrorDiffCaptureExtension.js";
+// import { RemirrorDiffCaptureExtension } from "./RemirrorDiffCaptureExtension.ts.xxx";
 
 function mkSpace(n: number) {
     return `${0.5 * n}rem`;

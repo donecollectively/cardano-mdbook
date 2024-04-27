@@ -30,7 +30,7 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      // "@/*": ["src/*"]
+      "@/*": ["src/*"]
       //   "@donecollectively/stellar-contracts": [
       //     "node_modules/@donecollectively/stellar-contracts"
       //   ]
@@ -52,7 +52,8 @@
     "src/**/*.js",
     "src/**/*.jsx",
     "tests/**/*.ts"
-  ],
+
+],
   "exclude": [
     "node_modules"
   ]

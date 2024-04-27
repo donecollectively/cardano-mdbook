@@ -84,24 +84,25 @@ export type PageStatus = {
 };
 
 class NetworkParamsWithFeeOverride extends NetworkParams {
-    static withFeeOverride(params: NetParams) : NetworkParamsWithFeeOverride {
+    static withFeeOverride(params: NetParams): NetworkParamsWithFeeOverride {
         // return new NetworkParams(params.raw)
         // create an object wrapping params, with a getter for exFeeParams
         return new NetworkParamsWithFeeOverride(params);
     }
     constructor(params: NetParams) {
         super(params.raw);
-        const that : NetParams = this;
+        const that: NetParams = this;
         return new Proxy(params, {
-            get(target : NetParams, prop, receiver) {
+            get(target: NetParams, prop, receiver) {
                 if (prop == "exFeeParams") {
-                    //@ts-expect-error
-                    const { exFeeParams: [ mem, cpu ] } = target;
-                    
-                    return [ mem * 2.5,cpu * 2.5];
+                    const {
+                        exFeeParams: [mem, cpu],
+                    } = target;
+
+                    return [mem * 2.5, cpu * 2.5];
                 }
                 if (typeof params[prop] == "function") {
-                    return params[prop].bind(params)
+                    return params[prop].bind(params);
                 }
                 return Reflect.get(params, prop, params);
             },
@@ -408,7 +409,7 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             }
         } else if ("view" == route) {
             // status = "";
-            const [ id, changeId ] = arg2.split("+");
+            const [id, changeId] = arg2.split("+");
             const entry = this.state.bookEntryIndex[id];
             const change = entry.pendingChanges.find(
                 (x) => x.change.id == changeId
@@ -520,12 +521,14 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
         this.props.router.push("/book/invite", "", { shallow: true });
     }
 
-    goViewPage(id: string, change? : string) {
-        this.props.router.push(this.pageViewUrl(id, change), "", { shallow: true });
+    goViewPage(id: string, change?: string) {
+        this.props.router.push(this.pageViewUrl(id, change), "", {
+            shallow: true,
+        });
     }
 
-    pageViewUrl(id: string, change? : string) {
-        const frag = change ? `${id}+${change}`: id;
+    pageViewUrl(id: string, change?: string) {
+        const frag = change ? `${id}+${change}` : id;
         const be = this.state.bookEntryIndex[id];
         const title = be.pageEntry.entry.title;
         // convert characters in title to be SEO friendly:
@@ -637,10 +640,11 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
     //  ---- Component setup sequence starts here
     //  -- step 1: get blockfrost's network params
     async componentDidMount() {
-        const networkParams: NetParams = NetworkParamsWithFeeOverride.withFeeOverride(
-            await this.bf.getParameters()
-        )
-        
+        const networkParams: NetParams =
+            NetworkParamsWithFeeOverride.withFeeOverride(
+                await this.bf.getParameters()
+            );
+
         if ("undefined" != typeof window) {
             if (window.localStorage.getItem("autoConnect")) {
                 await this.connectWallet();
@@ -662,7 +666,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
     async componentWillUnmount() {
         this._unmounted = true;
         console.error("cMDBook unmounted"); // not really an error
-        
     }
 
     newWalletSelected(selectedWallet: string = "eternl") {
@@ -911,7 +914,6 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
 
     //  -- step 3a - initialize the registry if needed
     async bootstrapBookContract() {
-
         if (!this.state.wallet) await this.connectWallet();
 
         await this.connectBookContract(false, "reset");
@@ -979,26 +981,29 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
                     "Okay: self-deployed dev-time config.  It might take 10-20s for the charter to be found on-chain",
                     {
                         clearAfter: 5000,
-                        moreInstructions: "Next: will create 3x onchain reference scripts"
+                        moreInstructions:
+                            "Next: will create 3x onchain reference scripts",
                     },
                     "//stored bootstrapped config in localStorage"
                 );
-                await new Promise(res => setTimeout(res, 5000));
+                await new Promise((res) => setTimeout(res, 5000));
             }
-        
+
             let i = 1;
-            const n = [...Object.keys(tcx.state.addlTxns)] .length
+            const n = [...Object.keys(tcx.state.addlTxns)].length;
             await bookContract.submitAddlTxns(tcx, async (addlTxn) => {
                 await this.updateState(
-                    `(${i++} of ${n}): loading txn to wallet: ${addlTxn.description}`,
+                    `(${i++} of ${n}): loading txn to wallet: ${
+                        addlTxn.description
+                    }`,
                     {
                         tcx: addlTxn.tcx,
                         progressBar: true,
                         moreInstructions: addlTxn.moreInfo,
                     },
                     `///push ${addlTxn.description} txn to wallet`
-                );    
-            })
+                );
+            });
             if ("development" == process.env.NODE_ENV) {
                 return this.updateState(
                     `Dev-time config and refScripts submitted.  The refScripts will be found on-chain in 10-20 seconds.`,

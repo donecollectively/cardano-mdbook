@@ -33,7 +33,6 @@ const {
     Value,
     TxOutput,
     Datum,
-    //@ts-expect-error
     Option,
     TxOutputId,
 } = helios;
@@ -43,7 +42,7 @@ import specializedCapo from "./specializedCMDBCapo.hl"; // assert { type: 'text'
 
 import { CMDBMintDelegate } from "./CMDBMintDelegate.js";
 import { CMDBController } from "./CMDBController.js";
-import { EditorStateChannel } from "../EditorStateChannel.js";
+// import { EditorStateChannel } from "../EditorStateChannel.ts.xxx";
 import { diff_match_patch as dmp } from "../diff-match-patch-uncompressed.js";
 
 const differ = new dmp();
@@ -283,7 +282,7 @@ export class CMDBCapo extends DefaultCapo {
         }
         const OptTxId = Option(helios.TxId);
         const OptIndex = Option(helios.HInt);
-        //@ts-expect-error
+
         const OptString = Option(helios.HString);
         const ownerAuthority = this.mkOnchainDelegateLink(d.ownerAuthority);
         const bookEntryStruct = new hlBookEntryStruct(
