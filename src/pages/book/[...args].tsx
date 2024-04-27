@@ -12,7 +12,7 @@
 const CMDB_BookContractConfig = {
     mph: { bytes: "1caa8526c25066237f4d1e5e271790fa7de0bc286c1b39ccac076f92" },
     rev: "1",
-    isDev: true,
+    isDev: false,
     devGen: "8",
     seedTxn: {
         bytes: "ebea3b3fe691b71fa254682e9232ab14540ea694c13945ac41d32c6487c1e21e",
