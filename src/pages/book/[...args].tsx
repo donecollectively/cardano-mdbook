@@ -870,6 +870,8 @@ export class BookHomePage extends React.Component<paramsType, BookPageState> {
             ...config,
         };
         try {
+            console.log("init with cfg", cfg);
+            
             const bookContract = await CMDBCapo.createWith(cfg);
             const isConfigured = await bookContract.isConfigured;
             if (!isConfigured) {
