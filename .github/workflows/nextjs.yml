@@ -52,8 +52,8 @@ jobs:
           # server side image optimization (https://nextjs.org/docs/api-reference/next/image#unoptimized).
           #
           # You may remove this line if you want to manage the configuration yourself.
-          static_site_generator: next
-          generator_config_file: "./next.config.mjs"
+          # static_site_generator: next
+          # generator_config_file: "./next.config.mjs"
       - name: Install PNPM
         run: npm i -g pnpm@7.29     
       - name: Restore cache
