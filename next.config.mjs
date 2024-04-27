@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+console.log(process.env);
 
 if (!process.env.BASE_PATH) throw new Error(`BASE_PATH environment variable should be set in .env.development`)
 if (!process.env.BASE_PATH.startsWith('/')) throw new Error(`BASE_PATH must start with a slash (/)`);
